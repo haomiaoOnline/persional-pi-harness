@@ -425,3 +425,55 @@ export interface EffectExecutionResult {
 	reused: boolean;
 	record: EffectRecord;
 }
+
+export interface CommandEvidence {
+	command: string;
+	exit_code: number;
+	stdout: string;
+	stderr: string;
+}
+
+export interface EvidenceRecord {
+	id: string;
+	task_id: string;
+	run_id: string;
+	captured_at: string;
+	diff: {
+		files: string[];
+		digest: string;
+	};
+	commands: CommandEvidence[];
+	stdout: string;
+	stderr: string;
+	test_result?: string;
+	build_result?: string;
+	artifacts: string[];
+	evidence_types: string[];
+}
+
+export interface WorkspaceSnapshot {
+	commit_hash: string;
+	diff_digest: string;
+	artifact_digest: string;
+}
+
+export interface VerificationRecord {
+	id: string;
+	task_id: string;
+	status: VerificationStatus;
+	verification_confidence: VerificationStrength;
+	task_revision: number;
+	commit_hash: string;
+	diff_digest: string;
+	artifact_digest: string;
+	checked_at: string;
+	checks: string[];
+	reasons: string[];
+}
+
+export interface VerificationRecipe {
+	id: string;
+	task_type: string;
+	required: string[];
+	evidence: string[];
+}
