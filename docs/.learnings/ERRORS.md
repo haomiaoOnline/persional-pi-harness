@@ -69,3 +69,38 @@ This callback passed to forEach() iterable method should not return a value.
 - **Notes**: 已改为块体回调，待完整 `npm run check` 重跑确认。
 
 ---
+
+## [ERR-20260913-003] Phase 2 规则覆盖
+
+**Logged**: 2026-09-13T21:29:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: tests
+
+### Summary
+初轮规划测试发现 API 关键词和 `integration` 依赖信号没有覆盖到预期路径。
+
+### Error
+```text
+Expected dispatch mode: DECOMPOSE, received: PARALLEL
+Expected worker tier: standard, received: cheap
+```
+
+### Context
+- Operation: Phase 2 Vitest suite.
+- The deterministic rule table did not treat a standalone API keyword as medium risk.
+- The dependency regex used a prefix with a trailing word boundary and did not match `integration`.
+
+### Suggested Fix
+将 standalone `api` 纳入 API 风险信号，使用完整 `integration/integrate` 依赖词，并覆盖 `deploy to production` 的高风险表达。
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/planning.ts`, `packages/personal-pi/test/planning.test.ts`
+- Tags: phase-2, preclassifier, assessment, dispatch
+
+### Resolution
+- **Resolved**: 2026-09-13T21:30:00+08:00
+- **Notes**: 已补齐规则并继续运行 Phase 2 测试。
+
+---

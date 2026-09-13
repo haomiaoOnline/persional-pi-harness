@@ -228,3 +228,127 @@ export interface PromptPayload {
 	inputs: Record<string, JsonValue>;
 	context: TaskContext;
 }
+
+export type RiskPath = "FAST" | "SLOW";
+export type Workload = "small" | "medium" | "large";
+export type Uncertainty = "low" | "medium" | "high";
+export type DependencyComplexity = "simple" | "complex";
+export type Parallelism = "eligible" | "ineligible";
+export type DispatchMode = "SINGLE_WORKER" | "DECOMPOSE" | "PARALLEL" | "BATCH";
+
+export interface Preclassification {
+	path: RiskPath;
+	reasons: string[];
+	matched_signals: string[];
+	confidence: number;
+}
+
+export interface PreclassifierIncident {
+	task_id: string;
+	predicted_path: RiskPath;
+	missed_signal: string;
+	correction: string;
+	at: string;
+}
+
+export interface TaskAssessment {
+	scope: string[];
+	workload: Workload;
+	risk: RiskLevel;
+	uncertainty: Uncertainty;
+	dependency: DependencyComplexity;
+	parallelism: Parallelism;
+	verification: VerificationStrength;
+	context_budget: number;
+	confidence: number;
+	capability_tags: string[];
+}
+
+export interface DispatchDecision {
+	mode: DispatchMode;
+	worker_tier: WorkerTier;
+	reasoning_depth: ReasoningDepth;
+	candidate_worker_types: WorkerType[];
+	capability_tags: string[];
+	reason: string;
+}
+
+export interface DecisionRecord {
+	id: string;
+	decision_type: string;
+	decision: string;
+	reason: string;
+	inputs: string[];
+	at: string;
+}
+
+export interface RequirementContract {
+	user: string;
+	data_sources: string[];
+	permission_location: string[];
+	delivery: string;
+	acceptance: string[];
+	constraints: string[];
+	unknowns: string[];
+	sustainability: string[];
+	non_functional: string[];
+	commercialization: string[];
+}
+
+export interface ArchitectureCommercialAssessment {
+	scalability: string;
+	security: string;
+	cost: string;
+	extensibility: string;
+	testability: string;
+	business_viability: string;
+	confidence: number;
+	open_risks: string[];
+	playbook_refs: string[];
+}
+
+export interface PlanQualityChecklist {
+	technical_feasibility: boolean;
+	scalability: boolean;
+	commercial_reasonableness: boolean;
+	testability: boolean;
+}
+
+export interface PlanApproval {
+	approved_by: string;
+	action_digest: string;
+	bound_revision: number;
+	expires_at: string;
+}
+
+export interface PlanQualityGateResult {
+	passed: boolean;
+	checklist: PlanQualityChecklist;
+	approval?: PlanApproval;
+	reasons: string[];
+}
+
+export interface CredentialScope {
+	allowed_services: string[];
+	allowed_scopes: string[];
+	forbidden: string[];
+}
+
+export interface RoleProfile {
+	id: string;
+	mission: string;
+	suitable_tasks: string[];
+	ownership_scope: string[];
+	credential_scope: CredentialScope;
+	preferred_tools: string[];
+	prohibited_actions: string[];
+	context_policy: {
+		required: string[];
+		optional: string[];
+	};
+	output_contract: string[];
+	handoff: {
+		downstream: string[];
+	};
+	verifier_profile: string[];
+}
