@@ -10,8 +10,10 @@ import type {
 	DecisionRecord,
 	DispatchRecord,
 	EvidenceRecord,
+	ExecutionTrace,
 	PersistentState,
 	RecoveryDecision,
+	RegressionCase,
 	ResultContract,
 	RoleProfile,
 	RunRecord,
@@ -36,12 +38,24 @@ function emptyState(): PersistentState {
 		decisions: [],
 		role_profiles: [],
 		effects: [],
+		traces: [],
+		regressions: [],
 		snapshots: [],
 	};
 }
 
+function normalizeState(state: Partial<PersistentState>): PersistentState {
+	const base = emptyState();
+	return {
+		...base,
+		...state,
+		traces: state.traces ?? [],
+		regressions: state.regressions ?? [],
+	};
+}
+
 function cloneState(state: PersistentState): PersistentState {
-	return structuredClone(state);
+	return normalizeState(structuredClone(state));
 }
 
 function stateDigest(state: PersistentState): string {
@@ -62,7 +76,7 @@ function loadState(path: string): PersistentState {
 	if (!parsed || typeof parsed !== "object" || (parsed as { version?: unknown }).version !== 1) {
 		throw new Error(`unsupported persistent state at ${path}`);
 	}
-	return parsed as PersistentState;
+	return normalizeState(parsed as Partial<PersistentState>);
 }
 
 export type PersistentStateMutation = (state: PersistentState) => void;
@@ -172,6 +186,23 @@ export class PersistentStateStore {
 
 	addDecision(decision: DecisionRecord): void {
 		this.transact((state) => state.decisions.push(structuredClone(decision)));
+	}
+
+	addTrace(trace: ExecutionTrace): void {
+		this.transact((state) => {
+			const index = state.traces.findIndex((candidate) => candidate.trace_id === trace.trace_id);
+			if (index >= 0) state.traces[index] = structuredClone(trace);
+			else state.traces.push(structuredClone(trace));
+		});
+	}
+
+	getTrace(traceId: string): ExecutionTrace | undefined {
+		const trace = this.state.traces.find((candidate) => candidate.trace_id === traceId);
+		return trace ? structuredClone(trace) : undefined;
+	}
+
+	addRegression(regression: RegressionCase): void {
+		this.transact((state) => state.regressions.push(structuredClone(regression)));
 	}
 
 	addProject(project: { id: string; name: string; working_directory: string }): void {

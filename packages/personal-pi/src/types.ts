@@ -298,6 +298,45 @@ export interface DecisionRecord {
 	at: string;
 }
 
+export type TraceOutcome = "DONE" | "FAILED" | "BLOCKED" | "UNKNOWN";
+
+export interface TraceEvent {
+	stage: string;
+	detail: string;
+	at: string;
+	fields?: Record<string, string | number | boolean>;
+}
+
+export interface TraceMetrics {
+	token_per_task: number;
+	cache_hit_rate: number;
+	worker_tier_distribution: Record<WorkerTier, number>;
+}
+
+export interface ExecutionTrace {
+	trace_id: string;
+	task_id: string;
+	run_id?: string;
+	started_at: string;
+	ended_at?: string;
+	outcome?: TraceOutcome;
+	events: TraceEvent[];
+	decisions: DecisionRecord[];
+	metrics: TraceMetrics;
+	replayable: boolean;
+}
+
+export interface RegressionCase {
+	id: string;
+	category: string;
+	task_id?: string;
+	expected: string;
+	actual: string;
+	evidence_ref?: string;
+	created_at: string;
+	resolved: boolean;
+}
+
 export interface RequirementContract {
 	user: string;
 	data_sources: string[];
@@ -546,6 +585,8 @@ export interface PersistentState {
 	decisions: DecisionRecord[];
 	role_profiles: RoleProfile[];
 	effects: EffectRecord[];
+	traces: ExecutionTrace[];
+	regressions: RegressionCase[];
 	snapshots: Array<Pick<StateSnapshot, "id" | "created_at" | "digest">>;
 }
 

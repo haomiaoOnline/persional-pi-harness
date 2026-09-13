@@ -19,12 +19,14 @@ import { evaluateDefinitionOfReady } from "./readiness.ts";
 import type { VerificationRecipeRegistry } from "./recipes.ts";
 import { validateResultContract } from "./result.ts";
 import { createTaskRecord, TaskStateMachine } from "./state-machine.ts";
+import { createRegressionCase, TraceRecorder } from "./trace.ts";
 import type {
 	ArchitectureCommercialAssessment,
 	DecisionRecord,
 	DispatchDecision,
 	DispatchRecord,
 	EvidenceRecord,
+	ExecutionTrace,
 	PermissionRequest,
 	PlanApproval,
 	PlanQualityChecklist,
@@ -103,6 +105,7 @@ export interface PipelineExecution {
 	dispatch: DispatchDecision;
 	decisions: DecisionRecord[];
 	resolved_context?: ResolvedContext;
+	trace: ExecutionTrace;
 }
 
 export interface PersonalPiPipelineOptions {
@@ -169,6 +172,7 @@ export class PersonalPiPipeline {
 
 	async execute(request: PipelineRequest): Promise<PipelineExecution> {
 		const at = request.at ?? new Date().toISOString();
+		const tracer = new TraceRecorder(request.task.id, undefined, at);
 		if (
 			request.requirement.user.length === 0 ||
 			request.requirement.delivery.length === 0 ||
@@ -176,6 +180,7 @@ export class PersonalPiPipeline {
 		) {
 			throw new PipelineStageError("REQUIREMENT", "Requirement Contract is incomplete");
 		}
+		tracer.record("REQUIREMENT", "Requirement Contract accepted", at);
 
 		const planAssessment =
 			request.plan_assessment ??
@@ -191,17 +196,24 @@ export class PersonalPiPipeline {
 			Date.parse(at),
 		);
 		if (!planGate.passed) throw new PipelineStageError("PLAN_GATE", planGate.reasons.join("; "));
+		tracer.record("PLAN_GATE", "plan quality gate passed", at);
 
 		const preclassification = preclassifyTask({
 			description: `${request.task.title}\n${request.task.objective}\n${request.requirement.delivery}`,
 			files: request.task.scope.files,
 		});
+		tracer.record("PRECLASSIFY", preclassification.path, at);
 		const assessment = crossCheckAssessment(
 			assessTask(request.task.objective, request.task.scope.files),
 			request.task.objective,
 			request.task.scope.files,
 		);
+		tracer.record("ASSESSMENT", `${assessment.risk}/${assessment.workload}`, at);
 		const dispatch = createDispatchDecision(request.task, assessment, request.role_profile);
+		tracer.record("DISPATCH", dispatch.mode, at, {
+			worker_tier: dispatch.worker_tier,
+			reasoning_depth: dispatch.reasoning_depth,
+		});
 		const decisions = [
 			createDecisionRecord(
 				"preclassification",
@@ -219,7 +231,10 @@ export class PersonalPiPipeline {
 			),
 			createDecisionRecord("dispatch_policy", dispatch.mode, dispatch.reason, [request.task.id], at),
 		];
-		for (const decision of decisions) this.stateStore.addDecision(decision);
+		for (const decision of decisions) {
+			this.stateStore.addDecision(decision);
+			tracer.addDecision(decision);
+		}
 
 		let task: TaskRecord;
 		if (request.existing_task) {
@@ -239,6 +254,7 @@ export class PersonalPiPipeline {
 		} else {
 			task = this.stateStore.createTask(request.task);
 		}
+		tracer.record("TASK", "Task Contract persisted", at);
 		const definitionOfReady = evaluateDefinitionOfReady(request.task, true);
 		if (!definitionOfReady.ready) {
 			task = this.stateStore.updateTask(
@@ -275,8 +291,12 @@ export class PersonalPiPipeline {
 		task = this.stateStore.updateTask(
 			new TaskStateMachine().transition(task, "RUNNING", "dispatch policy accepted", at),
 		);
+		tracer.record("DOR", "Definition of Ready passed", at);
+		tracer.record("WORKER", request.worker.worker_id, at);
 		const lease = this.leaseManager.acquire(task.id, request.worker.worker_id, at);
 		const run = this.stateStore.createRun(task.id, request.worker.worker_id, lease.lease_epoch, at);
+		tracer.attachRun(run.id);
+		tracer.record("RUN", "Run created", at);
 		this.stateStore.addDispatch({
 			id: randomUUID(),
 			task_id: task.id,
@@ -306,6 +326,7 @@ export class PersonalPiPipeline {
 			throw new PipelineStageError("RESULT", "Worker result rejected by fencing lease", task.id);
 		}
 		this.stateStore.saveResult(result, at);
+		tracer.record("RESULT", result.status, at);
 
 		const evidence = this.evidenceCollector.collect({
 			task_id: task.id,
@@ -318,6 +339,7 @@ export class PersonalPiPipeline {
 			captured_at: at,
 		});
 		this.stateStore.saveEvidence(evidence);
+		tracer.record("EVIDENCE", "Evidence recorded", at);
 		task = this.stateStore.updateTask(
 			new TaskStateMachine().transition(task, "VERIFYING", "Result and Evidence recorded", at),
 		);
@@ -334,15 +356,16 @@ export class PersonalPiPipeline {
 		};
 		const verification = await this.verificationEngine.verify(verificationRequest);
 		this.stateStore.saveVerification(verification);
-		this.stateStore.addDecision(
-			createDecisionRecord(
-				"verification",
-				verification.status,
-				verification.reasons.join("; ") || "checks passed",
-				[verification.id],
-				at,
-			),
+		const verificationDecision = createDecisionRecord(
+			"verification",
+			verification.status,
+			verification.reasons.join("; ") || "checks passed",
+			[verification.id],
+			at,
 		);
+		this.stateStore.addDecision(verificationDecision);
+		tracer.addDecision(verificationDecision);
+		tracer.record("VERIFICATION", verification.status, at);
 
 		if (verification.status === "PASS" && result.status === "success") {
 			task = this.acceptanceGate.markDone(task, verification, request.current_snapshot ?? request.snapshot);
@@ -359,7 +382,28 @@ export class PersonalPiPipeline {
 			);
 		}
 		this.stateStore.updateTask(task);
+		if (task.state !== "DONE") {
+			this.stateStore.addRegression(
+				createRegressionCase({
+					category: "pipeline_failure",
+					task_id: task.id,
+					expected: "DONE",
+					actual: task.state,
+					evidence_ref: evidence.id,
+					created_at: at,
+				}),
+			);
+		}
 		this.leaseManager.release(lease);
+		tracer.record("ACCEPTANCE", task.state, at);
+		tracer.setMetrics({
+			token_per_task: resolvedContext?.total_tokens ?? 0,
+			cache_hit_rate: resolvedContext?.cache_hit ? 1 : 0,
+			worker_tier: request.task.execution.worker_tier,
+		});
+		tracer.finish(task.state === "DONE" ? "DONE" : task.state === "BLOCKED" ? "BLOCKED" : "FAILED", at);
+		const trace = tracer.snapshot();
+		this.stateStore.addTrace(trace);
 		return {
 			task,
 			run: this.stateStore.getRuns(task.id).find((candidate) => candidate.id === run.id) ?? run,
@@ -375,6 +419,7 @@ export class PersonalPiPipeline {
 				...this.stateStore.read().decisions.filter((decision) => decision.inputs.includes(verification.id)),
 			],
 			resolved_context: resolvedContext,
+			trace,
 		};
 	}
 }

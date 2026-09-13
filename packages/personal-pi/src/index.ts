@@ -20,6 +20,7 @@ export * from "./routines.ts";
 export * from "./schema.ts";
 export * from "./security.ts";
 export * from "./state-machine.ts";
+export * from "./trace.ts";
 export * from "./triggers.ts";
 export * from "./types.ts";
 export * from "./verification.ts";

@@ -751,4 +751,68 @@ lint/suspicious/noImplicitAnyLet
 - **Resolved**: 2026-09-13T22:49:00+08:00
 - **Notes**: 已补显式类型注解。
 
+## [ERR-20260913-023] Phase 11 baseline attempt count
+
+**Logged**: 2026-09-13T23:00:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: test
+
+### Summary
+Phase 11 baseline acceptance test showed that `attempts` was storing a zero-based loop index instead of the actual number of executor attempts.
+
+### Error
+```text
+expected 2 to be received 1
+```
+
+### Context
+- Operation: `npm test --workspace=@personal-pi/core`
+- Cause: `SingleAgentBaselineRunner` increments its loop counter after the success break.
+- Impact: baseline reports undercount first-pass and retry attempts.
+
+### Suggested Fix
+Increment the attempt counter before each executor call and persist that one-based count in `BaselineCaseReport`.
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/trace.ts`, `packages/personal-pi/test/trace.test.ts`
+- Tags: phase-11, baseline, metrics
+
+### Resolution
+- **Resolved**: 2026-09-13T23:02:00+08:00
+- **Notes**: 已改为执行器调用前递增计数，BaselineCaseReport 现在记录从 1 开始的实际尝试次数；99/99 包测试与构建通过。
+
+## [ERR-20260913-024] Phase 11 UUID default parameter narrowing
+
+**Logged**: 2026-09-13T23:04:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: build
+
+### Summary
+The repository Stage Gate exposed an unintended TypeScript narrowing on Phase 11 test identifiers.
+
+### Error
+```text
+Argument of type '"trace-1"' is not assignable to parameter of type UUID template literal
+```
+
+### Context
+- Operation: `npm run check`
+- Cause: default parameters initialized with `randomUUID()` inferred a UUID-shaped parameter type.
+- Impact: callers could not supply ordinary stable trace or baseline IDs in tests and integrations.
+
+### Suggested Fix
+Annotate the public `traceId` and `baselineId` parameters as `string` while retaining UUID generation as the default.
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/trace.ts`, `packages/personal-pi/test/trace.test.ts`
+- Tags: phase-11, typescript, api
+
+### Resolution
+- **Resolved**: 2026-09-13T23:05:00+08:00
+- **Notes**: 已显式标注公共参数为 string；包级测试保持通过，后续仓库检查仅保留已知 upstream TS2322。
+
 ---
