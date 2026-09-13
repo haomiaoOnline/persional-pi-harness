@@ -352,3 +352,76 @@ export interface RoleProfile {
 	};
 	verifier_profile: string[];
 }
+
+export type ResultStatus = "success" | "failure" | "timeout" | "INSUFFICIENT_CONTEXT";
+
+export interface ResultContract {
+	task_id: string;
+	run_id: string;
+	worker_id: string;
+	lease_epoch: number;
+	status: ResultStatus;
+	summary: string;
+	changed_files: string[];
+	artifacts: string[];
+	evidence: string[];
+	errors: string[];
+	requested_context?: string[];
+}
+
+export interface BatchResultItem {
+	task_id: string;
+	status: ResultStatus;
+	changed_files: string[];
+	artifacts: string[];
+	evidence: string[];
+	errors: string[];
+	requested_context?: string[];
+}
+
+export interface BatchResultEnvelope {
+	batch_id: string;
+	worker_id: string;
+	lease_epoch: number;
+	results: BatchResultItem[];
+}
+
+export interface WorkerProtocolRequest {
+	task: TaskContract;
+	protocol: ProtocolEnvelope;
+	role_profile?: RoleProfile;
+	requested_actions?: string[];
+	run_id?: string;
+}
+
+export interface WorkerExecutionInput {
+	prompt: PromptPayload;
+	role_profile?: RoleProfile;
+	requested_actions: string[];
+}
+
+export interface WorkerExecutionOutput {
+	status: ResultStatus;
+	summary: string;
+	changed_files?: string[];
+	artifacts?: string[];
+	evidence?: string[];
+	errors?: string[];
+	requested_context?: string[];
+}
+
+export interface EffectRecord {
+	idempotency_key: string;
+	action_digest: string;
+	target: string;
+	status: "pending" | "committed" | "failed";
+	reversible: boolean;
+	compensation_action?: string;
+	updated_at: string;
+}
+
+export interface EffectExecutionResult {
+	committed: boolean;
+	reused: boolean;
+	record: EffectRecord;
+}
