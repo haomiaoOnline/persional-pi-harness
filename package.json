@@ -37,6 +37,8 @@
 		"profile:tui": "node scripts/profile-coding-agent-node.mjs --mode tui",
 		"profile:rpc": "node scripts/profile-coding-agent-node.mjs --mode rpc",
 		"test": "npm run test:scripts && npm run test --workspaces --if-present",
+		"test:personal-pi-regression": "node scripts/personal-pi-regression-suite.mjs",
+		"gate:upstream-upgrade": "node scripts/upstream-upgrade-gate.mjs",
 		"test:scripts": "node --test scripts/*.test.mjs",
 		"version:patch": "npm version patch --workspaces --no-git-tag-version --no-workspaces-update && node scripts/sync-versions.js && npm install --package-lock-only --ignore-scripts",
 		"version:minor": "npm version minor --workspaces --no-git-tag-version --no-workspaces-update && node scripts/sync-versions.js && npm install --package-lock-only --ignore-scripts",

@@ -1,0 +1,16 @@
+{
+	"schemaVersion": 1,
+	"entries": [
+		{
+			"id": "pi-client-unix-agent-core-entry",
+			"packageName": "@earendil-works/pi-client",
+			"testFile": "test/unix.test.ts",
+			"kind": "suite",
+			"testName": null,
+			"errorType": "Error",
+			"message": "Failed to resolve entry for package \"@earendil-works/pi-agent-core\". The package may have incorrect main/module/exports specified in its package.json.",
+			"expectedCount": 1,
+			"reason": "Upstream test-only baseline: the client suite resolves the unbuilt workspace package entry before a build step."
+		}
+	]
+}

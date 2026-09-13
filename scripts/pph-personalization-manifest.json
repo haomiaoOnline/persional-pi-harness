@@ -1,0 +1,27 @@
+{
+	"schemaVersion": 1,
+	"ownedFiles": [
+		".learnings/ERRORS.md",
+		"package.json",
+		"packages/coding-agent/install-lock/package-lock.json",
+		"packages/coding-agent/npm-shrinkwrap.json",
+		"packages/coding-agent/package.json",
+		"packages/coding-agent/test/config.test.ts",
+		"packages/coding-agent/test/package-distribution.test.ts",
+		"packages/coding-agent/test/personal-pi-regression.test.ts",
+		"scripts/personal-pi-regression-suite.mjs",
+		"scripts/pph-personalization-manifest.json",
+		"scripts/upstream-compatibility-allowlist.json",
+		"scripts/upstream-compatibility-suite.mjs",
+		"scripts/upstream-upgrade-gate.mjs",
+		"scripts/upstream-upgrade-gate.test.mjs",
+		"docs/upstream-upgrade-gate.md"
+	],
+	"identityProjectionFiles": [
+		"packages/coding-agent/install-lock/package-lock.json",
+		"packages/coding-agent/npm-shrinkwrap.json",
+		"packages/coding-agent/package.json",
+    "packages/coding-agent/test/config.test.ts",
+    "packages/coding-agent/test/package-distribution.test.ts"
+	]
+}
