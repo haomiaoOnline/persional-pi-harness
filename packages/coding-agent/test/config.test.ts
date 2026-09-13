@@ -1,10 +1,15 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
+import { homedir, tmpdir } from "os";
 import { delimiter, join } from "path";
 import { afterEach, describe, expect, test } from "vitest";
 import {
+	APP_NAME,
+	CONFIG_DIR_NAME,
 	detectInstallMethod,
+	ENV_AGENT_DIR,
+	ENV_SESSION_DIR,
 	findNodePackageDir,
+	getAgentDir,
 	getSelfUpdateCommand,
 	getSelfUpdateUnavailableInstruction,
 	getUpdateInstruction,
@@ -13,6 +18,7 @@ import {
 const execPathDescriptor = Object.getOwnPropertyDescriptor(process, "execPath");
 const originalPath = process.env.PATH;
 const originalPiPackageDir = process.env.PI_PACKAGE_DIR;
+const originalPphAgentDir = process.env.PPH_CODING_AGENT_DIR;
 const originalArgv1 = process.argv[1];
 let tempDir: string | undefined;
 
@@ -37,6 +43,11 @@ afterEach(() => {
 	} else {
 		process.env.PI_PACKAGE_DIR = originalPiPackageDir;
 	}
+	if (originalPphAgentDir === undefined) {
+		delete process.env.PPH_CODING_AGENT_DIR;
+	} else {
+		process.env.PPH_CODING_AGENT_DIR = originalPphAgentDir;
+	}
 	if (originalArgv1 === undefined) {
 		process.argv.splice(1, 1);
 	} else {
@@ -47,6 +58,16 @@ afterEach(() => {
 		rmSync(tempDir, { recursive: true, force: true });
 		tempDir = undefined;
 	}
+});
+
+test("derives the PPH runtime identity and isolated default directories", () => {
+	delete process.env[ENV_AGENT_DIR];
+
+	expect(APP_NAME).toBe("pph");
+	expect(CONFIG_DIR_NAME).toBe(".pph");
+	expect(ENV_AGENT_DIR).toBe("PPH_CODING_AGENT_DIR");
+	expect(ENV_SESSION_DIR).toBe("PPH_CODING_AGENT_SESSION_DIR");
+	expect(getAgentDir()).toBe(join(homedir(), ".pph", "agent"));
 });
 
 function createNpmPrefixInstall(template = "pi-prefix-"): { prefix: string; packageDir: string } {

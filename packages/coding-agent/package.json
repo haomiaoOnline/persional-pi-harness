@@ -4,10 +4,11 @@
 	"description": "Coding agent CLI with read, bash, edit, write tools and session management",
 	"type": "module",
 	"piConfig": {
-		"configDir": ".pi"
+		"name": "pph",
+		"configDir": ".pph"
 	},
 	"bin": {
-		"pi": "dist/bundle/cli.js"
+		"pph": "dist/bundle/cli.js"
 	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
