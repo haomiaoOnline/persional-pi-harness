@@ -25,6 +25,7 @@ import type {
 	DispatchDecision,
 	DispatchRecord,
 	EvidenceRecord,
+	PermissionRequest,
 	PlanApproval,
 	PlanQualityChecklist,
 	PlanQualityGateResult,
@@ -80,6 +81,7 @@ export interface PipelineRequest {
 	playbook?: ReferenceArchitecturePlaybook;
 	role_profile?: RoleProfile;
 	requested_actions?: string[];
+	permission_request?: PermissionRequest;
 	context_resolver?: ContextResolver;
 	command_runner?: CommandRunner;
 	recipe_registry?: VerificationRecipeRegistry;
@@ -290,6 +292,7 @@ export class PersonalPiPipeline {
 			protocol,
 			role_profile: request.role_profile,
 			requested_actions: request.requested_actions,
+			permission_request: request.permission_request,
 			run_id: run.id,
 			resolved_context: resolvedContext,
 		};

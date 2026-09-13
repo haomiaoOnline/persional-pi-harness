@@ -718,3 +718,37 @@ Found 2 warnings.
 - **Notes**: 已删除冗余导入。
 
 ---
+
+## [ERR-20260913-022] Phase 10 implicit permission type
+
+**Logged**: 2026-09-13T22:48:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: lint
+
+### Summary
+安全权限接入后，Worker 的权限局部变量触发仓库禁止隐式 any 的检查。
+
+### Error
+```text
+packages/personal-pi/src/worker.ts:71:7
+lint/suspicious/noImplicitAnyLet
+```
+
+### Context
+- Operation: `npm run check`
+- Cause: 跨 try/catch 赋值的 `let permission` 没有显式类型。
+
+### Suggested Fix
+用 `PermissionDecision` 标注局部变量，保持权限结果的明确边界。
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/worker.ts`
+- Tags: phase-10, biome, security
+
+### Resolution
+- **Resolved**: 2026-09-13T22:49:00+08:00
+- **Notes**: 已补显式类型注解。
+
+---

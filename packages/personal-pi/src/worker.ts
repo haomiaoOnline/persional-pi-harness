@@ -3,6 +3,7 @@ import { buildPromptPayload } from "./prompt.ts";
 import { validateResultContract } from "./result.ts";
 import { checkRoleBoundary } from "./roles.ts";
 import { validateTaskContract } from "./schema.ts";
+import { authorizeWorkerExecution, filterSensitiveContext, type PermissionDecision } from "./security.ts";
 import type { ResultContract, WorkerExecutionInput, WorkerExecutionOutput, WorkerProtocolRequest } from "./types.ts";
 
 export interface WorkerAdapter {
@@ -67,12 +68,24 @@ export class PiWorker implements WorkerAdapter {
 				]);
 		}
 
+		let permission: PermissionDecision;
 		try {
+			permission = authorizeWorkerExecution(request.task, request.permission_request, request.role_profile);
+		} catch (error) {
+			return failureResult(request, this.worker_id, "DENIED by permission contract", [
+				error instanceof Error ? error.message : String(error),
+			]);
+		}
+
+		try {
+			const safeContext = request.resolved_context
+				? filterSensitiveContext(request.resolved_context, permission.granted.credentials).context
+				: undefined;
 			const output = await this.executor({
 				prompt: buildPromptPayload(request.task),
 				role_profile: request.role_profile,
 				requested_actions: [...(request.requested_actions ?? [])],
-				resolved_context: request.resolved_context ? structuredClone(request.resolved_context) : undefined,
+				resolved_context: safeContext,
 			});
 			const result: ResultContract = {
 				task_id: request.task.id,

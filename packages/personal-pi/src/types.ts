@@ -48,6 +48,22 @@ export interface TaskPermissions {
 	};
 	network: NetworkPermission;
 	credentials: CredentialPermission;
+	git?: {
+		allowed: string[];
+	};
+}
+
+export interface PermissionRequest {
+	filesystem?: {
+		read?: string[];
+		write?: string[];
+	};
+	shell?: string[];
+	network?: boolean;
+	git?: string[];
+	credentials?: boolean;
+	credential_service?: string;
+	credential_scopes?: string[];
 }
 
 export interface TaskExecution {
@@ -393,6 +409,7 @@ export interface WorkerProtocolRequest {
 	requested_actions?: string[];
 	run_id?: string;
 	resolved_context?: ResolvedContext;
+	permission_request?: PermissionRequest;
 }
 
 export interface WorkerExecutionInput {

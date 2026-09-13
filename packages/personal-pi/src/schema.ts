@@ -15,6 +15,7 @@ const PermissionsSchema = Type.Object(
 		shell: Type.Object({ allowed: Type.Array(Type.String()) }),
 		network: Type.Union([Type.Literal("deny"), Type.Literal("allow")]),
 		credentials: Type.Union([Type.Literal("deny"), Type.Literal("allow")]),
+		git: Type.Optional(Type.Object({ allowed: Type.Array(Type.String()) }, { additionalProperties: false })),
 	},
 	{ additionalProperties: false },
 );
