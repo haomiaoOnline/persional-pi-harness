@@ -72,6 +72,7 @@ export class PiWorker implements WorkerAdapter {
 				prompt: buildPromptPayload(request.task),
 				role_profile: request.role_profile,
 				requested_actions: [...(request.requested_actions ?? [])],
+				resolved_context: request.resolved_context ? structuredClone(request.resolved_context) : undefined,
 			});
 			const result: ResultContract = {
 				task_id: request.task.id,

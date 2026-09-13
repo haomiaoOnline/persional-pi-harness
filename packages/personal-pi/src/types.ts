@@ -392,12 +392,14 @@ export interface WorkerProtocolRequest {
 	role_profile?: RoleProfile;
 	requested_actions?: string[];
 	run_id?: string;
+	resolved_context?: ResolvedContext;
 }
 
 export interface WorkerExecutionInput {
 	prompt: PromptPayload;
 	role_profile?: RoleProfile;
 	requested_actions: string[];
+	resolved_context?: ResolvedContext;
 }
 
 export interface WorkerExecutionOutput {

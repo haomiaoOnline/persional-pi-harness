@@ -174,7 +174,7 @@ describe("T6.2 context manifest and resolver", () => {
 		expect(report.split("\n")).toHaveLength(10);
 		expect(report.length).toBeLessThan(uncompressedEvidence.length / 20);
 		expect(report).not.toContain("secret");
-});
+	});
 });
 
 describe("T6.3 cache recovery", () => {
