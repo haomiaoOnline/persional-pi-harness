@@ -13,6 +13,7 @@ export * from "./prompt.ts";
 export * from "./protocol.ts";
 export * from "./readiness.ts";
 export * from "./recipes.ts";
+export * from "./recovery.ts";
 export * from "./result.ts";
 export * from "./roles.ts";
 export * from "./routines.ts";

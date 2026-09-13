@@ -582,3 +582,139 @@ Found 1 warning.
 - **Notes**: 已删除未使用导入。
 
 ---
+
+## [ERR-20260913-018] Phase 9 recovery fault test isolation
+
+**Logged**: 2026-09-13T22:36:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: tests
+
+### Summary
+Recovery 测试将 RESUME 与 REASSIGN 连续施加在同一 Task，触发了设计中的“两次失败后 BLOCKED”硬门。
+
+### Error
+```text
+expected REASSIGN
+received BLOCK
+```
+
+### Context
+- Operation: `npm test --workspace=@personal-pi/core`
+- Cause: 测试场景混合了两个独立恢复策略；第二次回收同一 Task 必须阻断自动恢复。
+
+### Suggested Fix
+将 RESUME 与 REASSIGN 放入独立 Task 故障场景，并保留专门测试验证两次失败后 BLOCKED。
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/test/recovery.test.ts`
+- Tags: phase-9, recovery, fault-injection
+
+### Resolution
+- **Resolved**: 2026-09-13T22:37:00+08:00
+- **Notes**: 已隔离故障场景，保留两次失败硬门测试。
+
+---
+
+## [ERR-20260913-019] Phase 9 recovery fencing window
+
+**Logged**: 2026-09-13T22:37:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: recovery
+
+### Summary
+Recovery 生成 REASSIGN 计划后到下一次 Retry 启动前，旧 Lease 仍可能被判定为 current。
+
+### Error
+```text
+expected old lease to be stale
+received accepted=true, reason=current
+```
+
+### Context
+- Operation: `npm test --workspace=@personal-pi/core`
+- Cause: 回收只改变了 Run/Task 状态，没有立即推进 Lease epoch。
+
+### Suggested Fix
+Recovery 计划落地时先为下一 Worker（或原 Worker 的续做）取得新的 epoch；正式 `startRetry` 再领取执行 Lease。
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/recovery.ts`, `packages/personal-pi/test/recovery.test.ts`
+- Tags: phase-9, recovery, fencing
+
+### Resolution
+- **Resolved**: 2026-09-13T22:38:00+08:00
+- **Notes**: 已在所有回收分支推进 Lease epoch，旧结果立即失效。
+
+---
+
+## [ERR-20260913-020] Phase 9 ValidationResult narrowing
+
+**Logged**: 2026-09-13T22:39:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: build
+
+### Summary
+Recovery 的包构建要求显式收窄通过校验后的 `ValidationResult.value`。
+
+### Error
+```text
+src/recovery.ts(188,7): error TS18048:
+'validation.value' is possibly 'undefined'.
+```
+
+### Context
+- Operation: `npm run build --workspace=@personal-pi/core`
+- Cause: `ValidationResult<T>.value` 是可选字段，`valid=true` 并未让编译器自动推断其存在。
+
+### Suggested Fix
+同时检查 `validation.value` 并保存为局部 `admitted` 后再做身份比较。
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/recovery.ts`
+- Tags: phase-9, typescript, result-contract
+
+### Resolution
+- **Resolved**: 2026-09-13T22:40:00+08:00
+- **Notes**: 已完成显式类型收窄。
+
+---
+
+## [ERR-20260913-021] Phase 9 recovery lint warnings
+
+**Logged**: 2026-09-13T22:40:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: lint
+
+### Summary
+仓库检查发现 Recovery 实现和故障测试各有未使用导入。
+
+### Error
+```text
+lint/correctness/noUnusedImports
+Found 2 warnings.
+```
+
+### Context
+- Operation: `npm run check`
+- Cause: `ResultContract`、`createTaskRecord` 和 `Lease` 在最终实现中没有直接使用。
+
+### Suggested Fix
+删除三个冗余导入。
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/recovery.ts`, `packages/personal-pi/test/recovery.test.ts`
+- Tags: phase-9, biome, recovery
+
+### Resolution
+- **Resolved**: 2026-09-13T22:41:00+08:00
+- **Notes**: 已删除冗余导入。
+
+---
