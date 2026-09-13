@@ -4,6 +4,7 @@ export * from "./evidence.ts";
 export * from "./graph.ts";
 export * from "./lease.ts";
 export * from "./master.ts";
+export * from "./persistence.ts";
 export * from "./planning.ts";
 export * from "./prompt.ts";
 export * from "./protocol.ts";

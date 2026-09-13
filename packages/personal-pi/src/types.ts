@@ -477,3 +477,70 @@ export interface VerificationRecipe {
 	required: string[];
 	evidence: string[];
 }
+
+export type RunStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "TIMEOUT" | "CRASHED";
+
+export interface RunRecord {
+	id: string;
+	task_id: string;
+	attempt: number;
+	worker_id: string;
+	lease_epoch: number;
+	status: RunStatus;
+	started_at: string;
+	ended_at?: string;
+	result_id?: string;
+	failure_reason?: string;
+}
+
+export interface StateSnapshot {
+	id: string;
+	created_at: string;
+	digest: string;
+	state: PersistentState;
+}
+
+export interface RecoveryDecision {
+	run_id: string;
+	task_id: string;
+	action: "RECLAIM" | "BLOCK" | "NOOP";
+	reason: string;
+}
+
+export interface ControlPlaneReconstruction {
+	next_ready_task_ids: string[];
+	running_run_ids: string[];
+	blocked_task_ids: string[];
+	decision_ids: string[];
+}
+
+export interface PersistentState {
+	version: 1;
+	projects: ProjectRecord[];
+	tasks: TaskRecord[];
+	graphs: TaskGraph[];
+	dispatches: DispatchRecord[];
+	runs: RunRecord[];
+	results: ResultContract[];
+	evidence: EvidenceRecord[];
+	verifications: VerificationRecord[];
+	decisions: DecisionRecord[];
+	role_profiles: RoleProfile[];
+	effects: EffectRecord[];
+	snapshots: Array<Pick<StateSnapshot, "id" | "created_at" | "digest">>;
+}
+
+export interface ProjectRecord {
+	id: string;
+	name: string;
+	working_directory: string;
+}
+
+export interface DispatchRecord {
+	id: string;
+	task_id: string;
+	worker_id: string;
+	lease_epoch: number;
+	mode: ExecutionMode;
+	created_at: string;
+}
