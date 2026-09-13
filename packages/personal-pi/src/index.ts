@@ -3,6 +3,7 @@ export * from "./context.ts";
 export * from "./effects.ts";
 export * from "./evidence.ts";
 export * from "./graph.ts";
+export * from "./graph-intelligence.ts";
 export * from "./lease.ts";
 export * from "./master.ts";
 export * from "./persistence.ts";

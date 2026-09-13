@@ -513,3 +513,72 @@ lint/correctness/noUnusedFunctionParameters
 - **Notes**: 已清理 5 条告警，待重跑仓库检查。
 
 ---
+
+## [ERR-20260913-016] Phase 8 graph intelligence semantics
+
+**Logged**: 2026-09-13T22:26:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: graph intelligence
+
+### Summary
+Phase 8 初测发现子任务只通过结构 schema 不足以满足 DoR；终态任务被 `resolveAll` 误映射为 READY；预算错误缺少维度标识。
+
+### Error
+```text
+invalid child with empty acceptance criteria was accepted
+DONE dependencies were reported as READY
+budget error did not identify its exceeded dimension
+```
+
+### Context
+- Operation: `npm test --workspace=@personal-pi/core`
+- Cause: DynamicDecomposer 未执行子任务最小 DoR 语义，DependencyResolver 的汇总只调用 READY 判定，BudgetExceededError 消息未带维度。
+
+### Suggested Fix
+拒绝空验收子任务；`resolveAll` 保留 DONE 终态；预算错误消息包含 `max_*` 维度，便于 Controller 留痕和人工调升。
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/graph-intelligence.ts`, `packages/personal-pi/test/graph-intelligence.test.ts`
+- Tags: phase-8, graph, budget, readiness
+
+### Resolution
+- **Resolved**: 2026-09-13T22:27:00+08:00
+- **Notes**: 已修正拆解、依赖汇总和预算错误语义。
+
+---
+
+## [ERR-20260913-017] Phase 8 graph lint warning
+
+**Logged**: 2026-09-13T22:27:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: lint
+
+### Summary
+仓库检查发现 Graph Intelligence 模块有一个未使用的 `GraphNode` 类型导入。
+
+### Error
+```text
+lint/correctness/noUnusedImports
+Found 1 warning.
+```
+
+### Context
+- Operation: `npm run check`
+- Cause: 实现使用 `graphNodeForTask` 的结构返回类型，没有直接引用 `GraphNode`。
+
+### Suggested Fix
+删除冗余类型导入。
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/graph-intelligence.ts`
+- Tags: phase-8, biome, graph
+
+### Resolution
+- **Resolved**: 2026-09-13T22:28:00+08:00
+- **Notes**: 已删除未使用导入。
+
+---
