@@ -9,6 +9,7 @@ export * from "./master.ts";
 export * from "./persistence.ts";
 export * from "./pipeline.ts";
 export * from "./planning.ts";
+export * from "./plugin.ts";
 export * from "./prompt.ts";
 export * from "./protocol.ts";
 export * from "./readiness.ts";

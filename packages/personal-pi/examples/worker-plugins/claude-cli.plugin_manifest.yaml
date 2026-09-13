@@ -1,0 +1,14 @@
+worker_plugin:
+  id: claude-cli
+  adapter_entry: adapters/claude-cli.ts
+  models_supported:
+    - model: claude-sonnet
+      reasoning_levels: [medium, high]
+  capability_tags: [coding, shell, browser]
+  context_limit: 200000
+  cost_tier: frontier
+  auth:
+    type: api_key
+    env_var: CLAUDE_API_KEY
+  discovery:
+    type: static_config

@@ -11,6 +11,30 @@ export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue
 export type WorkerType = "pi" | "codex" | "claude" | "local_model" | "cli";
 export type WorkerTier = "cheap" | "standard" | "frontier";
 export type ReasoningDepth = "low" | "medium" | "high" | "extended";
+export type WorkerPluginAuthType = "none" | "api_key";
+
+export interface WorkerPluginModel {
+	model: string;
+	reasoning_levels: ReasoningDepth[];
+}
+
+export interface WorkerPluginManifest {
+	worker_plugin: {
+		id: string;
+		adapter_entry: string;
+		models_supported: WorkerPluginModel[];
+		capability_tags: string[];
+		context_limit: number;
+		cost_tier: WorkerTier;
+		auth: {
+			type: WorkerPluginAuthType;
+			env_var?: string;
+		};
+		discovery: {
+			type: "static_config";
+		};
+	};
+}
 export type ExecutionMode = "single" | "decompose" | "parallel" | "batch";
 export type NetworkPermission = "deny" | "allow";
 export type CredentialPermission = "deny" | "allow";

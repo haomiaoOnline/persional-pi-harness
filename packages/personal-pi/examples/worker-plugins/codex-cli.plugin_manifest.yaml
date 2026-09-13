@@ -1,0 +1,14 @@
+worker_plugin:
+  id: codex-cli
+  adapter_entry: adapters/codex-cli.ts
+  models_supported:
+    - model: gpt-5-codex
+      reasoning_levels: [low, medium, high]
+  capability_tags: [coding, shell]
+  context_limit: 200000
+  cost_tier: standard
+  auth:
+    type: api_key
+    env_var: CODEX_API_KEY
+  discovery:
+    type: static_config
