@@ -1,0 +1,21 @@
+{
+  "id": "task-invalid",
+  "schema_version": 2,
+  "task_revision": 0,
+  "graph_revision": 0,
+  "type": "cli",
+  "title": "Invalid enum and revision",
+  "objective": "This example intentionally violates the schema.",
+  "requirements": [],
+  "constraints": [],
+  "scope": { "files": [] },
+  "inputs": {},
+  "data_sources": [],
+  "data_references": [],
+  "permissions": {
+    "filesystem": { "read": [], "write": [] },
+    "shell": { "allowed": [] },
+    "network": "maybe",
+    "credentials": "deny"
+  }
+}

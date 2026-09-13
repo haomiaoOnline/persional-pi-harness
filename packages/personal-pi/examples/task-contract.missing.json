@@ -1,0 +1,39 @@
+{
+  "id": "task-missing",
+  "schema_version": 2,
+  "task_revision": 1,
+  "graph_revision": 0,
+  "type": "cli",
+  "title": "Missing required boundaries",
+  "objective": "This example intentionally omits permissions and verification.",
+  "requirements": [],
+  "constraints": [],
+  "scope": { "files": [] },
+  "inputs": {},
+  "data_sources": [],
+  "data_references": [],
+  "execution": {
+    "worker_type": "pi",
+    "worker_tier": "standard",
+    "reasoning_depth": "low",
+    "capability_tags": [],
+    "mode": "single",
+    "working_directory": ".",
+    "allowed_tools": []
+  },
+  "dependencies": [],
+  "artifact_dependencies": [],
+  "expected_outputs": [],
+  "acceptance_criteria": [],
+  "context": {
+    "required": [],
+    "optional": [],
+    "excluded": [],
+    "budget": { "max_input_tokens": 1000 }
+  },
+  "risk": "low",
+  "priority": "P0",
+  "timeout": 1000,
+  "retry_policy": { "max_attempts": 1, "backoff": 0 },
+  "approval": { "required": false }
+}

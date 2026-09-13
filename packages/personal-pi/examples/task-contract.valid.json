@@ -1,0 +1,52 @@
+{
+  "id": "task-valid",
+  "schema_version": 2,
+  "task_revision": 1,
+  "graph_revision": 0,
+  "type": "cli",
+  "title": "Validate a small change",
+  "objective": "Run the deterministic verification for a small change.",
+  "requirements": ["Return a structured result"],
+  "constraints": [],
+  "scope": { "files": ["packages/personal-pi/src/index.ts"] },
+  "inputs": {},
+  "data_sources": [],
+  "data_references": [],
+  "permissions": {
+    "filesystem": { "read": ["packages/personal-pi"], "write": [] },
+    "shell": { "allowed": ["npm test"] },
+    "network": "deny",
+    "credentials": "deny"
+  },
+  "execution": {
+    "worker_type": "pi",
+    "worker_tier": "standard",
+    "reasoning_depth": "low",
+    "capability_tags": ["coding", "test_runner"],
+    "mode": "single",
+    "working_directory": ".",
+    "allowed_tools": ["repo", "shell"]
+  },
+  "dependencies": [],
+  "artifact_dependencies": [],
+  "expected_outputs": ["test report"],
+  "acceptance_criteria": ["The verification command passes"],
+  "verification": {
+    "strategy": "automated",
+    "commands": ["npm test"],
+    "checks": ["exit_code_zero"],
+    "evidence_required": ["stdout", "test_result"],
+    "strength": "strong"
+  },
+  "context": {
+    "required": [],
+    "optional": [],
+    "excluded": [],
+    "budget": { "max_input_tokens": 4000 }
+  },
+  "risk": "low",
+  "priority": "P0",
+  "timeout": 30000,
+  "retry_policy": { "max_attempts": 2, "backoff": 100 },
+  "approval": { "required": false }
+}
