@@ -36,6 +36,74 @@ Received reason: worker_mismatch
 
 ---
 
+## [ERR-20260913-007] Phase 6 erasable TypeScript build gate
+
+**Logged**: 2026-09-13T21:55:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: build
+
+### Summary
+Phase 6 测试通过后，包构建因参数属性不符合 `erasableSyntaxOnly` 失败。
+
+### Error
+```text
+src/context.ts(160,14): error TS1294:
+This syntax is not allowed when 'erasableSyntaxOnly' is enabled.
+```
+
+### Context
+- Operation: `npm run build --workspace=@personal-pi/core`
+- Cause: `ContextResolver` used a constructor parameter property.
+
+### Suggested Fix
+使用显式的 `private readonly store` 字段和普通构造函数赋值，保持仓库的纯擦除 TypeScript 约束。
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/context.ts`
+- Tags: phase-6, typescript, build
+
+### Resolution
+- **Resolved**: 2026-09-13T21:56:00+08:00
+- **Notes**: 已改为显式字段，待重跑构建和仓库检查。
+
+---
+
+## [ERR-20260913-006] Phase 6 context cache validation
+
+**Logged**: 2026-09-13T21:54:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: context projection
+
+### Summary
+第二次解析压缩后的必需上下文没有命中缓存。
+
+### Error
+```text
+expected second.cache_hit to be true
+received false
+```
+
+### Context
+- Operation: `npm test --workspace=@personal-pi/core`
+- Cause: cache validation compared compacted item content with the original content returned by the content-addressed store.
+
+### Suggested Fix
+缓存项只需按其内容地址重新读取并通过哈希完整性校验；不得把预算压缩后的投影文本与原文直接比较。
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/context.ts`, `packages/personal-pi/test/context.test.ts`
+- Tags: phase-6, context, cache
+
+### Resolution
+- **Resolved**: 2026-09-13T21:55:00+08:00
+- **Notes**: 缓存校验改为 `ContextStore.get` 完整性结果，随后重跑测试与构建。
+
+---
+
 ## [ERR-20260913-002] 仓库级 Biome 检查
 
 **Logged**: 2026-09-13T21:25:00+08:00
@@ -171,5 +239,39 @@ packages/personal-pi/src/worker.ts: unused TaskContract type import
 ### Resolution
 - **Resolved**: 2026-09-13T21:39:00+08:00
 - **Notes**: 已删除两个未使用导入，待完整检查确认。
+
+---
+
+## [ERR-20260913-008] Phase 6 repository lint gate
+
+**Logged**: 2026-09-13T21:56:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: lint
+
+### Summary
+仓库级检查拒绝了缓存命中判断中的可选链风格告警。
+
+### Error
+```text
+lint/complexity/useOptionalChain
+Found 1 warning.
+```
+
+### Context
+- Operation: `npm run check`
+- Cause: Biome 要求对可能为空的缓存对象使用 optional chain。
+
+### Suggested Fix
+将 `cached && cached.items...` 改为 `cached?.items...`。
+
+### Metadata
+- Reproducible: yes
+- Related Files: `packages/personal-pi/src/context.ts`
+- Tags: phase-6, biome, lint
+
+### Resolution
+- **Resolved**: 2026-09-13T21:57:00+08:00
+- **Notes**: 已按仓库 lint 规则修正。
 
 ---

@@ -530,6 +530,49 @@ export interface PersistentState {
 	snapshots: Array<Pick<StateSnapshot, "id" | "created_at" | "digest">>;
 }
 
+export interface ContextReference {
+	digest: string;
+	source_path?: string;
+	token_estimate: number;
+	held_out?: boolean;
+}
+
+export interface ContextManifest {
+	required: string[];
+	optional: string[];
+	excluded: string[];
+	budget: {
+		max_input_tokens: number;
+	};
+}
+
+export interface ResolvedContextItem {
+	digest: string;
+	content: string;
+	token_estimate: number;
+}
+
+export interface ResolvedContext {
+	items: ResolvedContextItem[];
+	text: string;
+	total_tokens: number;
+	cache_hit: boolean;
+	omitted_optional: string[];
+	manifest_digest: string;
+}
+
+export interface ContextCacheStats {
+	hits: number;
+	misses: number;
+}
+
+export interface EvidenceSummary {
+	task_id: string;
+	status: VerificationStatus;
+	summary: string;
+	evidence_ref: string;
+}
+
 export interface ProjectRecord {
 	id: string;
 	name: string;

@@ -1,4 +1,5 @@
 export * from "./artifacts.ts";
+export * from "./context.ts";
 export * from "./effects.ts";
 export * from "./evidence.ts";
 export * from "./graph.ts";
