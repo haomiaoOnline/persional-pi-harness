@@ -57,3 +57,13 @@ The v3 task list asks T3.2 to demonstrate five real small tasks and Role boundar
 ## Evidence collection / final verdict
 
 Evidence is the core test output plus receipt/effect/rejection assertions. **PARTIAL / REOPENED** until five strict real-worker tasks and their independent evidence are captured.
+
+## Closure update — 2026-09-14
+
+The repository-level coding-agent differential and known-upstream gate are now
+closed as described in Phase 0. The strict Phase 3 blocker is unchanged:
+local Worker/Result/Receipt tests pass, but no authorized real Provider path
+exists for the required five real Worker tasks. No mock or local synthetic
+provider is promoted as real evidence. T3.2-A phased permission escalation is
+tracked in [`v3.1-gap-matrix.md`](./v3.1-gap-matrix.md) and is not yet
+implemented at this baseline.

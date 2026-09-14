@@ -67,3 +67,20 @@ The repository-level upgrade gate must be rerun and closed from a committed SHA 
 ## Evidence collection / final verdict
 
 Evidence is in [`evidence-bundle.md`](./evidence-bundle.md) and the aggregate report. **PARTIAL / REOPENED**.
+
+## Closure update — 2026-09-14
+
+The historical baseline above is preserved. The remaining PPH differential was
+closed on `bfde9ffbe`: the original **76** PPH-only coding-agent failures were
+all classified as expected `pi`/`.pi` versus `pph`/`.pph` identity fixture
+drift, and the complete suite now passes (`266/273` files, `2239/2293`
+tests). See [`evidence/phase-00-pph-identity-closure-2026-09-14.md`](./evidence/phase-00-pph-identity-closure-2026-09-14.md).
+
+The inherited `google-shared.ts:402` TS2322 remains non-green in the normal
+repository check, but it is now governed by the exact fail-closed
+Known-Upstream-Failure gate. The gate verified the pinned source digest and
+revision, reproduced the exact failure in a pristine archive checkout, and
+passed PPH build/core tests/regression/protocol proofs. Phase 0 is therefore
+**PASS for PPH differential closure under the explicit known-upstream gate**;
+the normal check is not relabeled as green and no `--no-verify` exception is
+used.

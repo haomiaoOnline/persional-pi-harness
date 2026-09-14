@@ -54,3 +54,13 @@ Strict task-list evidence still lacks a real five-task T3.2 run, a T7.2 self-dev
 ## Evidence collection / final verdict
 
 Evidence is the child-process artifacts, independent verifier exits, persisted state counts and trace replay assertions. **PARTIAL / REOPENED** pending the strict real-worker/self-development evidence.
+
+## Closure update — 2026-09-14
+
+Phase 0's 76 PPH-only differential failures are no longer a blocker; the
+exact coding-agent suite and commit gate are recorded in the Phase 0 evidence.
+Phase 7 remains **PARTIAL / REOPENED** because the available evidence is three
+local child-process E2 paths. A real self-development run that changes and
+re-verifies this project, plus strict real Provider/Worker and long-running
+Trigger/Routine evidence, is still unavailable. T7.5 Background Memory
+Consolidation is a v3.1 delta and is not started at this baseline.

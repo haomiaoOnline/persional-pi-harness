@@ -58,3 +58,13 @@ The current comparison uses two instances of the local-process Worker kind, not 
 ## Evidence collection / final verdict
 
 Evidence: Phase 12 unit tests, handoff exhaustion test, local baseline metrics and [`evidence-bundle.md`](./evidence-bundle.md). **PARTIAL / REOPENED** pending real external Worker/provider evidence and repository gate closure.
+
+## Closure update — 2026-09-14
+
+The repository gate closure portion is now satisfied by the exact
+Known-Upstream-Failure gate and the 76-failure coding-agent differential is
+zero. The strict Phase 12 blocker remains: the existing benchmark uses the
+same local-process Worker kind twice, not two independently validated real
+Worker backends. T12.1–T12.3 progressive exposure and structured
+`HANDOFF_READY` wakeup are v3.1 delta work and are not started at this
+baseline. External authorization/provider evidence remains required.

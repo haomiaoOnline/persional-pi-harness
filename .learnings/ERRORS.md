@@ -238,3 +238,143 @@ Use a simple single-quoted marker expression and pass the candidate filename dir
 
 - Reproducible: no
 - Related Files: `/private/tmp/pph-a0-safety.P1IqAP/all-change-files.txt`
+
+## [ERR-20260914-003] zsh-optional-glob-diagnostic
+
+**Logged**: 2026-09-14T18:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: diagnostic tooling
+
+### Summary
+
+A grouped repository search used an optional `src/theme*` glob without a
+matching path, so zsh stopped the command before that search completed.
+
+### Error
+
+```text
+zsh: no matches found: packages/coding-agent/src/theme*
+```
+
+### Context
+
+- The command was read-only and did not modify repository files.
+- The remaining explicit-file inspections completed, but the theme search had
+  to be rerun with concrete paths.
+
+### Suggested Fix
+
+Use `rg` with an explicit path list or disable unmatched-glob expansion only
+for a controlled diagnostic; do not treat this shell error as a test failure.
+
+### Metadata
+
+- Reproducible: yes
+- Related Files: `packages/coding-agent/test/theme-export.test.ts`, `packages/coding-agent/test/theme-picker.test.ts`
+
+## [ERR-20260914-005] husky-failfast-gate-unreachable
+
+**Logged**: 2026-09-14T18:00:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: commit gate
+
+### Summary
+
+The first normal commit attempt showed that Husky invokes the hook with
+`sh -e`; a standalone failing `npm run check` exited before the following
+`$?` branch could invoke the exact known-upstream-failure gate.
+
+### Error
+
+```text
+husky - pre-commit script failed (code 2)
+```
+
+### Context
+
+- The repository check reached only the pinned upstream TS2322 diagnostic.
+- The intended fail-closed known-failure gate was not executed.
+- The commit was rejected and no commit was created.
+
+### Suggested Fix
+
+Put commands whose non-zero result is an expected branch condition directly
+in an `if` statement under Husky's fail-fast shell.
+
+### Metadata
+
+- Reproducible: yes
+- Related Files: `.husky/pre-commit`, `scripts/known-upstream-failure-gate.mjs`
+
+## [ERR-20260914-004] zsh-readonly-status-variable
+
+**Logged**: 2026-09-14T18:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: diagnostic tooling
+
+### Summary
+
+A check wrapper used the zsh special variable name `status` for the exit code,
+so zsh rejected the assignment before the repository check ran.
+
+### Error
+
+```text
+zsh:1: read-only variable: status
+```
+
+### Context
+
+- The wrapper was intended to preserve and report the exit code from
+  `npm run check`.
+- No repository check output was produced and no project file was changed by
+  the failed wrapper.
+
+### Suggested Fix
+
+Use a task-specific variable such as `check_code`; never assign to zsh's
+special `status` variable.
+
+### Metadata
+
+- Reproducible: yes
+- Related Files: `scripts/known-upstream-failure-gate.mjs`
+
+## [ERR-20260914-006] gate-worktree-index-lock
+
+**Logged**: 2026-09-14T18:00:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: commit gate
+
+### Summary
+
+The first normal commit after making the hook reachable showed that a
+pre-commit hook cannot safely run `git worktree add`: the parent commit holds
+the repository index lock while the hook is executing.
+
+### Error
+
+```text
+fatal: .git/index: index file open failed: Not a directory
+```
+
+### Context
+
+- The same gate passed when invoked manually outside a commit.
+- The failure was caused by the gate's temporary worktree mutation, not by
+  the pinned upstream check.
+- The commit was rejected and no commit was created.
+
+### Suggested Fix
+
+Materialize the pinned revision with `git archive` into a temporary directory
+and extract it without modifying the main repository index or worktree list.
+
+### Metadata
+
+- Reproducible: yes
+- Related Files: `scripts/known-upstream-failure-gate.mjs`, `.husky/pre-commit`

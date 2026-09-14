@@ -51,6 +51,49 @@ message
 The expected count is checked as well. A changed message, a new failure, a
 duplicate failure, or a stale allowlist entry fails the gate.
 
+## Known upstream TypeScript failure gate
+
+The normal repository check remains authoritative and is always run first. The
+current upstream baseline has one inherited TypeScript diagnostic at
+`packages/ai/src/api/google-shared.ts:402`; the PPH fork does not modify that
+file. A normal commit may proceed only through the explicit, fail-closed gate
+in `scripts/known-upstream-failure-gate.mjs`:
+
+```bash
+node scripts/known-upstream-failure-gate.mjs --allow-known-upstream-failure
+```
+
+The JSON entry in `scripts/known-upstream-failure-allowlist.json` binds the
+package name, repository-relative source file and line, TypeScript error code,
+exact semantic message, source needle, full upstream revision and SHA-256
+source digest. The current fingerprint is:
+
+```text
+@earendil-works/pi-ai
+packages/ai/src/api/google-shared.ts:402
+TS2322
+Type 'FinishReason.TOO_MANY_TOOL_CALLS' is not assignable to type 'never'.
+upstream revision: 71dca871bc80b6bc97be37f0ca3189399d651fff
+source digest: sha256:fa9a45177b6c1e1636b8b1ef4c8b332e903e4b379039cb1bacbbc312a8e1662d
+```
+
+The gate accepts only one of two states: a normal check with no diagnostics,
+or a non-zero check whose complete parsed and unparsed diagnostic set is
+exactly the allowlist. For the known-failure state it additionally verifies
+the pinned source and package identity, reproduces the same failure from a
+pristine `git archive` checkout of the pinned upstream revision, and requires
+all PPH proofs to pass: core build, core tests, Personal PI regression, and
+protocol isolation. A changed line, source digest, package, error code,
+semantic message, extra diagnostic, missing diagnostic, pristine mismatch or
+PPH proof failure blocks.
+
+The pre-commit hook still runs the normal check and invokes this gate only
+after that exact check fails. The pristine checkout is an extracted archive,
+so a commit's active index lock is never mutated. Every successful invocation
+writes a local Decision/Evidence JSON artifact under
+`.git/pph-known-upstream-failure-gate/`; it is local Git evidence, not a
+tracked source file or a replacement for a green normal check.
+
 ## Normal procedure
 
 Start from a clean local `main` checkout:
@@ -113,6 +156,8 @@ The first unexpected result stops the flow. In particular:
 - any PPH identity regression blocks promotion;
 - a changed `main` ref blocks promotion and is reported as a protection
   failure.
+- the known-upstream TypeScript path is an explicit evidence-bound override,
+  never a blanket `--no-verify` or a global hook disable.
 
 Temporary worktrees are removed after each run. The candidate branch is kept
 for inspection; it is local only and is never pushed by the gate.
