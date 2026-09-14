@@ -1,0 +1,59 @@
+# Phase 3 Stage Gate — Worker Runtime
+
+Final verdict: **PARTIAL / REOPENED**
+Evidence base SHA: `71b3e44297d20b43faf31a677c2f5224a9e57481`；本轮没有 commit。
+
+## Requirements / tasks
+
+`T3.1` Worker Adapter、`T3.2` PI Worker/Role 注入、`T3.3` Result Contract、`T3.4` idempotency/effect journal、`T3.5` Work Receipt/No-op Receipt。
+
+## Scope / implementation location
+
+- Adapter/result contracts：`packages/personal-pi/src/worker.ts`、`src/result.ts:69-122`、`src/types.ts`。
+- Effect persistence/idempotency：`src/effects.ts:19-99`。
+- Pipeline admission and receipt acceptance：`src/pipeline.ts:362-528`、`src/verification.ts:197-232`。
+- Tests: `test/worker.test.ts`, `test/effects-persistence.integration.test.ts`, `test/pipeline.test.ts`, `test/verification.test.ts`。
+
+## Commands / expected / actual
+
+```text
+npm run test --workspace @personal-pi/core
+expected: worker/result/effect/receipt tests pass
+actual: 25 files, 142 tests passed
+
+npm run build --workspace @personal-pi/core
+expected: runtime contract compiles
+actual: passed
+```
+
+## Static Validation
+
+Core TypeScript build and `git diff --check` pass. The repository-wide known TypeScript error is outside the Personal PI Worker/Result surface.
+
+## Failure injection
+
+Malformed output, worker failure, missing idempotency key, action digest mismatch, false verification and successful-but-empty work were injected. The Work Receipt case with `status=success`, no artifact, `state_changed=false`, `no_op=false`, and no valid reason raises `work_receipt_anomaly`; `no_op=true` with a non-empty reason is accepted.
+
+## Persistence / recovery evidence
+
+Effect records are persisted as pending/committed/failed and a new journal reuses a committed effect without rerunning the action. Cross-Run Loop Budget and controller restart evidence is in Phases 1 and 5.
+
+## Bound Coverage
+
+Worker execution enters B1/B2 through `beforeRun`/`beforeModelCall`; verification commands enter B3; Recovery reassignment enters B4. Each has a Task-level persisted bound. Independent command failures remain missing evidence/UNKNOWN; they are never converted into PASS.
+
+## Regression results
+
+Worker, pipeline, verification, effects and full core regression pass. The local Phase 7 E2E launches three child-process tasks, not five production Worker tasks.
+
+## Known upstream failures
+
+Repository-wide static and coding-agent failures remain exactly as listed in the bundle. They are outside `packages/personal-pi` and were not skipped.
+
+## Unresolved issues
+
+The v3 task list asks T3.2 to demonstrate five real small tasks and Role boundary behavior. This audit has three real local child-process tasks in Phase 7 and unit/integration coverage, but no external Provider/production Worker evidence. Therefore this Phase cannot be closed at the strict architecture evidence level.
+
+## Evidence collection / final verdict
+
+Evidence is the core test output plus receipt/effect/rejection assertions. **PARTIAL / REOPENED** until five strict real-worker tasks and their independent evidence are captured.

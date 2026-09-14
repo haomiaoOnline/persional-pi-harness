@@ -39,10 +39,15 @@ function emptyState(): PersistentState {
 		decisions: [],
 		role_profiles: [],
 		effects: [],
+		budget_usage: {},
+		budget_decisions: {},
+		leases: {},
+		lease_epochs: {},
 		loop_usage: {},
 		traces: [],
 		regressions: [],
 		snapshots: [],
+		snapshot_payloads: {},
 	};
 }
 
@@ -53,7 +58,12 @@ function normalizeState(state: Partial<PersistentState>): PersistentState {
 		...state,
 		traces: state.traces ?? [],
 		regressions: state.regressions ?? [],
+		budget_usage: state.budget_usage ?? {},
+		budget_decisions: state.budget_decisions ?? {},
+		leases: state.leases ?? {},
+		lease_epochs: state.lease_epochs ?? {},
 		loop_usage: state.loop_usage ?? {},
+		snapshot_payloads: state.snapshot_payloads ?? {},
 	};
 }
 
@@ -62,7 +72,7 @@ function cloneState(state: PersistentState): PersistentState {
 }
 
 function stateDigest(state: PersistentState): string {
-	const snapshotSafe = { ...state, snapshots: [] };
+	const snapshotSafe = { ...state, snapshots: [], snapshot_payloads: {} };
 	return createHash("sha256").update(JSON.stringify(snapshotSafe)).digest("hex");
 }
 
@@ -179,6 +189,16 @@ export class PersistentStateStore {
 		});
 	}
 
+	markRunFailed(runId: string, reason: string, endedAt = new Date().toISOString()): void {
+		this.transact((state) => {
+			const run = state.runs.find((candidate) => candidate.id === runId);
+			if (!run) throw new Error(`unknown Run: ${runId}`);
+			if (["SUCCEEDED", "RUNNING", "PENDING"].includes(run.status)) run.status = "FAILED";
+			run.ended_at = endedAt;
+			run.failure_reason = reason;
+		});
+	}
+
 	saveEvidence(evidence: EvidenceRecord): void {
 		this.transact((state) => state.evidence.push(structuredClone(evidence)));
 	}
@@ -269,27 +289,58 @@ export class PersistentStateStore {
 	createSnapshot(createdAt = new Date().toISOString()): StateSnapshot {
 		const snapshotState = this.read();
 		snapshotState.snapshots = [];
+		snapshotState.snapshot_payloads = {};
 		const snapshot: StateSnapshot = {
 			id: randomUUID(),
 			created_at: createdAt,
 			digest: stateDigest(snapshotState),
 			state: snapshotState,
 		};
-		this.transact((state) =>
-			state.snapshots.push({ id: snapshot.id, created_at: snapshot.created_at, digest: snapshot.digest }),
-		);
+		this.transact((state) => {
+			state.snapshots.push({ id: snapshot.id, created_at: snapshot.created_at, digest: snapshot.digest });
+			state.snapshot_payloads[snapshot.id] = {
+				created_at: snapshot.created_at,
+				digest: snapshot.digest,
+				state: structuredClone(snapshot.state),
+			};
+		});
 		return structuredClone(snapshot);
+	}
+
+	getSnapshot(snapshotId: string): StateSnapshot | undefined {
+		const payload = this.state.snapshot_payloads[snapshotId];
+		if (!payload) return undefined;
+		return {
+			id: snapshotId,
+			created_at: payload.created_at,
+			digest: payload.digest,
+			state: structuredClone(payload.state),
+		};
+	}
+
+	restoreSnapshotFromStore(snapshotId: string): PersistentState {
+		const snapshot = this.getSnapshot(snapshotId);
+		if (!snapshot) throw new Error(`unknown persisted snapshot: ${snapshotId}`);
+		return this.restoreSnapshot(snapshot);
 	}
 
 	restoreSnapshot(snapshot: StateSnapshot): PersistentState {
 		const candidate = cloneState(snapshot.state);
 		candidate.snapshots = [];
+		candidate.snapshot_payloads = {};
 		if (stateDigest(candidate) !== snapshot.digest) throw new Error("snapshot digest mismatch");
 		const knownSnapshots = this.state.snapshots.filter((entry) => entry.id !== snapshot.id);
+		const knownPayloads = { ...this.state.snapshot_payloads };
 		candidate.snapshots = [
 			...knownSnapshots,
 			{ id: snapshot.id, created_at: snapshot.created_at, digest: snapshot.digest },
 		];
+		knownPayloads[snapshot.id] = {
+			created_at: snapshot.created_at,
+			digest: snapshot.digest,
+			state: structuredClone(snapshot.state),
+		};
+		candidate.snapshot_payloads = knownPayloads;
 		if (this.filePath) writeAtomically(this.filePath, candidate);
 		this.state = candidate;
 		return this.read();
@@ -305,7 +356,7 @@ export class PersistentStateStore {
 		this.transact(mutate);
 		this.restoreSnapshot(snapshot);
 		const after = this.read();
-		const compare = (state: PersistentState) => ({ ...state, snapshots: [] });
+		const compare = (state: PersistentState) => ({ ...state, snapshots: [], snapshot_payloads: {} });
 		return { restored: JSON.stringify(compare(before)) === JSON.stringify(compare(after)), before, after };
 	}
 
@@ -325,6 +376,7 @@ export class PersistentStateStore {
 				run.status = "CRASHED";
 				run.ended_at = at;
 				run.failure_reason = "worker missing after controller restart";
+				delete state.leases[run.task_id];
 				const task = state.tasks.find((candidate) => candidate.id === run.task_id);
 				if (task?.state === "RUNNING") {
 					task.state = new TaskStateMachine().transition(
@@ -357,6 +409,9 @@ export class PersistentStateStore {
 			running_run_ids: this.state.runs.filter((run) => run.status === "RUNNING").map((run) => run.id),
 			blocked_task_ids: this.state.tasks.filter((task) => task.state === "BLOCKED").map((task) => task.id),
 			decision_ids: this.state.decisions.map((decision) => decision.id),
+			active_leases: Object.values(this.state.leases).map((lease) => structuredClone(lease)),
+			lease_epochs: { ...this.state.lease_epochs },
+			snapshot_ids: this.state.snapshots.map((snapshot) => snapshot.id),
 		};
 	}
 }

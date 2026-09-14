@@ -1,5 +1,7 @@
 # Personal PI v3.0 Backfill Evidence
 
+> **状态说明（2026-09-14）**：本文是审计前的历史回填快照，不能作为当前 Stage Gate 或 T13 放行依据。当前结论以 [`docs/stage-gates/v3-retroactive-audit.md`](../stage-gates/v3-retroactive-audit.md)、[`bound-coverage.md`](../stage-gates/bound-coverage.md) 和 [`evidence-bundle.md`](../stage-gates/evidence-bundle.md) 为准。
+
 ## Authority and boundary
 
 This addendum records the v3.0 tasks that were added after the repository had already completed the v2.1 Phase 11 baseline and T12.0-A manifest contract. The v3.0 architecture and executable task list are authoritative. T12.1–T12.3 implementation is held until these backfills pass their Gate.

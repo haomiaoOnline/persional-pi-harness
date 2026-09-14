@@ -1,0 +1,128 @@
+# v3.0 Retroactive Audit Evidence Bundle
+
+审计日期：2026-09-14（Asia/Taipei）
+仓库：`/Users/chenglong/github/persional-pi-harness`
+审计基线 SHA：`71b3e44297d20b43faf31a677c2f5224a9e57481`
+工作树：基于该 SHA 的未提交审计补丁；本轮没有创建 commit、没有使用 `--no-verify`。
+
+## Authoritative inputs
+
+本轮唯一需求基线是用户上传的两个 v3.0 文件；仓库内 `sources/` 只读，不能用历史 v2 文件替代：
+
+| Document | Local preview path | SHA-256 |
+| --- | --- | --- |
+| 01-Personal_PI_架构设计_v3.0.md | `/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/codex-file-preview-Um8Nub/01-Personal_PI_架构设计_v3.0.md` | `63bd83b86396dc43e7505ca3a322a0ff2add3a820de0e4c6e9d3ae5077c5edee` |
+| 02-Personal_PI_可执行任务清单_v3.0.md | `/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/codex-file-preview-PtbBdM/02-Personal_PI_可执行任务清单_v3.0.md` | `45a7f08e16e19a631f8a5eacba42c92a49a66396408379254f6f5f1c63064105` |
+
+## Repository evidence
+
+| Check | Expected | Actual |
+| --- | --- | --- |
+| `git rev-parse HEAD` | auditable base | `71b3e44297d20b43faf31a677c2f5224a9e57481` |
+| branch/remotes | Personal branch + upstream retained | `feature/t1-task-contract`; `origin` Personal fork; `upstream` `earendil-works/pi` |
+| existing baseline tags | v0.1 tags present | `personal-pi-baseline`=`3b5bc5c8d2a7c4a236264022d73cb9e59b9365bd`; `PERSONAL_PI_V0.1_CORE_V1.1`=`c0c24d6743e6d6ed17a085a42e0e107d8a1dd17e0` |
+| new audit commit | user did not request commit | none; all changes remain reviewable in working tree |
+
+## Commands and results
+
+```text
+npm run test --workspace @personal-pi/core
+25 test files passed; 142 tests passed
+
+npm run build --workspace @personal-pi/core
+passed
+
+npm run check:protocol-isolation --workspace @personal-pi/core
+protocol metadata isolation: PASS
+
+npm run check:browser-smoke
+passed
+
+npm run test:scripts
+23 tests passed
+
+npm run test:personal-pi-regression
+3 files passed; 23 tests passed
+
+npm run check
+Biome checked 1362 files; pinned dependencies, runtime dependencies,
+TS imports, entry graphs, shrinkwrap and coding-agent install-lock passed.
+The check stopped at the exact inherited error:
+packages/ai/src/api/google-shared.ts(402,10): error TS2322:
+Type 'FinishReason.TOO_MANY_TOOL_CALLS' is not assignable to type 'never'.
+
+./test.sh
+scripts: 23 passed; packages/agent: 711 passed, 1 skipped;
+@personal-pi/core: 142 passed.
+The root run exited 1 because packages/coding-agent reported:
+18 failed files, 248 passed, 7 skipped;
+77 failed tests, 2162 passed, 54 skipped.
+```
+
+Targeted v3 run:
+
+```text
+npm exec --workspace @personal-pi/core vitest -- run \
+  test/loop-budget.integration.test.ts \
+  test/verifier-isolation.integration.test.ts \
+  test/controller-restart.integration.test.ts \
+  test/phase-7-real-e2e.test.ts \
+  test/single-vs-multi.eval.test.ts \
+  test/trace.test.ts --reporter=verbose --testTimeout=30000
+6 files passed; 19 tests passed
+```
+
+## Failure injection evidence
+
+| Case | Injection | Expected | Observed |
+| --- | --- | --- | --- |
+| A Loop Budget | Worker result is rejected by deterministic verification, Recovery starts a second Run, second Run fails, then another Run is requested | Task-level `max_attempts` stops the next admission; usage survives controller restart | `BLOCKED`; attempts=2; next `beforeRun` throws `LoopBudgetExhaustedError`; no active lease |
+| B Work Receipt | `status=success`, empty artifacts, `state_changed=false`, `no_op=false`, no `no_op_reason` | `work_receipt_anomaly`; no normal DONE | Acceptance Gate throws anomaly; explicit `no_op=true` + reason reaches DONE |
+| C Verifier Isolation | Worker emits a persuasive false explanation while deterministic command exits 1; rerun after removing explanation | Both conclusions and reasons remain FAIL/equal | Both runs `FAIL`; summary/private text absent from verifier DTO |
+| D Graph Metrics | Real Trace events from local process E2E and single/multi comparison | derive all required fields, not only interface | `computeGraphEfficiencyMetrics` and `summarizeGraphEfficiency` produce fields and brief-compatible metrics |
+| E Crash/Restart | SIGKILL controller after persisted RUNNING Run, start a new process using state file | recover CRASHED/BLOCKED, reject stale lease, retain effects/usage, restore snapshot | all assertions pass in `controller-restart.integration.test.ts` |
+| F Replan/Handoff | replan with a new controller after budget exhausted; REASSIGN with `max_handoffs=0` | DENY/BLOCKED before unbounded re-entry | persisted DENY; no replacement lease; task BLOCKED |
+
+## Local E2E and baseline artifacts
+
+`phase-7-real-e2e.test.ts` launches actual local child processes (`local-e2e-worker.mjs` and `local-e2e-verifier.mjs`) for three distinct tasks. This is E2 local-process evidence: it proves process, artifact, persistence, independent command verification and trace replay. It is not an external Provider, production repository, or public deployment claim.
+
+The same three task/action definitions, permissions, tools and budgets were used for the Single vs Multi Worker comparison. The latest successful run observed:
+
+| Metric | Single Worker | Multi Worker |
+| --- | ---: | ---: |
+| worker_count | 1 | 2 |
+| verified_success_rate | 1.0 | 1.0 |
+| time_per_verified_task (ms) | 75.45468066666666 | 44.99808333333332 |
+| cost_per_verified_task (USD) | 0 | 0 |
+| handoffs | 0 | 0 |
+| retries | 0 | 0 |
+| verification_first_pass_rate | 1.0 | 1.0 |
+| coordination_efficiency | 1.0 | 1.0 |
+| graph_width | 1 | 2 |
+| peak_active_workers | 1 | 2 |
+
+Policy finding: this three-task local sample shows equal verified success and first-pass quality, with lower observed wall-clock time in Multi mode, but zero provider cost and zero handoff/retry coordination cost. It is not enough to claim general Multi-Worker superiority; a larger same-budget real Provider benchmark remains open.
+
+Machine-readable copy of this comparison: `docs/stage-gates/evidence/single-vs-multi-2026-09-14.json`.
+
+## Known upstream/PPH failures
+
+These are retained as exact fingerprints and are not broad skips:
+
+1. `packages/ai/src/api/google-shared.ts(402,10): error TS2322: Type 'FinishReason.TOO_MANY_TOOL_CALLS' is not assignable to type 'never'.`
+2. `packages/coding-agent` session/CLI tests still expect `pi`, while current PPH runtime returns `pph` (for example “Session file is not a valid pi session” versus “...pph session”).
+3. `packages/coding-agent` package/resource/trust tests still expect `.pi` and old project paths, while runtime returns `.pph`/agent paths.
+4. Experimental remote runtime tests report `Unknown session: demo-1` and `No discovered server contains session demo-1`.
+5. fswatch test reports `no FSWatcher found among active handles`.
+
+No Personal PI file in this audit modifies those areas. They prevent the repository-wide Phase 0 promotion gate from closing.
+
+## Evidence file inventory
+
+- Phase records: `docs/stage-gates/phase-00.md` through `phase-12.md`.
+- Aggregate decision: `docs/stage-gates/v3-retroactive-audit.md`.
+- v3 requirement mapping: `docs/stage-gates/v3-gap-matrix.md`.
+- Machine-readable bound review: `docs/stage-gates/bound-coverage.md`.
+- Source/test implementation: `packages/personal-pi/src/` and `packages/personal-pi/test/` listed in the aggregate audit.
+- Failure/lesson log: `docs/.learnings/ERRORS.md` entry `ERR-20260914-030`.

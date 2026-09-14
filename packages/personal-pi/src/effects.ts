@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { PersistentStateStore } from "./persistence.ts";
 import type { EffectExecutionResult, EffectRecord, TaskContract } from "./types.ts";
 
 export class MissingIdempotencyKeyError extends Error {
@@ -8,9 +9,22 @@ export class MissingIdempotencyKeyError extends Error {
 	}
 }
 
+export class EffectJournalError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "EffectJournalError";
+	}
+}
+
 export class EffectJournal {
 	private readonly records = new Map<string, EffectRecord>();
 	private readonly inFlight = new Map<string, Promise<EffectExecutionResult>>();
+	private readonly store?: PersistentStateStore;
+
+	constructor(store?: PersistentStateStore) {
+		this.store = store;
+		for (const record of store?.read().effects ?? []) this.records.set(record.idempotency_key, { ...record });
+	}
 
 	get(idempotencyKey: string): EffectRecord | undefined {
 		const record = this.records.get(idempotencyKey);
@@ -24,6 +38,9 @@ export class EffectJournal {
 		options: { action_digest?: string; reversible?: boolean; compensation_action?: string } = {},
 	): Promise<EffectExecutionResult> {
 		const existing = this.records.get(idempotencyKey);
+		if (existing && options.action_digest && existing.action_digest !== options.action_digest) {
+			throw new EffectJournalError(`effect action digest mismatch for ${idempotencyKey}`);
+		}
 		if (existing?.status === "committed") return { committed: true, reused: true, record: { ...existing } };
 		const running = this.inFlight.get(idempotencyKey);
 		if (running) {
@@ -56,18 +73,29 @@ export class EffectJournal {
 			updated_at: new Date().toISOString(),
 		};
 		this.records.set(idempotencyKey, record);
+		this.persist(record);
 		try {
 			await action();
 			record.status = "committed";
 			record.updated_at = new Date().toISOString();
 			this.records.set(idempotencyKey, record);
+			this.persist(record);
 			return { committed: true, reused: false, record: { ...record } };
 		} catch (error) {
 			record.status = "failed";
 			record.updated_at = new Date().toISOString();
 			this.records.set(idempotencyKey, record);
+			this.persist(record);
 			throw error;
 		}
+	}
+
+	private persist(record: EffectRecord): void {
+		this.store?.transact((state) => {
+			const index = state.effects.findIndex((candidate) => candidate.idempotency_key === record.idempotency_key);
+			if (index >= 0) state.effects[index] = { ...record };
+			else state.effects.push({ ...record });
+		});
 	}
 }
 

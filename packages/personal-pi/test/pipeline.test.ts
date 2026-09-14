@@ -12,6 +12,7 @@ import {
 	PiWorker,
 	ReferenceArchitecturePlaybook,
 	type TaskContract,
+	type WorkerAdapter,
 } from "../src/index.ts";
 
 const temporaryDirectories: string[] = [];
@@ -62,6 +63,18 @@ function makeTask(id: string, objective = "Return a verified result"): TaskContr
 		priority: "P1",
 		timeout: 30000,
 		retry_policy: { max_attempts: 2, backoff: 0 },
+		loop_budget: {
+			max_attempts: 2,
+			max_model_calls: 2,
+			max_tool_calls: 4,
+			max_handoffs: 1,
+			max_elapsed_ms: 60000,
+			max_input_tokens: 4000,
+			max_output_tokens: 4000,
+			max_cost_usd: 1,
+			max_state_growth_bytes: 10000,
+			on_exhaustion: { action: "BLOCKED", escalation: "human" },
+		},
 		approval: { required: false },
 	};
 }
@@ -213,6 +226,67 @@ describe("T7.1 complete Personal PI pipeline", () => {
 		expect(execution.task.state).toBe("BLOCKED");
 		expect(execution.trace.events.at(-1)?.detail).toBe("work receipt anomaly requires human review");
 		expect(store.read().regressions[0]?.category).toBe("pipeline_failure");
+	});
+
+	test("converts a well-shaped result from another execution into a bound failure", async () => {
+		const store = new PersistentStateStore();
+		const task = makeTask("e2e-result-identity");
+		const worker: WorkerAdapter = {
+			worker_id: "pi-identity",
+			execute: async (request) => ({
+				task_id: "other-task",
+				run_id: "other-run",
+				worker_id: "other-worker",
+				lease_epoch: request.protocol.lease_epoch + 1,
+				status: "success",
+				summary: "cross-execution result",
+				changed_files: [],
+				artifacts: [],
+				evidence: ["worker_result"],
+				errors: [],
+			}),
+		};
+
+		const execution = await new PersonalPiPipeline({ state_store: store }).execute({
+			...planFor(task),
+			requirement: requirement(),
+			task,
+			worker,
+			snapshot: captureWorkspaceSnapshot("identity-commit", [], []),
+		});
+
+		expect(execution.task.state).toBe("FAILED");
+		expect(execution.result.summary).toBe("worker result identity mismatch");
+		expect(execution.result.task_id).toBe(task.id);
+		expect(execution.result.run_id).toBe(execution.run.id);
+		expect(execution.result.worker_id).toBe(worker.worker_id);
+		expect(store.read().results).toHaveLength(1);
+		expect(store.read().results[0]?.run_id).toBe(execution.run.id);
+	});
+
+	test("bounds additional Worker model calls through execution controls", async () => {
+		const store = new PersistentStateStore();
+		const task = makeTask("e2e-model-call-bound");
+		let callbackCalls = 0;
+		const execution = new PersonalPiPipeline({ state_store: store }).execute({
+			...planFor(task),
+			requirement: requirement(),
+			task,
+			worker: new PiWorker("pi-model-loop", ({ loop_budget }) => {
+				loop_budget?.beforeModelCall();
+				callbackCalls += 1;
+				loop_budget?.beforeModelCall();
+				callbackCalls += 1;
+				return { status: "success", summary: "unreachable", evidence: ["worker_result"] };
+			}),
+			snapshot: captureWorkspaceSnapshot("model-call-bound", [], []),
+		});
+
+		await expect(execution).rejects.toThrow("max_model_calls");
+		expect(store.getTask(task.id)?.state).toBe("BLOCKED");
+		expect(callbackCalls).toBe(1);
+		expect(store.getLoopUsage(task.id)).toMatchObject({ attempts: 1, model_calls: 2 });
+		expect(store.read().results[0]?.errors.join(" ")).toContain("max_model_calls");
 	});
 });
 

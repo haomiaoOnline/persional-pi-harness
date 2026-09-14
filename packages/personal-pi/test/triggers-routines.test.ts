@@ -59,6 +59,18 @@ function makeTask(id: string, topic = "daily summary"): TaskContract {
 		priority: "P1",
 		timeout: 30000,
 		retry_policy: { max_attempts: 2, backoff: 0 },
+		loop_budget: {
+			max_attempts: 2,
+			max_model_calls: 2,
+			max_tool_calls: 4,
+			max_handoffs: 1,
+			max_elapsed_ms: 60000,
+			max_input_tokens: 4000,
+			max_output_tokens: 4000,
+			max_cost_usd: 1,
+			max_state_growth_bytes: 10000,
+			on_exhaustion: { action: "BLOCKED", escalation: "human" },
+		},
 		approval: { required: false },
 	};
 }

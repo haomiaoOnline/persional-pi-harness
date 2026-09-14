@@ -80,6 +80,13 @@ export class LoopBudgetExhaustedError extends Error {
 	}
 }
 
+export class LoopBudgetMissingError extends Error {
+	constructor(taskId: string) {
+		super(`loop budget required for executable task: ${taskId}`);
+		this.name = "LoopBudgetMissingError";
+	}
+}
+
 export class LoopBudgetController {
 	private readonly store: PersistentStateStore;
 
@@ -104,6 +111,7 @@ export class LoopBudgetController {
 	}
 
 	record(task: Pick<TaskContract, "id" | "loop_budget">, delta: Partial<LoopUsage>): LoopUsage {
+		if (!task.loop_budget) throw new LoopBudgetMissingError(task.id);
 		const current = this.store.getLoopUsage(task.id);
 		const decision = evaluateLoopBudget(task, current, delta);
 		if (!decision.allowed) throw new LoopBudgetExhaustedError(decision);

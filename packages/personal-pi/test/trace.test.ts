@@ -4,6 +4,7 @@ import {
 	baselineReportsStable,
 	buildGraphEfficiencyBrief,
 	captureWorkspaceSnapshot,
+	computeGraphEfficiencyMetrics,
 	createPlanApproval,
 	EvalContextStore,
 	PersistentStateStore,
@@ -65,6 +66,18 @@ function makeTask(id: string): TaskContract {
 		priority: "P1",
 		timeout: 30000,
 		retry_policy: { max_attempts: 2, backoff: 0 },
+		loop_budget: {
+			max_attempts: 2,
+			max_model_calls: 2,
+			max_tool_calls: 2,
+			max_handoffs: 1,
+			max_elapsed_ms: 60000,
+			max_input_tokens: 4000,
+			max_output_tokens: 4000,
+			max_cost_usd: 1,
+			max_state_growth_bytes: 10000,
+			on_exhaustion: { action: "BLOCKED", escalation: "human" },
+		},
 		approval: { required: false },
 	};
 }
@@ -112,6 +125,39 @@ function planFor(task: TaskContract) {
 }
 
 describe("T11.1 execution trace", () => {
+	test("derives graph efficiency from recorded execution facts", () => {
+		const recorder = new TraceRecorder("metrics-task", "metrics-trace", "2026-09-13T11:00:00.000Z");
+		recorder.record("DISPATCH", "parallel dispatch", "2026-09-13T11:00:00.010Z", {
+			graph_width: 2,
+			graph_depth: 3,
+			active_workers: 2,
+			handoff_count: 1,
+		});
+		recorder.record("WORKER", "worker-a", "2026-09-13T11:00:00.020Z", {
+			active_workers: 2,
+			agent_calls: 1,
+		});
+		recorder.record("RUN", "retry run", "2026-09-13T11:00:00.030Z", { attempt: 2 });
+		recorder.record("RESULT", "success", "2026-09-13T11:00:00.040Z", { useful_work: 1 });
+		recorder.record("VERIFICATION", "PASS", "2026-09-13T11:00:00.050Z", { status: "PASS" });
+		recorder.finish("DONE", "2026-09-13T11:00:00.060Z");
+
+		expect(computeGraphEfficiencyMetrics(recorder.snapshot())).toEqual({
+			graph_width: 2,
+			graph_depth: 3,
+			handoff_count: 1,
+			peak_active_workers: 2,
+			retry_depth: 1,
+			replan_count: 0,
+			useful_work_ratio: 1,
+			verification_first_pass_rate: 0,
+			cost_per_verified_task: 0,
+			time_per_verified_task: 60,
+			agent_calls: 1,
+			coordination_efficiency: 1 / 3,
+		});
+	});
+
 	test("records every required stage and replays the decision path", () => {
 		const recorder = new TraceRecorder("trace-task", "trace-1", "2026-09-13T11:00:00.000Z");
 		for (const stage of TRACE_STAGES) recorder.record(stage, `${stage} completed`);

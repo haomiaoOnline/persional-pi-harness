@@ -1,5 +1,5 @@
 import type { LeaseManager } from "./lease.ts";
-import { LoopBudgetController, LoopBudgetExhaustedError } from "./loop-budget.ts";
+import { LoopBudgetController, LoopBudgetExhaustedError, LoopBudgetMissingError } from "./loop-budget.ts";
 import type { PersistentStateStore } from "./persistence.ts";
 import { createDecisionRecord } from "./planning.ts";
 import { validateResultContract } from "./result.ts";
@@ -109,10 +109,14 @@ export class RecoveryManager {
 		let action: RecoveryAction;
 		let nextWorkerId: string | undefined;
 		const recoveryLimit = Math.min(task.retry_policy.max_attempts, 2);
+		const loopBudgetMissing = !task.loop_budget;
 		const loopBudgetExhausted = task.loop_budget
 			? this.stateStore.getLoopUsage(task.id).attempts >= task.loop_budget.max_attempts
 			: false;
-		if (failedRuns.length >= recoveryLimit || loopBudgetExhausted) {
+		let decisionReason = loopBudgetMissing
+			? `${reason}; loop budget is required for recovery`
+			: `${reason}; failed_attempts=${failedRuns.length}`;
+		if (failedRuns.length >= recoveryLimit || loopBudgetMissing || loopBudgetExhausted) {
 			action = "BLOCK";
 			if (isOpenTask(nextTask.state)) {
 				if (nextTask.state === "RUNNING")
@@ -133,17 +137,22 @@ export class RecoveryManager {
 				nextTask = new TaskStateMachine().transition(nextTask, "READY", `recovery ${action.toLowerCase()}`, at);
 			}
 		}
-		// 回收决定一旦落地就立即推进 epoch，关闭旧 Worker 迟到写入的窗口；
-		// startRetry 随后会再领取一个新的正式执行 Lease。
-		this.leaseManager.acquire(task.id, nextWorkerId ?? run.worker_id, at);
+		if (action === "REASSIGN") {
+			try {
+				this.loopBudgetController.beforeHandoff(task);
+			} catch (error) {
+				if (!(error instanceof LoopBudgetExhaustedError || error instanceof LoopBudgetMissingError)) throw error;
+				action = "BLOCK";
+				nextWorkerId = undefined;
+				decisionReason = `${reason}; ${error.message}`;
+				nextTask = new TaskStateMachine().transition(nextTask, "BLOCKED", error.message, at);
+			}
+		}
+		// Recovery 只决定下一步，不预先创建 Lease；只有 startRetry 创建下一次 Run 时才推进 epoch。
+		const currentLease = this.leaseManager.currentLease(task.id);
+		if (currentLease) this.leaseManager.release(currentLease);
 		this.stateStore.updateTask(nextTask);
-		const decision = createDecisionRecord(
-			"recovery",
-			action,
-			`${reason}; failed_attempts=${failedRuns.length}`,
-			[task.id, run.id],
-			at,
-		);
+		const decision = createDecisionRecord("recovery", action, decisionReason, [task.id, run.id], at);
 		this.stateStore.addDecision(decision);
 		return {
 			task_id: task.id,
@@ -196,7 +205,21 @@ export class RecoveryManager {
 			return { accepted: false, reason: "malformed_result", decision: recovery.decision, recovery };
 		}
 		const admitted = validation.value;
-		if (admitted.task_id !== lease.task_id || admitted.lease_epoch !== lease.lease_epoch) {
+		const run = this.stateStore
+			.getRuns(lease.task_id)
+			.find(
+				(candidate) =>
+					candidate.status === "RUNNING" &&
+					candidate.lease_epoch === lease.lease_epoch &&
+					candidate.worker_id === lease.worker_id,
+			);
+		if (
+			!run ||
+			admitted.task_id !== lease.task_id ||
+			admitted.run_id !== run.id ||
+			admitted.worker_id !== lease.worker_id ||
+			admitted.lease_epoch !== lease.lease_epoch
+		) {
 			const recovery = this.recover({
 				task_id: lease.task_id,
 				fault: "wrong_result",

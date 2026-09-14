@@ -9,6 +9,7 @@ import {
 	DependencyResolver,
 	DynamicDecomposer,
 	graphNodeForTask,
+	PersistentStateStore,
 	type TaskContract,
 	TaskGraphStore,
 	type TaskRecord,
@@ -77,7 +78,11 @@ describe("T8.1 dynamic decomposition", () => {
 		const parent = makeTask("parent");
 		const children = [makeTask("prepare"), makeTask("execute"), makeTask("verify")];
 		const graph = new TaskGraphStore({ revision: 0, nodes: [graphNodeForTask(parent.id)], edges: [] });
-		const decomposer = new DynamicDecomposer(graph, undefined, [parent]);
+		const decomposer = new DynamicDecomposer(
+			graph,
+			new BudgetController({ max_depth: 2, max_children_per_task: 3, max_total_open_tasks: 5, max_replan_count: 1 }),
+			[parent],
+		);
 
 		const result = decomposer.decompose(parent, children);
 
@@ -90,7 +95,11 @@ describe("T8.1 dynamic decomposition", () => {
 	test("rejects an invalid child before changing the graph", () => {
 		const parent = makeTask("parent");
 		const graph = new TaskGraphStore({ revision: 0, nodes: [graphNodeForTask(parent.id)], edges: [] });
-		const decomposer = new DynamicDecomposer(graph, undefined, [parent]);
+		const decomposer = new DynamicDecomposer(
+			graph,
+			new BudgetController({ max_depth: 2, max_children_per_task: 3, max_total_open_tasks: 5, max_replan_count: 1 }),
+			[parent],
+		);
 		const invalid = { ...makeTask("invalid"), acceptance_criteria: [] };
 
 		expect(() => decomposer.decompose(parent, [invalid])).toThrow(DecompositionContractError);
@@ -179,5 +188,20 @@ describe("T8.4 decomposition and coordination budgets", () => {
 		budget.recordReplan();
 		budget.recordReplan();
 		expect(() => budget.recordReplan()).toThrow("max_replan_count");
+	});
+
+	test("persists the open task count used by decomposition admission", () => {
+		const store = new PersistentStateStore();
+		const limits = { max_depth: 2, max_children_per_task: 2, max_total_open_tasks: 4, max_replan_count: 1 };
+		const parent = makeTask("persisted-parent");
+		const child = makeTask("persisted-child");
+		const graph = new TaskGraphStore({ revision: 0, nodes: [graphNodeForTask(parent.id)], edges: [] });
+		const budget = new BudgetController(limits, undefined, {}, { store, scope: "persisted-graph" });
+
+		new DynamicDecomposer(graph, budget, [parent]).decompose(parent, [child]);
+
+		expect(store.read().budget_usage["persisted-graph"]?.open_tasks).toBe(2);
+		const restarted = new BudgetController(limits, undefined, {}, { store, scope: "persisted-graph" });
+		expect(restarted.read().usage.open_tasks).toBe(2);
 	});
 });

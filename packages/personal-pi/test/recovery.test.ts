@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
 	LeaseManager,
+	LoopBudgetController,
 	PersistentStateStore,
 	RecoveryManager,
 	type TaskContract,
@@ -53,6 +54,18 @@ function makeTask(id: string): TaskContract {
 		priority: "P1",
 		timeout: 10,
 		retry_policy: { max_attempts: 3, backoff: 0 },
+		loop_budget: {
+			max_attempts: 2,
+			max_model_calls: 2,
+			max_tool_calls: 2,
+			max_handoffs: 1,
+			max_elapsed_ms: 60000,
+			max_input_tokens: 2000,
+			max_output_tokens: 2000,
+			max_cost_usd: 1,
+			max_state_growth_bytes: 10000,
+			on_exhaustion: { action: "BLOCKED", escalation: "human" },
+		},
 		approval: { required: false },
 	};
 }
@@ -69,6 +82,7 @@ function startRunning(
 	record = machine.transition(record, "READY", "test ready", at);
 	record = machine.transition(record, "RUNNING", "test running", at);
 	store.updateTask(record);
+	new LoopBudgetController(store).beforeRun(task);
 	const lease = leases.acquire(task.id, workerId, at);
 	const run = store.createRun(task.id, workerId, lease.lease_epoch, at);
 	return { lease, run };
@@ -135,7 +149,7 @@ describe("T9.2 resume and reassign", () => {
 
 		expect(reassign.action).toBe("REASSIGN");
 		expect(reassign.next_worker_id).toBe("worker-b");
-		expect(leases.acceptResult(reassignRun.lease)).toEqual({ accepted: false, reason: "stale_result" });
+		expect(leases.acceptResult(reassignRun.lease)).toEqual({ accepted: false, reason: "unknown_lease" });
 	});
 });
 

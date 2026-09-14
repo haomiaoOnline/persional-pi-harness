@@ -16,6 +16,21 @@ import type {
 
 export type CommandRunner = (command: string) => Promise<CommandEvidence> | CommandEvidence;
 
+/** Verifier 的唯一 Result 视图；不包含 Worker 的 summary、scratchpad 或解释文本。 */
+export interface SanitizedVerifierResult {
+	task_id: string;
+	run_id: string;
+	worker_id: string;
+	lease_epoch: number;
+	status: ResultStatus;
+	changed_files: string[];
+	artifacts: string[];
+	evidence: string[];
+	errors: string[];
+	requested_context?: string[];
+	work_receipt?: ResultContract["work_receipt"];
+}
+
 export interface VerificationRequest {
 	task: TaskContract;
 	evidence: EvidenceRecord;
@@ -24,7 +39,7 @@ export interface VerificationRequest {
 	commandRunner?: CommandRunner;
 	recipeRegistry?: VerificationRecipeRegistry;
 	workerStatus?: ResultStatus;
-	result?: ResultContract;
+	result?: SanitizedVerifierResult;
 	checked_at?: string;
 }
 
@@ -35,19 +50,7 @@ export interface VerifierInput {
 		acceptance_criteria: string[];
 		verification: TaskContract["verification"];
 	};
-	result?: {
-		task_id: string;
-		run_id: string;
-		worker_id: string;
-		lease_epoch: number;
-		status: ResultStatus;
-		changed_files: string[];
-		artifacts: string[];
-		evidence: string[];
-		errors: string[];
-		requested_context?: string[];
-		work_receipt?: ResultContract["work_receipt"];
-	};
+	result?: SanitizedVerifierResult;
 	evidence: {
 		diff: EvidenceRecord["diff"];
 		commands: EvidenceRecord["commands"];
@@ -67,21 +70,7 @@ export function buildVerifierInput(request: VerificationRequest): VerifierInput 
 			acceptance_criteria: [...request.task.acceptance_criteria],
 			verification: structuredClone(request.task.verification),
 		},
-		result: request.result
-			? {
-					task_id: request.result.task_id,
-					run_id: request.result.run_id,
-					worker_id: request.result.worker_id,
-					lease_epoch: request.result.lease_epoch,
-					status: request.result.status,
-					changed_files: [...request.result.changed_files],
-					artifacts: [...request.result.artifacts],
-					evidence: [...request.result.evidence],
-					errors: [...request.result.errors],
-					requested_context: request.result.requested_context ? [...request.result.requested_context] : undefined,
-					work_receipt: request.result.work_receipt ? structuredClone(request.result.work_receipt) : undefined,
-				}
-			: undefined,
+		result: request.result ? sanitizeResultForVerification(request.result) : undefined,
 		evidence: {
 			diff: structuredClone(request.evidence.diff),
 			commands: structuredClone(request.evidence.commands),
@@ -91,6 +80,24 @@ export function buildVerifierInput(request: VerificationRequest): VerifierInput 
 			evidence_types: [...request.evidence.evidence_types],
 		},
 		recipe_ref: request.task.verification.recipe_ref,
+	};
+}
+
+export function sanitizeResultForVerification(
+	result: ResultContract | SanitizedVerifierResult,
+): SanitizedVerifierResult {
+	return {
+		task_id: result.task_id,
+		run_id: result.run_id,
+		worker_id: result.worker_id,
+		lease_epoch: result.lease_epoch,
+		status: result.status,
+		changed_files: [...result.changed_files],
+		artifacts: [...result.artifacts],
+		evidence: [...result.evidence],
+		errors: [...result.errors],
+		requested_context: result.requested_context ? [...result.requested_context] : undefined,
+		work_receipt: result.work_receipt ? structuredClone(result.work_receipt) : undefined,
 	};
 }
 
@@ -209,9 +216,11 @@ export class AcceptanceGate {
 		if (
 			result?.status === "success" &&
 			(!result.work_receipt ||
-				(result.work_receipt.artifacts_created.length === 0 &&
+				(!result.work_receipt.no_op &&
+					result.work_receipt.artifacts_created.length === 0 &&
 					!result.work_receipt.state_changed &&
-					!result.work_receipt.no_op_reason))
+					result.work_receipt.effects_count === 0) ||
+				(result.work_receipt.no_op && !result.work_receipt.no_op_reason))
 		) {
 			throw new AcceptanceGateError(
 				"work_receipt_anomaly: successful result has no observable work or no-op reason",

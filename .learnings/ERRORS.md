@@ -174,3 +174,67 @@ missing. Keep the copied inputs identical across pure and projected runs.
 
 - Reproducible: yes
 - Related Files: scripts/upstream-upgrade-gate.mjs
+
+## [ERR-20260914-001] personal-pi-vitest-cache-permission
+
+**Logged**: 2026-09-14T17:00:00+08:00
+**Priority**: medium
+**Status**: environment-bounded
+**Area**: tests
+
+### Summary
+
+The Personal PI core test command could not start because Vite could not write its temporary config bundle under the package-local node_modules cache.
+
+### Error
+
+```text
+EPERM: operation not permitted, open packages/personal-pi/node_modules/.vite-temp/vitest.config.ts.timestamp-*.mjs
+```
+
+### Context
+
+- Operation: `npm test --workspace=@personal-pi/core`
+- The process exited during Vitest configuration loading, before any test assertion ran.
+- The repository and source files were not changed by the failed command.
+
+### Suggested Fix
+
+Re-run the same command with the approved local execution boundary or a writable Vite cache. Treat this as an execution-environment failure, not a Personal PI regression.
+
+### Metadata
+
+- Reproducible: yes
+- Related Files: `packages/personal-pi/vitest.config.ts`
+
+## [ERR-20260914-002] audit-secret-scan-shell-arguments
+
+**Logged**: 2026-09-14T17:02:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: audit tooling
+
+### Summary
+
+Two initial filenames-only secret-scan probes failed before scanning because the shell expression had an unmatched quote and the ripgrep end-of-options marker was supplied as a filename argument.
+
+### Error
+
+```text
+zsh: unmatched \"
+rg: --: No such file or directory
+```
+
+### Context
+
+- The probes were intended to inspect only the current changed-file list and never printed matching content.
+- No repository file was changed by either failed probe.
+
+### Suggested Fix
+
+Use a simple single-quoted marker expression and pass the candidate filename directly after the pattern; keep the scanner output limited to filenames.
+
+### Metadata
+
+- Reproducible: no
+- Related Files: `/private/tmp/pph-a0-safety.P1IqAP/all-change-files.txt`

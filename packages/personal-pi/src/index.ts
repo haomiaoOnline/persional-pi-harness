@@ -1,4 +1,5 @@
 export * from "./artifacts.ts";
+export * from "./bound-coverage.ts";
 export * from "./context.ts";
 export * from "./effects.ts";
 export * from "./evidence.ts";

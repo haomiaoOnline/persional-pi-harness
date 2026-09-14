@@ -106,6 +106,10 @@ export class TraceRecorder {
 		};
 	}
 
+	setGraphEfficiencyMetrics(metrics: GraphEfficiencyMetrics): void {
+		this.trace.metrics.graph_efficiency = structuredClone(metrics);
+	}
+
 	finish(outcome: TraceOutcome, endedAt = new Date().toISOString()): void {
 		this.trace.outcome = outcome;
 		this.trace.ended_at = endedAt;
@@ -114,6 +118,85 @@ export class TraceRecorder {
 	snapshot(): ExecutionTrace {
 		return structuredClone(this.trace);
 	}
+}
+
+function numericField(event: TraceEvent, ...names: string[]): number | undefined {
+	for (const name of names) {
+		const value = event.fields?.[name];
+		if (typeof value === "number" && Number.isFinite(value)) return value;
+	}
+	return undefined;
+}
+
+function booleanField(event: TraceEvent, ...names: string[]): boolean | undefined {
+	for (const name of names) {
+		const value = event.fields?.[name];
+		if (typeof value === "boolean") return value;
+	}
+	return undefined;
+}
+
+/** 从 Trace 事件派生图效率；调用方只需记录边界事实，不得手工注入汇总结果。 */
+export function computeGraphEfficiencyMetrics(trace: ExecutionTrace): GraphEfficiencyMetrics {
+	const events = trace.events;
+	const workerEvents = events.filter((event) => event.stage === "WORKER");
+	const runEvents = events.filter((event) => event.stage === "RUN");
+	const resultEvents = events.filter((event) => event.stage === "RESULT");
+	const verificationEvents = events.filter((event) => event.stage === "VERIFICATION");
+	const graphWidth = Math.max(0, ...events.map((event) => numericField(event, "graph_width") ?? 0));
+	const graphDepth = Math.max(0, ...events.map((event) => numericField(event, "graph_depth") ?? 0));
+	const handoffCount = events.reduce((sum, event) => sum + (numericField(event, "handoff_count", "handoffs") ?? 0), 0);
+	const peakActiveWorkers = Math.max(
+		0,
+		...events.map((event) => numericField(event, "active_workers", "peak_active_workers") ?? 0),
+	);
+	const retryDepth = Math.max(
+		0,
+		...runEvents.map((event) => Math.max(0, (numericField(event, "attempt") ?? 1) - 1)),
+		...events.map((event) => numericField(event, "retry_depth") ?? 0),
+	);
+	const replanCount = events.reduce((sum, event) => sum + (numericField(event, "replan_count", "replans") ?? 0), 0);
+	const usefulSignals = resultEvents
+		.map((event) => {
+			const useful = numericField(event, "useful_work");
+			if (useful !== undefined) return useful;
+			const noOp = booleanField(event, "no_op");
+			if (noOp !== undefined) return noOp ? 0 : 1;
+			return undefined;
+		})
+		.filter((value): value is number => value !== undefined);
+	const usefulWorkRatio =
+		usefulSignals.length === 0
+			? 0
+			: usefulSignals.reduce((sum, value) => sum + (value > 0 ? 1 : 0), 0) / usefulSignals.length;
+	const agentCalls = events.reduce((sum, event) => sum + (numericField(event, "agent_calls", "model_calls") ?? 0), 0);
+	const measuredAgentCalls = agentCalls > 0 ? agentCalls : workerEvents.length;
+	const firstPass =
+		trace.outcome === "DONE" &&
+		verificationEvents.some((event) => event.detail === "PASS" || event.fields?.status === "PASS") &&
+		retryDepth === 0
+			? 1
+			: 0;
+	const measuredCost = events.reduce((sum, event) => sum + (numericField(event, "cost_usd", "cost") ?? 0), 0);
+	const measuredElapsed = events.reduce((sum, event) => sum + (numericField(event, "elapsed_ms") ?? 0), 0);
+	const derivedElapsed =
+		trace.ended_at && trace.started_at ? Math.max(0, Date.parse(trace.ended_at) - Date.parse(trace.started_at)) : 0;
+	const timePerVerifiedTask = measuredElapsed > 0 ? measuredElapsed : derivedElapsed;
+	const verified = trace.outcome === "DONE";
+	return {
+		graph_width: graphWidth,
+		graph_depth: graphDepth,
+		handoff_count: handoffCount,
+		peak_active_workers: peakActiveWorkers,
+		retry_depth: retryDepth,
+		replan_count: replanCount,
+		useful_work_ratio: usefulWorkRatio,
+		verification_first_pass_rate: firstPass,
+		cost_per_verified_task: verified ? measuredCost : 0,
+		time_per_verified_task: verified ? timePerVerifiedTask : 0,
+		agent_calls: measuredAgentCalls,
+		coordination_efficiency: verified ? 1 / Math.max(1, handoffCount + retryDepth + measuredAgentCalls) : 0,
+	};
 }
 
 export interface TraceReplay {

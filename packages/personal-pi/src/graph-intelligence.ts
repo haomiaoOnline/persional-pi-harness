@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ArtifactStore } from "./artifacts.ts";
 import type { TaskGraphStore } from "./graph.ts";
+import type { PersistentStateStore } from "./persistence.ts";
 import { evaluateDefinitionOfReady } from "./readiness.ts";
 import { validateTaskContract } from "./schema.ts";
 import type {
@@ -54,6 +55,11 @@ export interface BudgetApproval {
 	at?: string;
 }
 
+export interface BudgetPersistenceOptions {
+	store: PersistentStateStore;
+	scope?: string;
+}
+
 export interface BudgetDecision {
 	id: string;
 	dimension: string;
@@ -85,7 +91,9 @@ export class BudgetController {
 	private decomposition: DecompositionBudget;
 	private coordination: CoordinationBudget;
 	private usage: BudgetUsage;
-	private readonly decisions: BudgetDecision[] = [];
+	private readonly decisions: BudgetDecision[];
+	private readonly store?: PersistentStateStore;
+	private readonly persistenceScope: string;
 
 	constructor(
 		decomposition: DecompositionBudget,
@@ -95,16 +103,29 @@ export class BudgetController {
 			max_concurrent_roles: 1,
 		},
 		usage: Partial<BudgetUsage> = {},
+		persistence?: BudgetPersistenceOptions,
 	) {
 		this.decomposition = { ...decomposition };
 		this.coordination = { ...coordination };
+		this.store = persistence?.store;
+		this.persistenceScope = persistence?.scope ?? "global";
+		const persistedUsage = this.store?.read().budget_usage[this.persistenceScope];
 		this.usage = {
-			open_tasks: usage.open_tasks ?? 0,
-			replan_count: usage.replan_count ?? 0,
-			active_workers: usage.active_workers ?? 0,
-			handoffs_by_task: { ...(usage.handoffs_by_task ?? {}) },
-			concurrent_roles: usage.concurrent_roles ?? 0,
+			open_tasks: persistedUsage?.open_tasks ?? usage.open_tasks ?? 0,
+			replan_count: persistedUsage?.replan_count ?? usage.replan_count ?? 0,
+			active_workers: persistedUsage?.active_workers ?? usage.active_workers ?? 0,
+			handoffs_by_task: {
+				...(persistedUsage?.handoffs_by_task ?? usage.handoffs_by_task ?? {}),
+			},
+			concurrent_roles: persistedUsage?.concurrent_roles ?? usage.concurrent_roles ?? 0,
 		};
+		this.decisions = (this.store?.read().budget_decisions[this.persistenceScope] ?? []).map((decision) => ({
+			...decision,
+		}));
+	}
+
+	hasPersistentState(): boolean {
+		return this.store !== undefined;
 	}
 
 	checkDecomposition(depth: number, children: number, openTasks: number): void {
@@ -123,12 +144,15 @@ export class BudgetController {
 			reason: `depth=${depth}, children=${children}, open_tasks=${openTasks}`,
 			at: now(),
 		});
+		this.usage.open_tasks = openTasks;
+		this.persist();
 	}
 
 	recordReplan(): void {
 		if (this.usage.replan_count >= this.decomposition.max_replan_count)
 			this.deny("max_replan_count", "replan count exceeds budget");
 		this.usage.replan_count += 1;
+		this.persist();
 	}
 
 	reserveDispatch(taskId: string, activeWorkers: number, handoffs: number, concurrentRoles: number): void {
@@ -148,6 +172,7 @@ export class BudgetController {
 			reason: `task=${taskId}, workers=${activeWorkers}, handoffs=${handoffs}, roles=${concurrentRoles}`,
 			at: now(),
 		});
+		this.persist();
 	}
 
 	increase(
@@ -168,6 +193,7 @@ export class BudgetController {
 			at: approval.at ?? now(),
 		};
 		this.decisions.push(decision);
+		this.persist();
 		return { ...decision };
 	}
 
@@ -191,7 +217,18 @@ export class BudgetController {
 			reason: message,
 			at: now(),
 		});
+		this.persist();
 		throw new BudgetExceededError(dimension, message);
+	}
+
+	private persist(): void {
+		if (!this.store) return;
+		const usage = cloneUsage(this.usage);
+		const decisions = this.decisions.map((decision) => ({ ...decision }));
+		this.store.transact((state) => {
+			state.budget_usage[this.persistenceScope] = usage;
+			state.budget_decisions[this.persistenceScope] = decisions;
+		});
 	}
 }
 
@@ -220,6 +257,7 @@ export class DynamicDecomposer {
 		if (!this.graph.read().nodes.some((node) => node.task_id === parent.id))
 			throw new DecompositionContractError(`parent task is absent from graph: ${parent.id}`);
 		if (children.length === 0) throw new DecompositionContractError("decomposition must produce at least one child");
+		if (!this.budget) throw new DecompositionContractError("decomposition budget is required for re-entry control");
 		const childIds = new Set<string>();
 		for (const child of children) {
 			const validation = validateTaskContract(child);
@@ -235,7 +273,7 @@ export class DynamicDecomposer {
 		}
 		const parentDepth = this.depths.get(parent.id) ?? 0;
 		const openTasks = this.tasks.size + children.length + (this.tasks.has(parent.id) ? 0 : 1);
-		if (this.budget) this.budget.checkDecomposition(parentDepth, children.length, openTasks);
+		this.budget.checkDecomposition(parentDepth, children.length, openTasks);
 		const nodes = children.map((child) => ({ id: `node:${child.id}`, task_id: child.id }));
 		const edges: GraphEdge[] = children.map((child) => ({
 			id: `decompose:${parent.id}:${child.id}`,
@@ -258,6 +296,14 @@ export class DynamicDecomposer {
 			graph_revision: graph.revision,
 			depth: parentDepth + 1,
 		};
+	}
+
+	replan(parent: TaskContract, children: readonly TaskContract[]): DecompositionResult {
+		if (!this.budget?.hasPersistentState())
+			throw new DecompositionContractError("persistent decomposition budget is required for replan");
+		const result = this.decompose(parent, children);
+		this.budget.recordReplan();
+		return result;
 	}
 
 	getTask(taskId: string): TaskContract | undefined {

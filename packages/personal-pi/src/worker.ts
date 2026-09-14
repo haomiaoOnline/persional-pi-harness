@@ -1,14 +1,21 @@
 import { randomUUID } from "node:crypto";
+import { LoopBudgetExhaustedError, LoopBudgetMissingError } from "./loop-budget.ts";
 import { buildPromptPayload } from "./prompt.ts";
 import { createWorkReceipt, validateResultContract } from "./result.ts";
 import { checkRoleBoundary } from "./roles.ts";
 import { validateTaskContract } from "./schema.ts";
 import { authorizeWorkerExecution, filterSensitiveContext, type PermissionDecision } from "./security.ts";
-import type { ResultContract, WorkerExecutionInput, WorkerExecutionOutput, WorkerProtocolRequest } from "./types.ts";
+import type {
+	ResultContract,
+	WorkerExecutionControls,
+	WorkerExecutionInput,
+	WorkerExecutionOutput,
+	WorkerProtocolRequest,
+} from "./types.ts";
 
 export interface WorkerAdapter {
 	readonly worker_id: string;
-	execute(request: WorkerProtocolRequest): Promise<ResultContract>;
+	execute(request: WorkerProtocolRequest, controls?: WorkerExecutionControls): Promise<ResultContract>;
 }
 
 export type PiWorkerExecutor = (input: WorkerExecutionInput) => Promise<WorkerExecutionOutput> | WorkerExecutionOutput;
@@ -42,7 +49,7 @@ export class PiWorker implements WorkerAdapter {
 		this.executor = executor;
 	}
 
-	async execute(request: WorkerProtocolRequest): Promise<ResultContract> {
+	async execute(request: WorkerProtocolRequest, controls?: WorkerExecutionControls): Promise<ResultContract> {
 		const validation = validateTaskContract(request.task);
 		if (!validation.valid) return failureResult(request, this.worker_id, "invalid task contract", validation.errors);
 		if (request.protocol.task_id !== request.task.id)
@@ -86,6 +93,7 @@ export class PiWorker implements WorkerAdapter {
 				role_profile: request.role_profile,
 				requested_actions: [...(request.requested_actions ?? [])],
 				resolved_context: safeContext,
+				loop_budget: controls,
 			});
 			const result: ResultContract = {
 				task_id: request.task.id,
@@ -108,6 +116,7 @@ export class PiWorker implements WorkerAdapter {
 				? result
 				: failureResult(request, this.worker_id, "worker returned malformed result", resultValidation.errors);
 		} catch (error) {
+			if (error instanceof LoopBudgetExhaustedError || error instanceof LoopBudgetMissingError) throw error;
 			const message = error instanceof Error ? error.message : String(error);
 			return failureResult(request, this.worker_id, "worker execution failed", [message]);
 		}

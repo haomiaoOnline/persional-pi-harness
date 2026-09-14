@@ -129,6 +129,15 @@ export interface LoopUsage {
 	state_growth_bytes: number;
 }
 
+/**
+ * Worker 适配器在一次执行中继续调用模型或工具时，必须通过这组控制点申请配额。
+ * 控制点只返回持久化后的累计用量，不把预算对象或凭证带入 Worker 协议正文。
+ */
+export interface WorkerExecutionControls {
+	beforeModelCall(): LoopUsage;
+	beforeToolCall(): LoopUsage;
+}
+
 export interface TaskVerification {
 	strategy: VerificationStrategy;
 	commands: string[];
@@ -537,6 +546,7 @@ export interface WorkerExecutionInput {
 	role_profile?: RoleProfile;
 	requested_actions: string[];
 	resolved_context?: ResolvedContext;
+	loop_budget?: WorkerExecutionControls;
 }
 
 export interface WorkerExecutionOutput {
@@ -652,6 +662,9 @@ export interface ControlPlaneReconstruction {
 	running_run_ids: string[];
 	blocked_task_ids: string[];
 	decision_ids: string[];
+	active_leases: Lease[];
+	lease_epochs: Record<string, number>;
+	snapshot_ids: string[];
 }
 
 export interface PersistentState {
@@ -667,10 +680,36 @@ export interface PersistentState {
 	decisions: DecisionRecord[];
 	role_profiles: RoleProfile[];
 	effects: EffectRecord[];
+	/** 分解/协调预算的累计用量，按预算作用域持久化。 */
+	budget_usage: Record<string, BudgetUsageState>;
+	/** 分解/协调预算的允许与拒绝决策，按预算作用域持久化。 */
+	budget_decisions: Record<string, BudgetDecisionState[]>;
+	/** 当前有效租约；释放后删除，历史 epoch 由 lease_epochs 保留。 */
+	leases: Record<string, Lease>;
+	/** 每个 Task 最近分配过的 epoch，防止 Controller 重启后 epoch 回退。 */
+	lease_epochs: Record<string, number>;
 	loop_usage: Record<string, LoopUsage>;
 	traces: ExecutionTrace[];
 	regressions: RegressionCase[];
 	snapshots: Array<Pick<StateSnapshot, "id" | "created_at" | "digest">>;
+	snapshot_payloads: Record<string, { created_at: string; digest: string; state: PersistentState }>;
+}
+
+export interface BudgetUsageState {
+	open_tasks: number;
+	replan_count: number;
+	active_workers: number;
+	handoffs_by_task: Record<string, number>;
+	concurrent_roles: number;
+}
+
+export interface BudgetDecisionState {
+	id: string;
+	dimension: string;
+	action: "ALLOW" | "DENY" | "INCREASE";
+	reason: string;
+	approved_by?: string;
+	at: string;
 }
 
 export interface ContextReference {

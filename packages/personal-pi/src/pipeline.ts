@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { type ContextResolver, evaluateContextReadiness } from "./context.ts";
 import { EvidenceCollector } from "./evidence.ts";
 import { LeaseManager } from "./lease.ts";
-import { LoopBudgetController, LoopBudgetExhaustedError } from "./loop-budget.ts";
+import { LoopBudgetController, LoopBudgetExhaustedError, LoopBudgetMissingError } from "./loop-budget.ts";
 import { PersistentStateStore } from "./persistence.ts";
 import {
 	assessArchitectureCommercial,
@@ -20,9 +20,10 @@ import { evaluateDefinitionOfReady } from "./readiness.ts";
 import type { VerificationRecipeRegistry } from "./recipes.ts";
 import { ensureWorkReceipt, validateResultContract } from "./result.ts";
 import { createTaskRecord, TaskStateMachine } from "./state-machine.ts";
-import { createRegressionCase, TraceRecorder } from "./trace.ts";
+import { computeGraphEfficiencyMetrics, createRegressionCase, TraceRecorder } from "./trace.ts";
 import type {
 	ArchitectureCommercialAssessment,
+	CommandEvidence,
 	DecisionRecord,
 	DispatchDecision,
 	DispatchRecord,
@@ -42,10 +43,17 @@ import type {
 	TaskContract,
 	TaskRecord,
 	VerificationRecord,
+	WorkerExecutionControls,
 	WorkerProtocolRequest,
 	WorkspaceSnapshot,
 } from "./types.ts";
-import { AcceptanceGate, type CommandRunner, VerificationEngine, type VerificationRequest } from "./verification.ts";
+import {
+	AcceptanceGate,
+	type CommandRunner,
+	sanitizeResultForVerification,
+	VerificationEngine,
+	type VerificationRequest,
+} from "./verification.ts";
 import type { WorkerAdapter } from "./worker.ts";
 
 export type PipelineStage =
@@ -124,14 +132,19 @@ function dispatchMode(mode: DispatchDecision["mode"]): DispatchRecord["mode"] {
 	return "single";
 }
 
-function failureResult(request: WorkerProtocolRequest, workerId: string, error: unknown): ResultContract {
+function failureResult(
+	request: WorkerProtocolRequest,
+	workerId: string,
+	error: unknown,
+	summary = "worker adapter threw before returning a Result Contract",
+): ResultContract {
 	return {
 		task_id: request.task.id,
 		run_id: request.run_id ?? randomUUID(),
 		worker_id: workerId,
 		lease_epoch: request.protocol.lease_epoch,
 		status: "failure",
-		summary: "worker adapter threw before returning a Result Contract",
+		summary,
 		changed_files: [],
 		artifacts: [],
 		evidence: [],
@@ -150,7 +163,18 @@ function failureResult(request: WorkerProtocolRequest, workerId: string, error: 
 
 function normalizeResult(request: WorkerProtocolRequest, result: ResultContract, workerId: string): ResultContract {
 	const validation = validateResultContract(result);
-	if (validation.valid) return ensureWorkReceipt(result);
+	if (validation.valid) {
+		const identityErrors = [
+			result.task_id === request.task.id ? undefined : `task_id mismatch: expected ${request.task.id}`,
+			result.run_id === request.run_id ? undefined : `run_id mismatch: expected ${request.run_id}`,
+			result.worker_id === workerId ? undefined : `worker_id mismatch: expected ${workerId}`,
+			result.lease_epoch === request.protocol.lease_epoch
+				? undefined
+				: `lease_epoch mismatch: expected ${request.protocol.lease_epoch}`,
+		].filter((error): error is string => error !== undefined);
+		if (identityErrors.length === 0) return ensureWorkReceipt(result);
+		return failureResult(request, workerId, new Error(identityErrors.join("; ")), "worker result identity mismatch");
+	}
 	return {
 		task_id: request.task.id,
 		run_id: request.run_id ?? randomUUID(),
@@ -175,7 +199,7 @@ export class PersonalPiPipeline {
 
 	constructor(options: PersonalPiPipelineOptions = {}) {
 		this.stateStore = options.state_store ?? new PersistentStateStore();
-		this.leaseManager = options.lease_manager ?? new LeaseManager();
+		this.leaseManager = options.lease_manager ?? new LeaseManager(this.stateStore);
 		this.evidenceCollector = options.evidence_collector ?? new EvidenceCollector();
 		this.verificationEngine = options.verification_engine ?? new VerificationEngine();
 		this.acceptanceGate = options.acceptance_gate ?? new AcceptanceGate();
@@ -225,6 +249,11 @@ export class PersonalPiPipeline {
 		tracer.record("DISPATCH", dispatch.mode, at, {
 			worker_tier: dispatch.worker_tier,
 			reasoning_depth: dispatch.reasoning_depth,
+			graph_width: 1,
+			graph_depth: 1,
+			active_workers: 1,
+			handoff_count: 0,
+			replan_count: 0,
 		});
 		const decisions = [
 			createDecisionRecord(
@@ -314,7 +343,13 @@ export class PersonalPiPipeline {
 			this.stateStore.addDecision(decision);
 			tracer.addDecision(decision);
 			tracer.record("RUN", "blocked before Run creation", at);
+			tracer.setMetrics({
+				token_per_task: 0,
+				cache_hit_rate: 0,
+				worker_tier: request.task.execution.worker_tier,
+			});
 			tracer.finish("BLOCKED", at);
+			tracer.setGraphEfficiencyMetrics(computeGraphEfficiencyMetrics(tracer.snapshot()));
 			this.stateStore.addTrace(tracer.snapshot());
 			throw new PipelineStageError("RUN", reason, task.id);
 		}
@@ -343,24 +378,99 @@ export class PersonalPiPipeline {
 		};
 		let result: ResultContract;
 		try {
-			result = normalizeResult(workerRequest, await request.worker.execute(workerRequest), request.worker.worker_id);
+			this.loopBudgetController.beforeModelCall(request.task);
+			const controls: WorkerExecutionControls = {
+				beforeModelCall: () => this.loopBudgetController.beforeModelCall(request.task),
+				beforeToolCall: () => this.loopBudgetController.beforeToolCall(request.task),
+			};
+			result = normalizeResult(
+				workerRequest,
+				await request.worker.execute(workerRequest, controls),
+				request.worker.worker_id,
+			);
 		} catch (error) {
+			if (error instanceof LoopBudgetExhaustedError || error instanceof LoopBudgetMissingError) {
+				const reason = error.message;
+				const blockedResult = failureResult(workerRequest, request.worker.worker_id, error);
+				this.stateStore.saveResult(blockedResult, at);
+				task = this.stateStore.updateTask(new TaskStateMachine().transition(task, "BLOCKED", reason, at));
+				const decision = createDecisionRecord("loop_budget", "BLOCKED", reason, [task.id, run.id], at);
+				this.stateStore.addDecision(decision);
+				tracer.addDecision(decision);
+				tracer.record("RESULT", "blocked before model call", at);
+				tracer.record("ACCEPTANCE", "loop budget exhaustion requires human review", at);
+				this.leaseManager.release(lease);
+				tracer.setMetrics({
+					token_per_task: resolvedContext?.total_tokens ?? 0,
+					cache_hit_rate: resolvedContext?.cache_hit ? 1 : 0,
+					worker_tier: request.task.execution.worker_tier,
+				});
+				tracer.finish("BLOCKED", at);
+				tracer.setGraphEfficiencyMetrics(computeGraphEfficiencyMetrics(tracer.snapshot()));
+				this.stateStore.addTrace(tracer.snapshot());
+				throw new PipelineStageError("RUN", reason, task.id);
+			}
 			result = failureResult(workerRequest, request.worker.worker_id, error);
 		}
 		if (!this.leaseManager.acceptResult(lease).accepted) {
 			throw new PipelineStageError("RESULT", "Worker result rejected by fencing lease", task.id);
 		}
 		this.stateStore.saveResult(result, at);
-		tracer.record("RESULT", result.status, at);
+		tracer.record("RESULT", result.status, at, {
+			useful_work: result.work_receipt && !result.work_receipt.no_op ? 1 : 0,
+			no_op: result.work_receipt?.no_op ?? false,
+		});
+
+		const verifierCommands: CommandEvidence[] = [];
+		if (request.command_runner) {
+			for (const command of request.task.verification.commands) {
+				try {
+					this.loopBudgetController.beforeToolCall(request.task);
+				} catch (error) {
+					if (error instanceof LoopBudgetExhaustedError || error instanceof LoopBudgetMissingError) {
+						const reason = error.message;
+						const blockedResult = failureResult(workerRequest, request.worker.worker_id, error);
+						this.stateStore.saveResult(blockedResult, at);
+						task = this.stateStore.updateTask(new TaskStateMachine().transition(task, "BLOCKED", reason, at));
+						const decision = createDecisionRecord("loop_budget", "BLOCKED", reason, [task.id, run.id], at);
+						this.stateStore.addDecision(decision);
+						tracer.addDecision(decision);
+						tracer.record("EVIDENCE", "blocked before verification tool call", at);
+						this.leaseManager.release(lease);
+						tracer.setMetrics({
+							token_per_task: resolvedContext?.total_tokens ?? 0,
+							cache_hit_rate: resolvedContext?.cache_hit ? 1 : 0,
+							worker_tier: request.task.execution.worker_tier,
+						});
+						tracer.finish("BLOCKED", at);
+						tracer.setGraphEfficiencyMetrics(computeGraphEfficiencyMetrics(tracer.snapshot()));
+						this.stateStore.addTrace(tracer.snapshot());
+						throw new PipelineStageError("EVIDENCE", reason, task.id);
+					}
+					throw error;
+				}
+				try {
+					verifierCommands.push(await request.command_runner(command));
+				} catch {
+					// 缺失的命令证据由 Verifier 记为 UNKNOWN；不把环境异常伪装成通过。
+				}
+			}
+		}
 
 		const evidence = this.evidenceCollector.collect({
 			task_id: task.id,
 			run_id: run.id,
 			changed_files: result.changed_files,
+			commands: verifierCommands,
 			stdout: result.summary,
 			stderr: result.errors.join("; "),
 			artifacts: result.artifacts,
-			evidence_types: result.evidence,
+			evidence_types: [
+				...new Set([
+					...result.evidence,
+					...(verifierCommands.some((command) => command.exit_code === 0) ? ["independent_command"] : []),
+				]),
+			],
 			captured_at: at,
 		});
 		this.stateStore.saveEvidence(evidence);
@@ -374,10 +484,10 @@ export class PersonalPiPipeline {
 			evidence,
 			snapshot: request.snapshot,
 			currentSnapshot: request.current_snapshot ?? request.snapshot,
-			commandRunner: request.command_runner,
+			commandRunner: undefined,
 			recipeRegistry: request.recipe_registry,
 			workerStatus: result.status,
-			result,
+			result: sanitizeResultForVerification(result),
 			checked_at: at,
 		};
 		const verification = await this.verificationEngine.verify(verificationRequest);
@@ -391,7 +501,7 @@ export class PersonalPiPipeline {
 		);
 		this.stateStore.addDecision(verificationDecision);
 		tracer.addDecision(verificationDecision);
-		tracer.record("VERIFICATION", verification.status, at);
+		tracer.record("VERIFICATION", verification.status, at, { status: verification.status });
 
 		if (verification.status === "PASS" && result.status === "success") {
 			try {
@@ -424,6 +534,11 @@ export class PersonalPiPipeline {
 		}
 		this.stateStore.updateTask(task);
 		if (task.state !== "DONE") {
+			this.stateStore.markRunFailed(
+				run.id,
+				verification.reasons.join("; ") || `verification ${verification.status}`,
+				at,
+			);
 			this.stateStore.addRegression(
 				createRegressionCase({
 					category: "pipeline_failure",
@@ -446,22 +561,9 @@ export class PersonalPiPipeline {
 			token_per_task: resolvedContext?.total_tokens ?? 0,
 			cache_hit_rate: resolvedContext?.cache_hit ? 1 : 0,
 			worker_tier: request.task.execution.worker_tier,
-			graph_efficiency: {
-				graph_width: 1,
-				graph_depth: 1,
-				handoff_count: 0,
-				peak_active_workers: 1,
-				retry_depth: Math.max(0, run.attempt - 1),
-				replan_count: 0,
-				useful_work_ratio: result.work_receipt?.no_op ? 0 : 1,
-				verification_first_pass_rate: verification.status === "PASS" && run.attempt === 1 ? 1 : 0,
-				cost_per_verified_task: 0,
-				time_per_verified_task: 0,
-				agent_calls: 1,
-				coordination_efficiency: task.state === "DONE" ? 1 : 0,
-			},
 		});
 		tracer.finish(task.state === "DONE" ? "DONE" : task.state === "BLOCKED" ? "BLOCKED" : "FAILED", at);
+		tracer.setGraphEfficiencyMetrics(computeGraphEfficiencyMetrics(tracer.snapshot()));
 		const trace = tracer.snapshot();
 		this.stateStore.addTrace(trace);
 		return {

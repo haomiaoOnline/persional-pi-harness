@@ -1024,4 +1024,79 @@ Post-commit audit found that `packages/personal-pi/src/loop-budget.ts` was still
 - **Resolved**: 2026-09-14T09:33:00+08:00
 - **Notes**: added the source in a corrective commit before continuing T12.1–T12.3; re-ran package tests/build and retained the untracked Registry work for its own commit.
 
+## [ERR-20260914-030] v3 retroactive audit execution and evidence capture friction
+
+**Logged**: 2026-09-14T12:00:00+08:00
+**Priority**: medium
+**Status**: resolved or explicitly bounded
+**Area**: audit tooling / environment / release hygiene
+
+### Symptoms
+
+- A malformed patch against `packages/personal-pi/src/recovery.ts` was rejected by `apply_patch` before changing the file.
+- The first sandboxed Vitest run could not open `packages/personal-pi/node_modules/.vite-temp/*` with `EPERM`; the test process did not reach assertions.
+- The first sandboxed `npm run check` stopped at Biome with `Operation not permitted`.
+- A direct test invocation used unsupported Vitest option `--minWorkers` and exited with `CACError: Unknown option`.
+- A macOS `find -printf` probe failed because that GNU-only predicate is not supported by the system `find`.
+- A later patch verification failure occurred while reviewing a displayed duplicate region; the source remained unchanged and was rechecked with `git diff --check`.
+
+### Resolution
+
+- Re-ran required tests and checks with the approved elevated execution boundary; Personal PI package tests, build, protocol isolation, scripts, and regression suites passed.
+- Kept the exact repository-wide upstream/PPH failures visible instead of skipping or weakening them.
+- Replaced unsupported probes with portable commands and verified the final working tree with `git diff --check`.
+- No `--no-verify` was used and no commit was created during this audit.
+
+### Known upstream fingerprints retained
+
+- `packages/ai/src/api/google-shared.ts(402,10): error TS2322: Type 'FinishReason.TOO_MANY_TOOL_CALLS' is not assignable to type 'never'.`
+- `packages/coding-agent` session/CLI expectations still assert `pi` while the current PPH runtime returns `pph`.
+- `packages/coding-agent` package/resource/trust expectations still assert `.pi` or old project paths while the current runtime returns `.pph`/agent paths.
+- `packages/coding-agent` experimental remote runtime tests report `Unknown session: demo-1` and `No discovered server contains session demo-1`.
+- `packages/coding-agent` fswatch test reports `no FSWatcher found among active handles`.
+
+These fingerprints are recorded as known upstream/PPH rebrand debt, not as Personal PI evidence and not as broad skip conditions.
+
+## [ERR-20260914-031] v3.0 reconciliation boundary fixes
+
+**Logged**: 2026-09-14T17:07:00+08:00
+**Priority**: high
+**Status**: resolved locally; external evidence remains blocked
+**Area**: Personal PI runtime / release hygiene
+
+### Symptoms
+
+- A structurally valid result with another task, Run, Worker, or lease epoch could reach the pipeline acceptance path.
+- Separate LeaseManager instances sharing one Persistent State Store could overwrite each other's active leases.
+- Decomposition admission recorded `open_tasks` in the decision text but not in persisted budget usage.
+- Recovery could create a replacement Lease before the next Run existed.
+- A Worker adapter had no explicit admission hook for additional model calls inside one execution.
+
+### Resolution
+
+- Bound pipeline results to task/run/worker/lease identity and convert mismatches to a current-run failure.
+- Make shared-store lease operations merge by entry, read the persistent current lease for fencing, and retain monotonic epochs.
+- Persist the admitted decomposition open-task count and defer replacement lease creation to `startRetry`.
+- Add Worker execution controls for nested model/tool admissions; `PiWorker` propagates budget exhaustion to the pipeline.
+- Added regression coverage for all five boundaries; the targeted suite passed 48 tests in 11 files.
+
+### Remaining boundary
+
+Adapters that make uninstrumented provider calls without using the execution controls remain outside the kernel's observable admission boundary. Real Provider/Worker evidence is still required before the reopened Phase 3, 7, and 12 gates can close.
+
+## [ERR-20260914-032] reconciliation-document patch construction
+
+**Logged**: 2026-09-14T17:10:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: audit tooling
+
+### Symptoms
+
+The first two attempts to add the reconciliation document were rejected by `apply_patch` because lines inside a fenced code block were missing patch prefixes; the repository was unchanged by those attempts.
+
+### Resolution
+
+Rebuilt the patch from the complete document content with one explicit add-line prefix per source line, then verified the resulting file and `git diff --check`.
+
 ---

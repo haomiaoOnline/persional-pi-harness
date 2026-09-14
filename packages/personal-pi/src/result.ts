@@ -90,15 +90,29 @@ export function ensureWorkReceipt(result: ResultContract): ResultContract {
 	};
 }
 
+export function workReceiptErrors(receipt: WorkReceipt): string[] {
+	const errors: string[] = [];
+	const observableWork = receipt.effects_count > 0 || receipt.artifacts_created.length > 0 || receipt.state_changed;
+	if (receipt.no_op && !receipt.no_op_reason) errors.push("/work_receipt/no_op_reason: required when no_op is true");
+	if (!receipt.no_op && receipt.no_op_reason)
+		errors.push("/work_receipt/no_op_reason: only allowed when no_op is true");
+	if (!receipt.work_attempted && !receipt.no_op)
+		errors.push("/work_receipt: work_attempted=false requires no_op=true");
+	if (receipt.no_op && observableWork) errors.push("/work_receipt: no_op=true cannot report observable work");
+	return errors;
+}
+
+export function workReceiptHasObservableWork(receipt: WorkReceipt): boolean {
+	return receipt.effects_count > 0 || receipt.artifacts_created.length > 0 || receipt.state_changed;
+}
+
 export function validateResultContract(value: unknown): ValidationResult<ResultContract> {
 	if (Value.Check(ResultContractSchema, value)) {
 		const result = value as ResultContract;
 		const receipt = result.work_receipt;
-		if (receipt?.no_op && !receipt.no_op_reason) {
-			return { valid: false, errors: ["/work_receipt/no_op_reason: required when no_op is true"] };
-		}
-		if (receipt && !receipt.work_attempted && !receipt.no_op) {
-			return { valid: false, errors: ["/work_receipt: work_attempted=false requires no_op=true"] };
+		if (receipt) {
+			const errors = workReceiptErrors(receipt);
+			if (errors.length > 0) return { valid: false, errors };
 		}
 		return { valid: true, value: result, errors: [] };
 	}

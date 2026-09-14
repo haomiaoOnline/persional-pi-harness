@@ -1,5 +1,7 @@
 # Personal PI Bound Coverage Audit
 
+> **状态说明（2026-09-14）**：本文是审计前的历史快照。其“PASS”结论已被当前 v3.0 Retroactive Stage Gate Audit supersede；当前路径、持久化与运行时硬门请查看 [`docs/stage-gates/bound-coverage.md`](../stage-gates/bound-coverage.md)。
+
 ## Audit scope
 
 This document implements the v3.0 `T1.6 Bound Coverage Audit` discipline. It is a Stage Gate review artifact, not a new runtime scheduler. The audit covers every active path in the current repository that can re-enter an earlier execution state. A future path remains explicitly marked inactive until the phase that introduces it.
