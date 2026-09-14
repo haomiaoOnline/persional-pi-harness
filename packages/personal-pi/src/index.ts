@@ -13,6 +13,7 @@ export * from "./planning.ts";
 export * from "./plugin.ts";
 export * from "./prompt.ts";
 export * from "./protocol.ts";
+export * from "./provider-resilience.ts";
 export * from "./readiness.ts";
 export * from "./recipes.ts";
 export * from "./recovery.ts";
