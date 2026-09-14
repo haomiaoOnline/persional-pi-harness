@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { type ContextResolver, evaluateContextReadiness } from "./context.ts";
 import { EvidenceCollector } from "./evidence.ts";
 import { LeaseManager } from "./lease.ts";
+import { LoopBudgetController, LoopBudgetExhaustedError } from "./loop-budget.ts";
 import { PersistentStateStore } from "./persistence.ts";
 import {
 	assessArchitectureCommercial,
@@ -17,7 +18,7 @@ import {
 import { createProtocolEnvelope } from "./protocol.ts";
 import { evaluateDefinitionOfReady } from "./readiness.ts";
 import type { VerificationRecipeRegistry } from "./recipes.ts";
-import { validateResultContract } from "./result.ts";
+import { ensureWorkReceipt, validateResultContract } from "./result.ts";
 import { createTaskRecord, TaskStateMachine } from "./state-machine.ts";
 import { createRegressionCase, TraceRecorder } from "./trace.ts";
 import type {
@@ -135,12 +136,21 @@ function failureResult(request: WorkerProtocolRequest, workerId: string, error: 
 		artifacts: [],
 		evidence: [],
 		errors: [error instanceof Error ? error.message : String(error)],
+		work_receipt: {
+			work_attempted: false,
+			effects_count: 0,
+			artifacts_created: [],
+			state_changed: false,
+			no_op: true,
+			no_op_reason: "worker adapter threw before execution",
+			evidence_refs: [],
+		},
 	};
 }
 
 function normalizeResult(request: WorkerProtocolRequest, result: ResultContract, workerId: string): ResultContract {
 	const validation = validateResultContract(result);
-	if (validation.valid) return structuredClone(result);
+	if (validation.valid) return ensureWorkReceipt(result);
 	return {
 		task_id: request.task.id,
 		run_id: request.run_id ?? randomUUID(),
@@ -161,6 +171,7 @@ export class PersonalPiPipeline {
 	private readonly evidenceCollector: EvidenceCollector;
 	private readonly verificationEngine: VerificationEngine;
 	private readonly acceptanceGate: AcceptanceGate;
+	private readonly loopBudgetController: LoopBudgetController;
 
 	constructor(options: PersonalPiPipelineOptions = {}) {
 		this.stateStore = options.state_store ?? new PersistentStateStore();
@@ -168,6 +179,7 @@ export class PersonalPiPipeline {
 		this.evidenceCollector = options.evidence_collector ?? new EvidenceCollector();
 		this.verificationEngine = options.verification_engine ?? new VerificationEngine();
 		this.acceptanceGate = options.acceptance_gate ?? new AcceptanceGate();
+		this.loopBudgetController = new LoopBudgetController(this.stateStore);
 	}
 
 	async execute(request: PipelineRequest): Promise<PipelineExecution> {
@@ -293,6 +305,19 @@ export class PersonalPiPipeline {
 		);
 		tracer.record("DOR", "Definition of Ready passed", at);
 		tracer.record("WORKER", request.worker.worker_id, at);
+		try {
+			this.loopBudgetController.beforeRun(request.task);
+		} catch (error) {
+			const reason = error instanceof LoopBudgetExhaustedError ? error.message : String(error);
+			task = this.stateStore.updateTask(new TaskStateMachine().transition(task, "BLOCKED", reason, at));
+			const decision = createDecisionRecord("loop_budget", "BLOCKED", reason, [task.id], at);
+			this.stateStore.addDecision(decision);
+			tracer.addDecision(decision);
+			tracer.record("RUN", "blocked before Run creation", at);
+			tracer.finish("BLOCKED", at);
+			this.stateStore.addTrace(tracer.snapshot());
+			throw new PipelineStageError("RUN", reason, task.id);
+		}
 		const lease = this.leaseManager.acquire(task.id, request.worker.worker_id, at);
 		const run = this.stateStore.createRun(task.id, request.worker.worker_id, lease.lease_epoch, at);
 		tracer.attachRun(run.id);
@@ -352,6 +377,7 @@ export class PersonalPiPipeline {
 			commandRunner: request.command_runner,
 			recipeRegistry: request.recipe_registry,
 			workerStatus: result.status,
+			result,
 			checked_at: at,
 		};
 		const verification = await this.verificationEngine.verify(verificationRequest);
@@ -368,7 +394,22 @@ export class PersonalPiPipeline {
 		tracer.record("VERIFICATION", verification.status, at);
 
 		if (verification.status === "PASS" && result.status === "success") {
-			task = this.acceptanceGate.markDone(task, verification, request.current_snapshot ?? request.snapshot);
+			try {
+				task = this.acceptanceGate.markDone(
+					task,
+					verification,
+					request.current_snapshot ?? request.snapshot,
+					result,
+				);
+			} catch (error) {
+				if (!(error instanceof Error) || !error.message.startsWith("work_receipt_anomaly:")) throw error;
+				const reason = error.message;
+				task = new TaskStateMachine().transition(task, "BLOCKED", reason, at);
+				const decision = createDecisionRecord("work_receipt", "BLOCKED", reason, [task.id, run.id], at);
+				this.stateStore.addDecision(decision);
+				tracer.addDecision(decision);
+				tracer.record("ACCEPTANCE", "work receipt anomaly requires human review", at);
+			}
 		} else {
 			const terminalState =
 				result.status === "INSUFFICIENT_CONTEXT" || verification.status === "UNKNOWN" ? "BLOCKED" : "FAILED";
@@ -395,11 +436,30 @@ export class PersonalPiPipeline {
 			);
 		}
 		this.leaseManager.release(lease);
-		tracer.record("ACCEPTANCE", task.state, at);
+		if (
+			task.state !== "BLOCKED" ||
+			!tracer.snapshot().events.some((event) => event.detail === "work receipt anomaly requires human review")
+		) {
+			tracer.record("ACCEPTANCE", task.state, at);
+		}
 		tracer.setMetrics({
 			token_per_task: resolvedContext?.total_tokens ?? 0,
 			cache_hit_rate: resolvedContext?.cache_hit ? 1 : 0,
 			worker_tier: request.task.execution.worker_tier,
+			graph_efficiency: {
+				graph_width: 1,
+				graph_depth: 1,
+				handoff_count: 0,
+				peak_active_workers: 1,
+				retry_depth: Math.max(0, run.attempt - 1),
+				replan_count: 0,
+				useful_work_ratio: result.work_receipt?.no_op ? 0 : 1,
+				verification_first_pass_rate: verification.status === "PASS" && run.attempt === 1 ? 1 : 0,
+				cost_per_verified_task: 0,
+				time_per_verified_task: 0,
+				agent_calls: 1,
+				coordination_efficiency: task.state === "DONE" ? 1 : 0,
+			},
 		});
 		tracer.finish(task.state === "DONE" ? "DONE" : task.state === "BLOCKED" ? "BLOCKED" : "FAILED", at);
 		const trace = tracer.snapshot();

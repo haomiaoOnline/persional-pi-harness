@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import type { BatchResultEnvelope, ResultContract, ResultStatus, ValidationResult } from "./types.ts";
+import type { BatchResultEnvelope, ResultContract, ResultStatus, ValidationResult, WorkReceipt } from "./types.ts";
 
 const ResultStatusSchema = Type.Union([
 	Type.Literal("success"),
@@ -8,6 +8,19 @@ const ResultStatusSchema = Type.Union([
 	Type.Literal("timeout"),
 	Type.Literal("INSUFFICIENT_CONTEXT"),
 ]);
+
+const WorkReceiptSchema = Type.Object(
+	{
+		work_attempted: Type.Boolean(),
+		effects_count: Type.Integer({ minimum: 0 }),
+		artifacts_created: Type.Array(Type.String()),
+		state_changed: Type.Boolean(),
+		no_op: Type.Boolean(),
+		no_op_reason: Type.Optional(Type.String({ minLength: 1 })),
+		evidence_refs: Type.Array(Type.String()),
+	},
+	{ additionalProperties: false },
+);
 
 const ResultItemSchema = Type.Object(
 	{
@@ -18,6 +31,7 @@ const ResultItemSchema = Type.Object(
 		evidence: Type.Array(Type.String()),
 		errors: Type.Array(Type.String()),
 		requested_context: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
+		work_receipt: Type.Optional(WorkReceiptSchema),
 	},
 	{ additionalProperties: false },
 );
@@ -35,6 +49,7 @@ const ResultContractSchema = Type.Object(
 		evidence: Type.Array(Type.String()),
 		errors: Type.Array(Type.String()),
 		requested_context: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
+		work_receipt: Type.Optional(WorkReceiptSchema),
 	},
 	{ additionalProperties: false },
 );
@@ -51,8 +66,42 @@ const BatchResultEnvelopeSchema = Type.Object(
 
 export { BatchResultEnvelopeSchema, ResultContractSchema, ResultItemSchema, ResultStatusSchema };
 
+export function createWorkReceipt(
+	changedFiles: readonly string[],
+	artifacts: readonly string[],
+	evidence: readonly string[],
+	workAttempted = true,
+): WorkReceipt {
+	return {
+		work_attempted: workAttempted,
+		effects_count: changedFiles.length + artifacts.length,
+		artifacts_created: [...artifacts],
+		state_changed: changedFiles.length > 0 || artifacts.length > 0,
+		no_op: false,
+		evidence_refs: [...evidence],
+	};
+}
+
+export function ensureWorkReceipt(result: ResultContract): ResultContract {
+	if (result.work_receipt) return structuredClone(result);
+	return {
+		...structuredClone(result),
+		work_receipt: createWorkReceipt(result.changed_files, result.artifacts, result.evidence),
+	};
+}
+
 export function validateResultContract(value: unknown): ValidationResult<ResultContract> {
-	if (Value.Check(ResultContractSchema, value)) return { valid: true, value: value as ResultContract, errors: [] };
+	if (Value.Check(ResultContractSchema, value)) {
+		const result = value as ResultContract;
+		const receipt = result.work_receipt;
+		if (receipt?.no_op && !receipt.no_op_reason) {
+			return { valid: false, errors: ["/work_receipt/no_op_reason: required when no_op is true"] };
+		}
+		if (receipt && !receipt.work_attempted && !receipt.no_op) {
+			return { valid: false, errors: ["/work_receipt: work_attempted=false requires no_op=true"] };
+		}
+		return { valid: true, value: result, errors: [] };
+	}
 	return {
 		valid: false,
 		errors: [...Value.Errors(ResultContractSchema, value)].map((error) => {

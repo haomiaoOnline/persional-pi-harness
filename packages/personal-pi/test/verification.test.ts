@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
 	AcceptanceGate,
 	AcceptanceGateError,
+	buildVerifierInput,
 	canUnlockDownstream,
 	captureWorkspaceSnapshot,
 	createTaskRecord,
@@ -127,6 +128,39 @@ describe("T4.2 Verification Engine", () => {
 		expect(record.reasons.join(" ")).toContain("command failed");
 	});
 
+	test("does not expose Worker explanation text to the Verifier input", async () => {
+		const task = makeTask();
+		const workerResult = {
+			task_id: task.id,
+			run_id: "run-1",
+			worker_id: "worker-1",
+			lease_epoch: 1,
+			status: "success" as const,
+			summary: "I think this passes because the hidden scratchpad says so",
+			changed_files: [],
+			artifacts: [],
+			evidence: ["stdout"],
+			errors: [],
+		};
+		const verifierInput = buildVerifierInput({
+			task,
+			evidence: evidence(task),
+			snapshot: captureWorkspaceSnapshot("commit-1", [], []),
+			result: workerResult,
+		});
+
+		expect(verifierInput.result).not.toHaveProperty("summary");
+		expect(JSON.stringify(verifierInput)).not.toContain("hidden scratchpad");
+		const record = await new VerificationEngine().verify({
+			task,
+			evidence: evidence(task),
+			snapshot: captureWorkspaceSnapshot("commit-1", [], []),
+			result: workerResult,
+			commandRunner: (command) => ({ command, exit_code: 1, stdout: "", stderr: "actual failure" }),
+		});
+		expect(record.status).toBe("FAIL");
+	});
+
 	test("reports UNKNOWN when evidence or the verification environment is incomplete", async () => {
 		const task = makeTask();
 		const missing = await new VerificationEngine().verify({
@@ -201,6 +235,50 @@ describe("T4.3–T4.4 Acceptance Gate and revision binding", () => {
 		expect(() => new AcceptanceGate().markDone({ ...record, state: "READY" }, verification, snapshot)).toThrow(
 			AcceptanceGateError,
 		);
+	});
+
+	test("blocks a successful result with no observable work and accepts an explicit no-op", async () => {
+		const task = makeTask();
+		let record = createTaskRecord(task);
+		const stateMachine = new TaskStateMachine();
+		record = stateMachine.transition(record, "READY");
+		record = stateMachine.transition(record, "RUNNING");
+		record = stateMachine.transition(record, "VERIFYING");
+		const snapshot = captureWorkspaceSnapshot("commit-1", [], []);
+		const verification = await new VerificationEngine().verify({
+			task,
+			evidence: evidence(task),
+			snapshot,
+			commandRunner: (command) => ({ command, exit_code: 0, stdout: "pass", stderr: "" }),
+		});
+		const anomaly = {
+			task_id: task.id,
+			run_id: "run-1",
+			worker_id: "worker-1",
+			lease_epoch: 1,
+			status: "success" as const,
+			summary: "green",
+			changed_files: [],
+			artifacts: [],
+			evidence: ["stdout", "test_result"],
+			errors: [],
+			work_receipt: {
+				work_attempted: true,
+				effects_count: 0,
+				artifacts_created: [],
+				state_changed: false,
+				no_op: false,
+				evidence_refs: [],
+			},
+		};
+		expect(() => new AcceptanceGate().markDone(record, verification, snapshot, anomaly)).toThrow(
+			"work_receipt_anomaly",
+		);
+		const legalNoOp = {
+			...anomaly,
+			work_receipt: { ...anomaly.work_receipt, no_op: true, no_op_reason: "没有新的消息" },
+		};
+		expect(new AcceptanceGate().markDone(record, verification, snapshot, legalNoOp).state).toBe("DONE");
 	});
 });
 

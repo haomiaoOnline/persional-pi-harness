@@ -5,6 +5,7 @@ import type {
 	ContextReference,
 	DecisionRecord,
 	ExecutionTrace,
+	GraphEfficiencyMetrics,
 	RegressionCase,
 	ResolvedContext,
 	TaskContract,
@@ -37,6 +38,24 @@ function emptyMetrics(): TraceMetrics {
 		token_per_task: 0,
 		cache_hit_rate: 0,
 		worker_tier_distribution: { cheap: 0, standard: 0, frontier: 0 },
+		graph_efficiency: emptyGraphEfficiency(),
+	};
+}
+
+function emptyGraphEfficiency(): GraphEfficiencyMetrics {
+	return {
+		graph_width: 0,
+		graph_depth: 0,
+		handoff_count: 0,
+		peak_active_workers: 0,
+		retry_depth: 0,
+		replan_count: 0,
+		useful_work_ratio: 0,
+		verification_first_pass_rate: 0,
+		cost_per_verified_task: 0,
+		time_per_verified_task: 0,
+		agent_calls: 0,
+		coordination_efficiency: 0,
 	};
 }
 
@@ -67,7 +86,12 @@ export class TraceRecorder {
 		this.trace.decisions.push(structuredClone(decision));
 	}
 
-	setMetrics(metrics: { token_per_task: number; cache_hit_rate: number; worker_tier: WorkerTier }): void {
+	setMetrics(metrics: {
+		token_per_task: number;
+		cache_hit_rate: number;
+		worker_tier: WorkerTier;
+		graph_efficiency?: GraphEfficiencyMetrics;
+	}): void {
 		this.trace.metrics = {
 			token_per_task: metrics.token_per_task,
 			cache_hit_rate: metrics.cache_hit_rate,
@@ -76,6 +100,9 @@ export class TraceRecorder {
 				standard: metrics.worker_tier === "standard" ? 1 : 0,
 				frontier: metrics.worker_tier === "frontier" ? 1 : 0,
 			},
+			graph_efficiency: metrics.graph_efficiency
+				? structuredClone(metrics.graph_efficiency)
+				: emptyGraphEfficiency(),
 		};
 	}
 
@@ -289,6 +316,54 @@ export function summarizeTraceMetrics(traces: readonly ExecutionTrace[]): TraceM
 			traces.length === 0 ? 0 : traces.reduce((sum, trace) => sum + trace.metrics.cache_hit_rate, 0) / traces.length,
 		worker_tier_distribution: tierDistribution,
 	};
+}
+
+export interface GraphEfficiencyBrief {
+	period: string;
+	sample_count: number;
+	verified_tasks: number;
+	metrics: GraphEfficiencyMetrics;
+	created_at: string;
+}
+
+export function summarizeGraphEfficiency(traces: readonly ExecutionTrace[]): {
+	verified_tasks: number;
+	metrics: GraphEfficiencyMetrics;
+} {
+	const metrics = traces.map((trace) => trace.metrics.graph_efficiency ?? emptyGraphEfficiency());
+	const verifiedTasks = traces.filter((trace) => trace.outcome === "DONE").length;
+	const sum = (field: keyof GraphEfficiencyMetrics): number => metrics.reduce((total, item) => total + item[field], 0);
+	const average = (field: keyof GraphEfficiencyMetrics): number =>
+		metrics.length === 0 ? 0 : sum(field) / metrics.length;
+	const totalCost = sum("cost_per_verified_task");
+	const totalTime = sum("time_per_verified_task");
+	const coordinationDenominator = sum("handoff_count") + sum("retry_depth") + sum("agent_calls");
+	return {
+		verified_tasks: verifiedTasks,
+		metrics: {
+			graph_width: average("graph_width"),
+			graph_depth: average("graph_depth"),
+			handoff_count: sum("handoff_count"),
+			peak_active_workers: Math.max(0, ...metrics.map((item) => item.peak_active_workers)),
+			retry_depth: sum("retry_depth"),
+			replan_count: sum("replan_count"),
+			useful_work_ratio: average("useful_work_ratio"),
+			verification_first_pass_rate: average("verification_first_pass_rate"),
+			cost_per_verified_task: verifiedTasks === 0 ? 0 : totalCost / verifiedTasks,
+			time_per_verified_task: verifiedTasks === 0 ? 0 : totalTime / verifiedTasks,
+			agent_calls: sum("agent_calls"),
+			coordination_efficiency: verifiedTasks / Math.max(1, coordinationDenominator),
+		},
+	};
+}
+
+export function buildGraphEfficiencyBrief(
+	traces: readonly ExecutionTrace[],
+	period: string,
+	createdAt = new Date().toISOString(),
+): GraphEfficiencyBrief {
+	const summary = summarizeGraphEfficiency(traces);
+	return { period, sample_count: traces.length, ...summary, created_at: createdAt };
 }
 
 export class EvalContextStore {

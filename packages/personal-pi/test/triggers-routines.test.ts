@@ -90,6 +90,18 @@ function pipelineOptions(task: TaskContract) {
 	};
 }
 
+function legalNoOpReceipt() {
+	return {
+		work_attempted: true,
+		effects_count: 0,
+		artifacts_created: [],
+		state_changed: false,
+		no_op: true,
+		no_op_reason: "scheduled check found no new state to change",
+		evidence_refs: ["worker_result"],
+	};
+}
+
 function requirement() {
 	return {
 		user: "owner",
@@ -161,6 +173,7 @@ describe("T7.3 Trigger Gateway", () => {
 				status: "success",
 				summary: "scheduled result passed",
 				evidence: ["worker_result"],
+				work_receipt: legalNoOpReceipt(),
 			})),
 			snapshot: captureWorkspaceSnapshot("scheduled-commit", [], []),
 		});
@@ -184,6 +197,7 @@ describe("T7.4 Demonstration-based Routine Capture", () => {
 				status: "success",
 				summary: "source summary passed",
 				evidence: ["worker_result"],
+				work_receipt: legalNoOpReceipt(),
 			})),
 			snapshot: captureWorkspaceSnapshot("routine-commit", [], []),
 		});
@@ -213,6 +227,7 @@ describe("T7.4 Demonstration-based Routine Capture", () => {
 				status: "success",
 				summary: "reused routine passed",
 				evidence: ["worker_result"],
+				work_receipt: legalNoOpReceipt(),
 			})),
 			snapshot: captureWorkspaceSnapshot("routine-commit", [], []),
 		});

@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
 	assertEvalIsolation,
 	baselineReportsStable,
+	buildGraphEfficiencyBrief,
 	captureWorkspaceSnapshot,
 	createPlanApproval,
 	EvalContextStore,
@@ -135,6 +136,20 @@ describe("T11.1 execution trace", () => {
 			token_per_task: 128,
 			cache_hit_rate: 1,
 			worker_tier_distribution: { cheap: 1, standard: 0, frontier: 0 },
+			graph_efficiency: {
+				graph_width: 0,
+				graph_depth: 0,
+				handoff_count: 0,
+				peak_active_workers: 0,
+				retry_depth: 0,
+				replan_count: 0,
+				useful_work_ratio: 0,
+				verification_first_pass_rate: 0,
+				cost_per_verified_task: 0,
+				time_per_verified_task: 0,
+				agent_calls: 0,
+				coordination_efficiency: 0,
+			},
 		});
 	});
 
@@ -149,6 +164,15 @@ describe("T11.1 execution trace", () => {
 				status: "success",
 				summary: "trace pipeline passed",
 				evidence: ["worker_result"],
+				work_receipt: {
+					work_attempted: true,
+					effects_count: 0,
+					artifacts_created: [],
+					state_changed: false,
+					no_op: true,
+					no_op_reason: "trace test has no file or artifact change",
+					evidence_refs: ["worker_result"],
+				},
 			})),
 			snapshot: captureWorkspaceSnapshot("trace-commit", [], []),
 			at: "2026-09-13T11:01:00.000Z",
@@ -233,6 +257,35 @@ describe("T11.2 regression and baseline controls", () => {
 			cache_hit_rate: 0.5,
 			worker_tier_distribution: { cheap: 1, standard: 1, frontier: 0 },
 		});
+	});
+
+	test("produces a graph efficiency brief with coordination efficiency", () => {
+		const recorder = new TraceRecorder("graph-metric");
+		recorder.setMetrics({
+			token_per_task: 100,
+			cache_hit_rate: 0,
+			worker_tier: "standard",
+			graph_efficiency: {
+				graph_width: 2,
+				graph_depth: 3,
+				handoff_count: 1,
+				peak_active_workers: 2,
+				retry_depth: 1,
+				replan_count: 0,
+				useful_work_ratio: 1,
+				verification_first_pass_rate: 1,
+				cost_per_verified_task: 0,
+				time_per_verified_task: 20,
+				agent_calls: 1,
+				coordination_efficiency: 0,
+			},
+		});
+		recorder.finish("DONE");
+
+		const brief = buildGraphEfficiencyBrief([recorder.snapshot()], "2026-W37", "2026-09-13T11:03:00.000Z");
+		expect(brief.metrics.coordination_efficiency).toBe(1 / 3);
+		expect(brief.metrics.graph_depth).toBe(3);
+		expect(brief.verified_tasks).toBe(1);
 	});
 });
 

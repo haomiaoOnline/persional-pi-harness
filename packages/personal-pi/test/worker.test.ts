@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
 	createProtocolEnvelope,
+	createWorkReceipt,
 	DEFAULT_ROLE_PROFILES,
 	EffectJournal,
 	MissingIdempotencyKeyError,
@@ -95,6 +96,14 @@ describe("T3.3 Result Contract", () => {
 	test.each(["success", "failure", "timeout", "INSUFFICIENT_CONTEXT"] as const)("accepts %s results", (status) => {
 		const candidate = result(status);
 		if (status === "INSUFFICIENT_CONTEXT") candidate.requested_context = ["context:api-contract"];
+		expect(validateResultContract(candidate).valid).toBe(true);
+	});
+
+	test("requires a reason for an explicit no-op receipt", () => {
+		const candidate = result("success");
+		candidate.work_receipt = { ...createWorkReceipt([], [], ["stdout"]), no_op: true };
+		expect(validateResultContract(candidate).valid).toBe(false);
+		candidate.work_receipt.no_op_reason = "no new work was available";
 		expect(validateResultContract(candidate).valid).toBe(true);
 	});
 

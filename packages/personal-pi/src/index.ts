@@ -5,6 +5,7 @@ export * from "./evidence.ts";
 export * from "./graph.ts";
 export * from "./graph-intelligence.ts";
 export * from "./lease.ts";
+export * from "./loop-budget.ts";
 export * from "./master.ts";
 export * from "./persistence.ts";
 export * from "./pipeline.ts";

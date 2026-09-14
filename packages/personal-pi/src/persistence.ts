@@ -11,6 +11,7 @@ import type {
 	DispatchRecord,
 	EvidenceRecord,
 	ExecutionTrace,
+	LoopUsage,
 	PersistentState,
 	RecoveryDecision,
 	RegressionCase,
@@ -38,6 +39,7 @@ function emptyState(): PersistentState {
 		decisions: [],
 		role_profiles: [],
 		effects: [],
+		loop_usage: {},
 		traces: [],
 		regressions: [],
 		snapshots: [],
@@ -51,6 +53,7 @@ function normalizeState(state: Partial<PersistentState>): PersistentState {
 		...state,
 		traces: state.traces ?? [],
 		regressions: state.regressions ?? [],
+		loop_usage: state.loop_usage ?? {},
 	};
 }
 
@@ -199,6 +202,42 @@ export class PersistentStateStore {
 	getTrace(traceId: string): ExecutionTrace | undefined {
 		const trace = this.state.traces.find((candidate) => candidate.trace_id === traceId);
 		return trace ? structuredClone(trace) : undefined;
+	}
+
+	getLoopUsage(taskId: string): LoopUsage {
+		const usage = this.state.loop_usage[taskId];
+		return structuredClone(
+			usage ?? {
+				attempts: 0,
+				model_calls: 0,
+				tool_calls: 0,
+				handoffs: 0,
+				elapsed_ms: 0,
+				input_tokens: 0,
+				output_tokens: 0,
+				cost_usd: 0,
+				state_growth_bytes: 0,
+			},
+		);
+	}
+
+	recordLoopUsage(taskId: string, delta: Partial<LoopUsage>): LoopUsage {
+		if (!this.state.tasks.some((task) => task.id === taskId)) throw new Error(`unknown task: ${taskId}`);
+		this.transact((state) => {
+			const current = state.loop_usage[taskId] ?? this.getLoopUsage(taskId);
+			state.loop_usage[taskId] = {
+				attempts: current.attempts + (delta.attempts ?? 0),
+				model_calls: current.model_calls + (delta.model_calls ?? 0),
+				tool_calls: current.tool_calls + (delta.tool_calls ?? 0),
+				handoffs: current.handoffs + (delta.handoffs ?? 0),
+				elapsed_ms: current.elapsed_ms + (delta.elapsed_ms ?? 0),
+				input_tokens: current.input_tokens + (delta.input_tokens ?? 0),
+				output_tokens: current.output_tokens + (delta.output_tokens ?? 0),
+				cost_usd: current.cost_usd + (delta.cost_usd ?? 0),
+				state_growth_bytes: current.state_growth_bytes + (delta.state_growth_bytes ?? 0),
+			};
+		});
+		return this.getLoopUsage(taskId);
 	}
 
 	addRegression(regression: RegressionCase): void {

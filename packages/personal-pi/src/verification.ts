@@ -6,6 +6,7 @@ import { TaskStateMachine } from "./state-machine.ts";
 import type {
 	CommandEvidence,
 	EvidenceRecord,
+	ResultContract,
 	ResultStatus,
 	TaskContract,
 	TaskRecord,
@@ -23,7 +24,74 @@ export interface VerificationRequest {
 	commandRunner?: CommandRunner;
 	recipeRegistry?: VerificationRecipeRegistry;
 	workerStatus?: ResultStatus;
+	result?: ResultContract;
 	checked_at?: string;
+}
+
+export interface VerifierInput {
+	task: {
+		id: string;
+		task_revision: number;
+		acceptance_criteria: string[];
+		verification: TaskContract["verification"];
+	};
+	result?: {
+		task_id: string;
+		run_id: string;
+		worker_id: string;
+		lease_epoch: number;
+		status: ResultStatus;
+		changed_files: string[];
+		artifacts: string[];
+		evidence: string[];
+		errors: string[];
+		requested_context?: string[];
+		work_receipt?: ResultContract["work_receipt"];
+	};
+	evidence: {
+		diff: EvidenceRecord["diff"];
+		commands: EvidenceRecord["commands"];
+		test_result?: string;
+		build_result?: string;
+		artifacts: string[];
+		evidence_types: string[];
+	};
+	recipe_ref?: string;
+}
+
+export function buildVerifierInput(request: VerificationRequest): VerifierInput {
+	return {
+		task: {
+			id: request.task.id,
+			task_revision: request.task.task_revision,
+			acceptance_criteria: [...request.task.acceptance_criteria],
+			verification: structuredClone(request.task.verification),
+		},
+		result: request.result
+			? {
+					task_id: request.result.task_id,
+					run_id: request.result.run_id,
+					worker_id: request.result.worker_id,
+					lease_epoch: request.result.lease_epoch,
+					status: request.result.status,
+					changed_files: [...request.result.changed_files],
+					artifacts: [...request.result.artifacts],
+					evidence: [...request.result.evidence],
+					errors: [...request.result.errors],
+					requested_context: request.result.requested_context ? [...request.result.requested_context] : undefined,
+					work_receipt: request.result.work_receipt ? structuredClone(request.result.work_receipt) : undefined,
+				}
+			: undefined,
+		evidence: {
+			diff: structuredClone(request.evidence.diff),
+			commands: structuredClone(request.evidence.commands),
+			test_result: request.evidence.test_result,
+			build_result: request.evidence.build_result,
+			artifacts: [...request.evidence.artifacts],
+			evidence_types: [...request.evidence.evidence_types],
+		},
+		recipe_ref: request.task.verification.recipe_ref,
+	};
 }
 
 function missingEvidence(task: TaskContract, evidence: EvidenceRecord): string[] {
@@ -40,6 +108,7 @@ function snapshotMatches(left: WorkspaceSnapshot, right: WorkspaceSnapshot): boo
 
 export class VerificationEngine {
 	async verify(request: VerificationRequest): Promise<VerificationRecord> {
+		const verifierInput = buildVerifierInput(request);
 		const checks: string[] = [];
 		const reasons: string[] = [];
 		let status: VerificationRecord["status"] = "PASS";
@@ -90,7 +159,7 @@ export class VerificationEngine {
 				reasons.push(`command failed: ${command}`);
 			}
 		}
-		if (request.workerStatus === "failure") {
+		if ((verifierInput.result?.status ?? request.workerStatus) === "failure") {
 			// Worker 自称成功不能直接放行；Worker 已明确失败时只会让结论更差。
 			status = "FAIL";
 			reasons.push("worker result reported failure");
@@ -119,7 +188,12 @@ export class AcceptanceGateError extends Error {
 }
 
 export class AcceptanceGate {
-	markDone(task: TaskRecord, verification: VerificationRecord, currentSnapshot: WorkspaceSnapshot): TaskRecord {
+	markDone(
+		task: TaskRecord,
+		verification: VerificationRecord,
+		currentSnapshot: WorkspaceSnapshot,
+		result?: ResultContract,
+	): TaskRecord {
 		if (task.state !== "VERIFYING") throw new AcceptanceGateError("task must be VERIFYING before acceptance");
 		if (verification.status !== "PASS")
 			throw new AcceptanceGateError(`verification is ${verification.status}, not PASS`);
@@ -132,6 +206,17 @@ export class AcceptanceGate {
 		};
 		if (!snapshotMatches(recordedSnapshot, currentSnapshot))
 			throw new AcceptanceGateError("verification PASS invalidated by workspace change");
+		if (
+			result?.status === "success" &&
+			(!result.work_receipt ||
+				(result.work_receipt.artifacts_created.length === 0 &&
+					!result.work_receipt.state_changed &&
+					!result.work_receipt.no_op_reason))
+		) {
+			throw new AcceptanceGateError(
+				"work_receipt_anomaly: successful result has no observable work or no-op reason",
+			);
+		}
 		return new TaskStateMachine().transition(task, "DONE", "independent verification passed");
 	}
 }

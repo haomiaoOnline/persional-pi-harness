@@ -104,6 +104,26 @@ const TaskContractSchema = Type.Object(
 			},
 			{ additionalProperties: false },
 		),
+		loop_budget: Type.Optional(
+			Type.Object(
+				{
+					max_attempts: Type.Integer({ minimum: 1 }),
+					max_model_calls: Type.Integer({ minimum: 0 }),
+					max_tool_calls: Type.Integer({ minimum: 0 }),
+					max_handoffs: Type.Integer({ minimum: 0 }),
+					max_elapsed_ms: Type.Integer({ minimum: 1 }),
+					max_input_tokens: Type.Integer({ minimum: 0 }),
+					max_output_tokens: Type.Integer({ minimum: 0 }),
+					max_cost_usd: Type.Number({ minimum: 0 }),
+					max_state_growth_bytes: Type.Integer({ minimum: 0 }),
+					on_exhaustion: Type.Object(
+						{ action: Type.Literal("BLOCKED"), escalation: Type.Literal("human") },
+						{ additionalProperties: false },
+					),
+				},
+				{ additionalProperties: false },
+			),
+		),
 		approval: Type.Object(
 			{
 				required: Type.Boolean(),

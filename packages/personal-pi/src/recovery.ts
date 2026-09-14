@@ -1,4 +1,5 @@
 import type { LeaseManager } from "./lease.ts";
+import { LoopBudgetController, LoopBudgetExhaustedError } from "./loop-budget.ts";
 import type { PersistentStateStore } from "./persistence.ts";
 import { createDecisionRecord } from "./planning.ts";
 import { validateResultContract } from "./result.ts";
@@ -67,10 +68,12 @@ function isOpenTask(state: TaskStatus): boolean {
 export class RecoveryManager {
 	private readonly stateStore: PersistentStateStore;
 	private readonly leaseManager: LeaseManager;
+	private readonly loopBudgetController: LoopBudgetController;
 
 	constructor(stateStore: PersistentStateStore, leaseManager: LeaseManager) {
 		this.stateStore = stateStore;
 		this.leaseManager = leaseManager;
+		this.loopBudgetController = new LoopBudgetController(stateStore);
 	}
 
 	findTimedOut(at = new Date()): RecoveryPlan[] {
@@ -106,7 +109,10 @@ export class RecoveryManager {
 		let action: RecoveryAction;
 		let nextWorkerId: string | undefined;
 		const recoveryLimit = Math.min(task.retry_policy.max_attempts, 2);
-		if (failedRuns.length >= recoveryLimit) {
+		const loopBudgetExhausted = task.loop_budget
+			? this.stateStore.getLoopUsage(task.id).attempts >= task.loop_budget.max_attempts
+			: false;
+		if (failedRuns.length >= recoveryLimit || loopBudgetExhausted) {
 			action = "BLOCK";
 			if (isOpenTask(nextTask.state)) {
 				if (nextTask.state === "RUNNING")
@@ -154,6 +160,11 @@ export class RecoveryManager {
 		const task = this.stateStore.getTask(taskId);
 		if (!task) throw new RecoveryError(`unknown task: ${taskId}`);
 		if (task.state !== "READY") throw new RecoveryError(`task is not READY for recovery: ${task.state}`);
+		try {
+			this.loopBudgetController.beforeRun(task);
+		} catch (error) {
+			throw new RecoveryError(error instanceof LoopBudgetExhaustedError ? error.message : String(error));
+		}
 		const lease = this.leaseManager.acquire(task.id, workerId, at);
 		const running = new TaskStateMachine().transition(task, "RUNNING", "recovery retry started", at);
 		const updated = this.stateStore.updateTask(running);

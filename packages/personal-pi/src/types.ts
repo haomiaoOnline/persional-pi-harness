@@ -101,6 +101,34 @@ export interface TaskExecution {
 	idempotency_key?: string;
 }
 
+export interface LoopBudget {
+	max_attempts: number;
+	max_model_calls: number;
+	max_tool_calls: number;
+	max_handoffs: number;
+	max_elapsed_ms: number;
+	max_input_tokens: number;
+	max_output_tokens: number;
+	max_cost_usd: number;
+	max_state_growth_bytes: number;
+	on_exhaustion: {
+		action: "BLOCKED";
+		escalation: "human";
+	};
+}
+
+export interface LoopUsage {
+	attempts: number;
+	model_calls: number;
+	tool_calls: number;
+	handoffs: number;
+	elapsed_ms: number;
+	input_tokens: number;
+	output_tokens: number;
+	cost_usd: number;
+	state_growth_bytes: number;
+}
+
 export interface TaskVerification {
 	strategy: VerificationStrategy;
 	commands: string[];
@@ -159,6 +187,7 @@ export interface TaskContract {
 	priority: Priority;
 	timeout: number;
 	retry_policy: RetryPolicy;
+	loop_budget?: LoopBudget;
 	approval: TaskApproval;
 }
 
@@ -335,6 +364,22 @@ export interface TraceMetrics {
 	token_per_task: number;
 	cache_hit_rate: number;
 	worker_tier_distribution: Record<WorkerTier, number>;
+	graph_efficiency?: GraphEfficiencyMetrics;
+}
+
+export interface GraphEfficiencyMetrics {
+	graph_width: number;
+	graph_depth: number;
+	handoff_count: number;
+	peak_active_workers: number;
+	retry_depth: number;
+	replan_count: number;
+	useful_work_ratio: number;
+	verification_first_pass_rate: number;
+	cost_per_verified_task: number;
+	time_per_verified_task: number;
+	agent_calls: number;
+	coordination_efficiency: number;
 }
 
 export interface ExecutionTrace {
@@ -434,6 +479,16 @@ export interface RoleProfile {
 
 export type ResultStatus = "success" | "failure" | "timeout" | "INSUFFICIENT_CONTEXT";
 
+export interface WorkReceipt {
+	work_attempted: boolean;
+	effects_count: number;
+	artifacts_created: string[];
+	state_changed: boolean;
+	no_op: boolean;
+	no_op_reason?: string;
+	evidence_refs: string[];
+}
+
 export interface ResultContract {
 	task_id: string;
 	run_id: string;
@@ -446,6 +501,7 @@ export interface ResultContract {
 	evidence: string[];
 	errors: string[];
 	requested_context?: string[];
+	work_receipt?: WorkReceipt;
 }
 
 export interface BatchResultItem {
@@ -456,6 +512,7 @@ export interface BatchResultItem {
 	evidence: string[];
 	errors: string[];
 	requested_context?: string[];
+	work_receipt?: WorkReceipt;
 }
 
 export interface BatchResultEnvelope {
@@ -490,6 +547,7 @@ export interface WorkerExecutionOutput {
 	evidence?: string[];
 	errors?: string[];
 	requested_context?: string[];
+	work_receipt?: WorkReceipt;
 }
 
 export interface EffectRecord {
@@ -609,6 +667,7 @@ export interface PersistentState {
 	decisions: DecisionRecord[];
 	role_profiles: RoleProfile[];
 	effects: EffectRecord[];
+	loop_usage: Record<string, LoopUsage>;
 	traces: ExecutionTrace[];
 	regressions: RegressionCase[];
 	snapshots: Array<Pick<StateSnapshot, "id" | "created_at" | "digest">>;

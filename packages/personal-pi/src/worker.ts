@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { buildPromptPayload } from "./prompt.ts";
-import { validateResultContract } from "./result.ts";
+import { createWorkReceipt, validateResultContract } from "./result.ts";
 import { checkRoleBoundary } from "./roles.ts";
 import { validateTaskContract } from "./schema.ts";
 import { authorizeWorkerExecution, filterSensitiveContext, type PermissionDecision } from "./security.ts";
@@ -99,6 +99,9 @@ export class PiWorker implements WorkerAdapter {
 				evidence: [...(output.evidence ?? [])],
 				errors: [...(output.errors ?? [])],
 				requested_context: output.requested_context ? [...output.requested_context] : undefined,
+				work_receipt:
+					output.work_receipt ??
+					createWorkReceipt(output.changed_files ?? [], output.artifacts ?? [], output.evidence ?? []),
 			};
 			const resultValidation = validateResultContract(result);
 			return resultValidation.valid

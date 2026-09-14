@@ -108,6 +108,18 @@ function planFor(task: TaskContract) {
 	};
 }
 
+function legalNoOpReceipt() {
+	return {
+		work_attempted: true,
+		effects_count: 0,
+		artifacts_created: [],
+		state_changed: false,
+		no_op: true,
+		no_op_reason: "verification-only task produced no file or artifact",
+		evidence_refs: ["worker_result"],
+	};
+}
+
 afterEach(() => {
 	while (temporaryDirectories.length > 0)
 		rmSync(temporaryDirectories.pop() as string, { recursive: true, force: true });
@@ -125,6 +137,7 @@ describe("T7.1 complete Personal PI pipeline", () => {
 				summary: `${objective} passed`,
 				evidence: ["worker_result"],
 				changed_files: [],
+				work_receipt: legalNoOpReceipt(),
 			}));
 			const execution = await pipeline.execute({
 				...planFor(task),
@@ -162,7 +175,12 @@ describe("T7.1 complete Personal PI pipeline", () => {
 		const seen: string[] = [];
 		const worker = new PiWorker("pi-context", (input) => {
 			seen.push(input.resolved_context?.text ?? "");
-			return { status: "success", summary: "context consumed", evidence: ["worker_result"] };
+			return {
+				status: "success",
+				summary: "context consumed",
+				evidence: ["worker_result"],
+				work_receipt: legalNoOpReceipt(),
+			};
 		});
 		const execution = await new PersonalPiPipeline().execute({
 			...planFor(task),
@@ -175,6 +193,26 @@ describe("T7.1 complete Personal PI pipeline", () => {
 
 		expect(execution.task.state).toBe("DONE");
 		expect(seen).toEqual(["authoritative project fact"]);
+	});
+
+	test("blocks a green Worker result that has no work receipt explanation", async () => {
+		const store = new PersistentStateStore();
+		const task = makeTask("e2e-work-receipt-anomaly");
+		const execution = await new PersonalPiPipeline({ state_store: store }).execute({
+			...planFor(task),
+			requirement: requirement(),
+			task,
+			worker: new PiWorker("pi-anomaly", () => ({
+				status: "success",
+				summary: "claims success without doing work",
+				evidence: ["worker_result"],
+			})),
+			snapshot: captureWorkspaceSnapshot("anomaly-commit", [], []),
+		});
+
+		expect(execution.task.state).toBe("BLOCKED");
+		expect(execution.trace.events.at(-1)?.detail).toBe("work receipt anomaly requires human review");
+		expect(store.read().regressions[0]?.category).toBe("pipeline_failure");
 	});
 });
 
