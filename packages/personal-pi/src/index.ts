@@ -31,3 +31,4 @@ export * from "./verification.ts";
 export * from "./worker.ts";
 export * from "./worker-feedback.ts";
 export * from "./worker-pool.ts";
+export * from "./workspace-cache.ts";

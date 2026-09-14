@@ -36,6 +36,27 @@ Received reason: worker_mismatch
 
 ---
 
+## [ERR-20260914-032] T12.7 public export omitted from explicit staging
+
+**Logged**: 2026-09-14T09:55:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: release hygiene
+
+### Summary
+The T12.7 commit included `workspace-cache.ts` and its tests but omitted the matching `src/index.ts` public export.
+
+### Context
+- Operation: post-commit `git status --short` audit after `f31398f2e`.
+- Cause: the explicit staging command listed the new source and documentation but not the already-modified package index.
+- Impact: clean source built, but consumers of `@personal-pi/core` could not import the new Workspace Cache from the package entrypoint.
+
+### Resolution
+- **Resolved**: 2026-09-14T09:56:00+08:00
+- **Notes**: added and verified the public export in a corrective commit before the Phase 12 integration push; no T13 work was added.
+
+---
+
 ## [ERR-20260914-031] Worker Pool stale-lease test used the wrapper as a Lease
 
 **Logged**: 2026-09-14T09:36:00+08:00
