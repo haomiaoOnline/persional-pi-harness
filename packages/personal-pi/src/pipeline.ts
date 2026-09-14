@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { authorizeCommand, type CommandApproval, CommandRiskClassifier } from "./command-risk.ts";
 import { type ContextResolver, evaluateContextReadiness } from "./context.ts";
 import { EvidenceCollector } from "./evidence.ts";
 import { LeaseManager } from "./lease.ts";
+import type { LifecycleHookManager } from "./lifecycle-hooks.ts";
 import { LoopBudgetController, LoopBudgetExhaustedError, LoopBudgetMissingError } from "./loop-budget.ts";
 import { PersistentStateStore } from "./persistence.ts";
 import {
@@ -95,6 +97,10 @@ export interface PipelineRequest {
 	permission_request?: PermissionRequest;
 	context_resolver?: ContextResolver;
 	command_runner?: CommandRunner;
+	command_risk_classifier?: CommandRiskClassifier;
+	command_approval?: CommandApproval;
+	lifecycle_hooks?: LifecycleHookManager;
+	previous_working_directory?: string;
 	recipe_registry?: VerificationRecipeRegistry;
 	snapshot: WorkspaceSnapshot;
 	current_snapshot?: WorkspaceSnapshot;
@@ -189,6 +195,19 @@ function normalizeResult(request: WorkerProtocolRequest, result: ResultContract,
 	};
 }
 
+function blockedCommandEvidence(
+	command: string,
+	action: "ask_user" | "block",
+	reasons: readonly string[],
+): CommandEvidence {
+	return {
+		command,
+		exit_code: action === "block" ? 126 : 125,
+		stdout: "",
+		stderr: `${action}: ${reasons.join("; ")}`,
+	};
+}
+
 export class PersonalPiPipeline {
 	readonly stateStore: PersistentStateStore;
 	private readonly leaseManager: LeaseManager;
@@ -209,6 +228,7 @@ export class PersonalPiPipeline {
 	async execute(request: PipelineRequest): Promise<PipelineExecution> {
 		const at = request.at ?? new Date().toISOString();
 		const tracer = new TraceRecorder(request.task.id, undefined, at);
+		const lifecycleEvidence: string[] = [];
 		if (
 			request.requirement.user.length === 0 ||
 			request.requirement.delivery.length === 0 ||
@@ -217,6 +237,35 @@ export class PersonalPiPipeline {
 			throw new PipelineStageError("REQUIREMENT", "Requirement Contract is incomplete");
 		}
 		tracer.record("REQUIREMENT", "Requirement Contract accepted", at);
+		if (request.lifecycle_hooks) {
+			const started = await request.lifecycle_hooks.run("on_start", {
+				task_id: request.task.id,
+				cwd: request.task.execution.working_directory,
+			});
+			lifecycleEvidence.push(...started.evidence);
+			if (!started.allowed)
+				throw new PipelineStageError(
+					"REQUIREMENT",
+					`on_start hook failed: ${started.failures.join("; ")}`,
+					request.task.id,
+				);
+			if (
+				request.previous_working_directory &&
+				request.previous_working_directory !== request.task.execution.working_directory
+			) {
+				const cwdChanged = await request.lifecycle_hooks.run("on_cwd_change", {
+					task_id: request.task.id,
+					cwd: request.task.execution.working_directory,
+				});
+				lifecycleEvidence.push(...cwdChanged.evidence);
+				if (!cwdChanged.allowed)
+					throw new PipelineStageError(
+						"REQUIREMENT",
+						`on_cwd_change hook failed: ${cwdChanged.failures.join("; ")}`,
+						request.task.id,
+					);
+			}
+		}
 
 		const planAssessment =
 			request.plan_assessment ??
@@ -422,6 +471,8 @@ export class PersonalPiPipeline {
 		});
 
 		const verifierCommands: CommandEvidence[] = [];
+		const commandRiskClassifier =
+			request.command_risk_classifier ?? (request.lifecycle_hooks ? new CommandRiskClassifier() : undefined);
 		if (request.command_runner) {
 			for (const command of request.task.verification.commands) {
 				try {
@@ -449,11 +500,63 @@ export class PersonalPiPipeline {
 					}
 					throw error;
 				}
-				try {
-					verifierCommands.push(await request.command_runner(command));
-				} catch {
-					// 缺失的命令证据由 Verifier 记为 UNKNOWN；不把环境异常伪装成通过。
+				const authorization = commandRiskClassifier
+					? authorizeCommand(request.task, command, commandRiskClassifier, {
+							approval: request.command_approval,
+							now: at,
+						})
+					: undefined;
+				if (authorization)
+					lifecycleEvidence.push(`command-risk:${authorization.classification.risk}:${authorization.action}`);
+				let commandEvidence: CommandEvidence | undefined;
+				let toolExecuted = false;
+				if (request.lifecycle_hooks) {
+					const preTool = await request.lifecycle_hooks.run("pre_tool_use", {
+						task_id: request.task.id,
+						run_id: run.id,
+						cwd: request.task.execution.working_directory,
+						tool: {
+							name: "verification",
+							command,
+							risk: authorization?.classification.risk ?? "risky",
+						},
+					});
+					lifecycleEvidence.push(...preTool.evidence);
+					if (!preTool.allowed) commandEvidence = blockedCommandEvidence(command, "block", preTool.failures);
 				}
+				if (!commandEvidence && authorization && authorization.action !== "auto_run")
+					commandEvidence = blockedCommandEvidence(command, authorization.action, authorization.reasons);
+				if (!commandEvidence) {
+					try {
+						commandEvidence = await request.command_runner(command);
+						toolExecuted = commandEvidence !== undefined;
+					} catch {
+						// 缺失的命令证据由 Verifier 记为 UNKNOWN；不把环境异常伪装成通过。
+					}
+				}
+				if (commandEvidence && toolExecuted && request.lifecycle_hooks) {
+					const postTool = await request.lifecycle_hooks.run("post_tool_use", {
+						task_id: request.task.id,
+						run_id: run.id,
+						cwd: request.task.execution.working_directory,
+						tool: {
+							name: "verification",
+							command,
+							risk: authorization?.classification.risk ?? "risky",
+						},
+						code_changed: result.changed_files.length > 0,
+						changed_files: result.changed_files,
+					});
+					lifecycleEvidence.push(...postTool.evidence);
+					if (!postTool.allowed) {
+						commandEvidence = {
+							...commandEvidence,
+							exit_code: commandEvidence.exit_code === 0 ? 126 : commandEvidence.exit_code,
+							stderr: [commandEvidence.stderr, ...postTool.failures].filter(Boolean).join("; "),
+						};
+					}
+				}
+				if (commandEvidence) verifierCommands.push(commandEvidence);
 			}
 		}
 
@@ -468,6 +571,7 @@ export class PersonalPiPipeline {
 			evidence_types: [
 				...new Set([
 					...result.evidence,
+					...lifecycleEvidence,
 					...(verifierCommands.some((command) => command.exit_code === 0) ? ["independent_command"] : []),
 				]),
 			],

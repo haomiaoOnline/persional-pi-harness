@@ -73,6 +73,42 @@ export const V3_FEEDBACK_PATHS: readonly FeedbackPathCoverage[] = [
 		exhaustion_behavior: "BudgetExceededError with DENY decision",
 		test_evidence: "graph-intelligence.test.ts and loop-budget.integration.test.ts: persisted replan exhaustion",
 	},
+	{
+		path_id: "permission-phase-retry",
+		feedback_path: "Explore/Plan write denial -> acting phase -> retry",
+		deterministic_bound: "TaskContract.loop_budget.max_attempts",
+		runtime_enforcement: "PhasedPermissionController.request rejects non-acting writes before execution",
+		persistence: "PersistentStateStore.loop_usage and Run/Decision records owned by the caller",
+		exhaustion_behavior: "retry is blocked after the persisted attempt bound; no permission widening",
+		test_evidence: "permission-phases.test.ts: retryable non-acting write denial",
+	},
+	{
+		path_id: "lifecycle-hook-retry",
+		feedback_path: "pre/post tool hook rejection -> bounded tool retry",
+		deterministic_bound: "TaskContract.loop_budget.max_tool_calls",
+		runtime_enforcement: "LifecycleHookManager blocks the current tool call on deterministic hook failure",
+		persistence: "Evidence and Decision records from the Pipeline caller",
+		exhaustion_behavior: "tool retry stops at max_tool_calls and becomes BLOCKED",
+		test_evidence: "lifecycle-hooks.test.ts: reject and missing-checker paths",
+	},
+	{
+		path_id: "memory-consolidation-retry",
+		feedback_path: "completed Task -> Trigger Gateway consolidation -> no-new-content retry",
+		deterministic_bound: "TaskContract.loop_budget.max_attempts plus TriggerGateway idempotency key",
+		runtime_enforcement: "MemoryConsolidator deduplicates content and returns a legal NO_OP",
+		persistence: "TriggerGateway handled keys, consolidation records and Cold Evidence archive",
+		exhaustion_behavior: "duplicate cycle is NO_OP; raw Evidence remains archived",
+		test_evidence: "memory-consolidation.test.ts: archive preservation and idempotent no-op",
+	},
+	{
+		path_id: "handoff-ready-wakeup",
+		feedback_path: "Worker HANDOFF_READY -> Controller wakeup -> Persistent State/artifact readiness recheck",
+		deterministic_bound: "TaskContract.loop_budget.max_handoffs",
+		runtime_enforcement: "handleWorkerNotice accepts only structured readiness notices and invokes both rechecks",
+		persistence: "PersistentStateStore plus Artifact Handoff contract remain the state truth",
+		exhaustion_behavior: "invalid notice is rejected; no open-ended Worker chat or automatic handoff",
+		test_evidence: "progressive-tools.test.ts: structured notice and controller recheck",
+	},
 ];
 
 export function auditBoundCoverage(entries: readonly FeedbackPathCoverage[]): BoundCoverageAudit {
