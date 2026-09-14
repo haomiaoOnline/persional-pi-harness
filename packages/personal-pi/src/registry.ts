@@ -9,6 +9,7 @@ import type {
 	WorkerType,
 } from "./types.ts";
 import type { WorkerAdapter } from "./worker.ts";
+import type { WorkerSuccessRateTracker } from "./worker-feedback.ts";
 
 export interface WorkerCapabilityDescriptor {
 	languages: string[];
@@ -36,6 +37,7 @@ export interface WorkerSelectionCandidate {
 	worker_id: string;
 	worker_type: WorkerType;
 	score: number;
+	historical_success_rate: number;
 	reasons: string[];
 	registration: RegisteredWorker;
 }
@@ -86,6 +88,11 @@ function registrationValidation(input: WorkerRegistrationInput): ValidationResul
 
 export class WorkerRegistry {
 	private readonly workers = new Map<string, RegisteredWorker>();
+	private readonly feedback?: Pick<WorkerSuccessRateTracker, "rate">;
+
+	constructor(options: { feedback?: Pick<WorkerSuccessRateTracker, "rate"> } = {}) {
+		this.feedback = options.feedback;
+	}
 
 	register(input: WorkerRegistrationInput): RegisteredWorker {
 		if (this.workers.has(input.worker_id))
@@ -153,6 +160,7 @@ export class WorkerRegistry {
 			const preferredMatches = role
 				? role.preferred_tools.filter((tool) => plugin.capability_tags.includes(tool)).length
 				: 0;
+			const historicalSuccessRate = this.feedback?.rate(registration.worker_id, task.type)?.rate ?? 0.5;
 			const score =
 				matchingTags * 100 +
 				preferredMatches * 10 -
@@ -162,6 +170,7 @@ export class WorkerRegistry {
 				worker_id: registration.worker_id,
 				worker_type: registration.worker_type,
 				score,
+				historical_success_rate: historicalSuccessRate,
 				reasons: [
 					`capability_tags matched ${matchingTags}/${requiredTags.size}`,
 					`reasoning_depth ${task.execution.reasoning_depth} supported`,
@@ -172,7 +181,10 @@ export class WorkerRegistry {
 			});
 		}
 		return candidates.sort(
-			(left, right) => right.score - left.score || left.worker_id.localeCompare(right.worker_id),
+			(left, right) =>
+				right.score - left.score ||
+				right.historical_success_rate - left.historical_success_rate ||
+				left.worker_id.localeCompare(right.worker_id),
 		);
 	}
 

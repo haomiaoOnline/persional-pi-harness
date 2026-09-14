@@ -9,6 +9,7 @@ import {
 	type TaskContract,
 	validateResultContract,
 	WorkerRegistry,
+	WorkerSuccessRateTracker,
 } from "../src/index.ts";
 
 const codexManifestUrl = new URL("../examples/worker-plugins/codex-cli.plugin_manifest.yaml", import.meta.url);
@@ -149,6 +150,28 @@ describe("T12.1-T12.3 Worker Registry and Selection", () => {
 		const forbiddenTask = { ...makeTask("deploy-task"), type: "production_deploy" };
 
 		expect(() => registry.select(forbiddenTask, DEFAULT_ROLE_PROFILES[0])).toThrow(NoWorkerAvailableError);
+	});
+
+	test("uses historical success rate only as a secondary tie-breaker", () => {
+		const feedback = new WorkerSuccessRateTracker();
+		const registry = new WorkerRegistry({ feedback });
+		const plugin = manifest(codexManifestUrl);
+		for (const workerId of ["worker-a", "worker-b"]) {
+			registry.register({
+				worker_id: workerId,
+				worker_type: "cli",
+				manifest: plugin,
+				adapter: new PiWorker(workerId, () => ({ status: "success", summary: workerId })),
+			});
+		}
+		for (let index = 0; index < 3; index += 1) {
+			feedback.record({ worker_id: "worker-a", task_type: "backend", success: false });
+			feedback.record({ worker_id: "worker-b", task_type: "backend", success: true });
+		}
+
+		const candidates = registry.selectCandidates(makeTask());
+		expect(candidates.map((candidate) => candidate.worker_id)).toEqual(["worker-b", "worker-a"]);
+		expect(candidates[0]?.historical_success_rate).toBe(1);
 	});
 
 	test("rejects duplicate IDs and adapter identity mismatches", () => {
