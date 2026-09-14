@@ -878,7 +878,7 @@ Call `beforeRun` for its enforcing side effect without assigning its unused retu
 
 **Logged**: 2026-09-13T23:29:00+08:00
 **Priority**: medium
-**Status**: open
+**Status**: resolved
 **Area**: test
 
 ### Summary
@@ -910,7 +910,7 @@ Update only the verification-only fixtures with an explicit legal `no_op` receip
 
 **Logged**: 2026-09-13T23:24:00+08:00
 **Priority**: low
-**Status**: open
+**Status**: resolved
 **Area**: build
 
 ### Summary
@@ -938,5 +938,26 @@ Exclude `on_exhaustion` from the limit-key union so only numeric budget dimensio
 ### Resolution
 - **Resolved**: 2026-09-13T23:43:00+08:00
 - **Notes**: 已将 `on_exhaustion` 从数值限制键集合中排除，并补充调用前模型/工具/交接预检入口；112/112 包测试与构建通过。
+
+---
+
+## [ERR-20260914-029] v3 correction for an unstaged source file
+
+**Logged**: 2026-09-14T09:32:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: release hygiene
+
+### Summary
+Post-commit audit found that `packages/personal-pi/src/loop-budget.ts` was still untracked even though the committed public index exported it.
+
+### Context
+- Operation: post-commit `git status --short` audit after `c05b30ffc`.
+- Cause: the explicit staging list included the new Loop Budget test and index export but omitted the new source file.
+- Impact: the local checkout passed because the untracked source was present, while a clean checkout of the commit would be incomplete.
+
+### Resolution
+- **Resolved**: 2026-09-14T09:33:00+08:00
+- **Notes**: added the source in a corrective commit before continuing T12.1–T12.3; re-ran package tests/build and retained the untracked Registry work for its own commit.
 
 ---
