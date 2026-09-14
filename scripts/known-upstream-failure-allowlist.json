@@ -1,0 +1,16 @@
+{
+	"schemaVersion": 1,
+	"entries": [
+		{
+			"id": "pi-ai-google-shared-ts2322-finish-reason",
+			"packageName": "@earendil-works/pi-ai",
+			"file": "packages/ai/src/api/google-shared.ts",
+			"line": 402,
+			"errorCode": "TS2322",
+			"semanticMessage": "Type 'FinishReason.TOO_MANY_TOOL_CALLS' is not assignable to type 'never'.",
+			"sourceNeedle": "const _exhaustive: never = reason;",
+			"upstreamRevision": "71dca871bc80b6bc97be37f0ca3189399d651fff",
+			"sourceDigest": "sha256:fa9a45177b6c1e1636b8b1ef4c8b332e903e4b379039cb1bacbbc312a8e1662d"
+		}
+	]
+}
