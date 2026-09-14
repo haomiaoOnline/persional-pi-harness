@@ -36,6 +36,49 @@ Received reason: worker_mismatch
 
 ---
 
+## [ERR-20260914-031] Worker Pool stale-lease test used the wrapper as a Lease
+
+**Logged**: 2026-09-14T09:36:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: test
+
+### Summary
+The repository TypeScript Gate caught a test-only field access that confused `WorkerPoolLease` with its nested protocol `Lease`.
+
+### Error
+```text
+packages/personal-pi/test/worker-pool.test.ts(72,79): error TS2339:
+Property 'lease_epoch' does not exist on type 'WorkerPoolLease'.
+```
+
+### Resolution
+- **Resolved**: 2026-09-14T09:37:00+08:00
+- **Notes**: changed the stale-lease fixture to read `lease.lease.lease_epoch`; the runtime contract was unchanged.
+
+---
+
+## [ERR-20260914-030] Worker Pool test asserted a released lease should remain active
+
+**Logged**: 2026-09-14T09:34:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: test
+
+### Summary
+The first T12.4 lifecycle test expected a task to remain blocked after its Worker Lease had been released.
+
+### Context
+- Operation: `npm test --workspace=@personal-pi/core`
+- Cause: the assertion was placed after `pool.release(first)`, while the Pool correctly removes the active Task Lease on release.
+- Impact: one test assertion failed; the lifecycle implementation and duplicate-active-lease test were unaffected.
+
+### Resolution
+- **Resolved**: 2026-09-14T09:35:00+08:00
+- **Notes**: removed the misplaced assertion; duplicate lease rejection remains covered before release in the dedicated stale/duplicate lease test.
+
+---
+
 ## [ERR-20260914-028] v3 backfill commit hook blocked by inherited upstream type error
 
 **Logged**: 2026-09-14T00:02:00+08:00

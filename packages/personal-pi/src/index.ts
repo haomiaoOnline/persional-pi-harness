@@ -28,3 +28,4 @@ export * from "./triggers.ts";
 export * from "./types.ts";
 export * from "./verification.ts";
 export * from "./worker.ts";
+export * from "./worker-pool.ts";
