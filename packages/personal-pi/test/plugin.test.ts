@@ -1,10 +1,14 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { parseWorkerPluginManifest, validateWorkerPluginManifest, type WorkerPluginManifest } from "../src/index.ts";
 
 const exampleFiles = [
 	new URL("../examples/worker-plugins/codex-cli.plugin_manifest.yaml", import.meta.url),
 	new URL("../examples/worker-plugins/claude-cli.plugin_manifest.yaml", import.meta.url),
+	new URL("../examples/worker-plugins/pi-agent-deepseek-v4-flash.plugin_manifest.yaml", import.meta.url),
+	new URL("../examples/worker-plugins/codex-cli-existing-session.plugin_manifest.yaml", import.meta.url),
 ];
 
 describe("T12.0-A Worker Plugin Manifest", () => {
@@ -23,6 +27,17 @@ describe("T12.0-A Worker Plugin Manifest", () => {
 		expect(manifest.worker_plugin.auth).toEqual({ type: "api_key", env_var: "CODEX_API_KEY" });
 		expect(manifest.worker_plugin.models_supported[0]?.reasoning_levels).toEqual(["low", "medium", "high"]);
 		expect(JSON.stringify(manifest)).not.toMatch(/secret|token|key-[a-z0-9]+/i);
+	});
+
+	test("real CLI manifests point to checked-in adapter entries", () => {
+		for (const file of exampleFiles.slice(2)) {
+			const result = parseWorkerPluginManifest(readFileSync(file, "utf8"));
+			expect(result.valid, file.toString()).toBe(true);
+			const entry = result.value?.worker_plugin.adapter_entry;
+			expect(entry).toBeTruthy();
+			expect(existsSync(join(dirname(fileURLToPath(file)), "..", "..", entry as string))).toBe(true);
+			expect(result.value?.worker_plugin.auth.type).toBe("none");
+		}
 	});
 
 	test("rejects auto discovery, absolute adapter paths, and invalid auth declarations", () => {
