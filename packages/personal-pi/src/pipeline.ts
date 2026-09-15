@@ -3,7 +3,7 @@ import { authorizeCommand, type CommandApproval, CommandRiskClassifier } from ".
 import { type ContextResolver, evaluateContextReadiness } from "./context.ts";
 import { EvidenceCollector } from "./evidence.ts";
 import { LeaseManager } from "./lease.ts";
-import type { LifecycleHookManager } from "./lifecycle-hooks.ts";
+import type { LifecycleHookManager, LifecycleHookRunResult } from "./lifecycle-hooks.ts";
 import { LoopBudgetController, LoopBudgetExhaustedError, LoopBudgetMissingError } from "./loop-budget.ts";
 import { PersistentStateStore } from "./persistence.ts";
 import {
@@ -208,6 +208,10 @@ function blockedCommandEvidence(
 	};
 }
 
+function recordLifecycleResult(evidence: string[], result: LifecycleHookRunResult): void {
+	evidence.push(...result.evidence, ...result.warnings.map((warning) => `hook-warning:${warning}`));
+}
+
 export class PersonalPiPipeline {
 	readonly stateStore: PersistentStateStore;
 	private readonly leaseManager: LeaseManager;
@@ -242,7 +246,7 @@ export class PersonalPiPipeline {
 				task_id: request.task.id,
 				cwd: request.task.execution.working_directory,
 			});
-			lifecycleEvidence.push(...started.evidence);
+			recordLifecycleResult(lifecycleEvidence, started);
 			if (!started.allowed)
 				throw new PipelineStageError(
 					"REQUIREMENT",
@@ -257,7 +261,7 @@ export class PersonalPiPipeline {
 					task_id: request.task.id,
 					cwd: request.task.execution.working_directory,
 				});
-				lifecycleEvidence.push(...cwdChanged.evidence);
+				recordLifecycleResult(lifecycleEvidence, cwdChanged);
 				if (!cwdChanged.allowed)
 					throw new PipelineStageError(
 						"REQUIREMENT",
@@ -521,7 +525,7 @@ export class PersonalPiPipeline {
 							risk: authorization?.classification.risk ?? "risky",
 						},
 					});
-					lifecycleEvidence.push(...preTool.evidence);
+					recordLifecycleResult(lifecycleEvidence, preTool);
 					if (!preTool.allowed) commandEvidence = blockedCommandEvidence(command, "block", preTool.failures);
 				}
 				if (!commandEvidence && authorization && authorization.action !== "auto_run")
@@ -547,7 +551,7 @@ export class PersonalPiPipeline {
 						code_changed: result.changed_files.length > 0,
 						changed_files: result.changed_files,
 					});
-					lifecycleEvidence.push(...postTool.evidence);
+					recordLifecycleResult(lifecycleEvidence, postTool);
 					if (!postTool.allowed) {
 						commandEvidence = {
 							...commandEvidence,

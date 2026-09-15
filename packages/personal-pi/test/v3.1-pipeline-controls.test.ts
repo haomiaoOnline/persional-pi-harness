@@ -167,4 +167,39 @@ describe("v3.1 pipeline control integration", () => {
 		expect(execution.evidence.commands[0]?.exit_code).toBe(126);
 		expect(execution.evidence.evidence_types).toContain("hook:deny-tool:failed");
 	});
+
+	test("persists a missing post-tool checker warning as Evidence while allowing the Run", async () => {
+		const task = controlTask("pipeline-controls-missing-checker", "node --test");
+		const changedFile = "tmp/pipeline-controls-missing-checker.txt";
+		const snapshot = captureWorkspaceSnapshot("controls-missing-checker", [changedFile], [changedFile]);
+		const execution = await new PersonalPiPipeline().execute({
+			...planFor(task),
+			requirement: requirementFor("checker warning control path"),
+			task,
+			worker: new PiWorker("pi-controls-missing-checker", () => ({
+				status: "success",
+				summary: "worker changed a bounded file",
+				changed_files: [changedFile],
+				artifacts: [changedFile],
+				evidence: ["worker_result"],
+				work_receipt: {
+					work_attempted: true,
+					effects_count: 1,
+					artifacts_created: [changedFile],
+					state_changed: true,
+					no_op: false,
+					evidence_refs: ["worker_result"],
+				},
+			})),
+			command_runner: (command) => ({ command, exit_code: 0, stdout: "ok", stderr: "" }),
+			command_risk_classifier: new CommandRiskClassifier(),
+			lifecycle_hooks: new LifecycleHookManager(),
+			snapshot,
+			current_snapshot: snapshot,
+		});
+
+		expect(execution.task.state).toBe("DONE");
+		expect(execution.evidence.evidence_types).toContain("hook-checker-missing:post_tool_use");
+		expect(execution.evidence.evidence_types.some((entry) => entry.startsWith("hook-warning:"))).toBe(true);
+	});
 });
