@@ -1,5 +1,154 @@
 # Errors
 
+## [ERR-20260915-009] codex-accounting-test-budget-type
+
+**Logged**: 2026-09-15T16:25:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+
+The first commit-hook type check rejected three new conformance fixtures
+because spreading the optional `TaskContract.loop_budget` preserved optional
+property types.
+
+### Error
+
+```text
+TS2322: optional loop_budget properties are not assignable to LoopBudget
+```
+
+### Context
+
+- The exact Known-Upstream-Failure gate correctly refused to classify the
+  mixed upstream and local diagnostics as an allowed baseline.
+- No commit was created and no provider call or external side effect occurred.
+
+### Suggested Fix
+
+Use the fixture's established non-null budget assertion before overriding a
+single limit, then rerun the normal check and exact gate.
+
+### Metadata
+
+- Reproducible: yes before the assertion correction
+- Related Files: `packages/personal-pi/test/cli-adapters.test.ts`,
+  `scripts/known-upstream-failure-gate.mjs`
+
+## [ERR-20260915-008] codex-accounting-format-check
+
+**Logged**: 2026-09-15T16:15:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+
+The formatter check rejected the first source/test patch for import ordering
+and indentation.
+
+### Error
+
+```text
+Biome reported organizeImports and formatting fixes required
+```
+
+### Context
+
+- The check was read-only and did not run a provider or alter runtime state.
+- The findings were mechanical formatting issues in the new accounting code
+  and conformance tests.
+
+### Suggested Fix
+
+Run the repository formatter on the exact changed source and test files, then
+rerun the check before committing.
+
+### Metadata
+
+- Reproducible: yes before formatting
+- Related Files: `packages/personal-pi/src/adapters/cli-runtime.ts`,
+  `packages/personal-pi/src/adapters/codex-cli.ts`,
+  `packages/personal-pi/test/cli-adapters.test.ts`
+
+## [ERR-20260915-007] codex-conformance-fixture-policy
+
+**Logged**: 2026-09-15T16:10:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+
+The first new Codex accounting, malformed-output, and timeout fixtures
+inherited the generic fixture's `allowed_tools=["shell"]` value. The Codex
+adapter correctly denied them because it has no Task Contract tool bridge.
+
+### Error
+
+```text
+expected success/timeout, received policy-denied failure
+```
+
+### Context
+
+- The failure was confined to the newly added synthetic conformance cases.
+- No real provider call, workspace mutation, credential read, or external
+  side effect occurred.
+- The existing Codex policy-boundary test already used an explicit empty tool
+  set and passed.
+
+### Suggested Fix
+
+Every Codex conformance fixture must explicitly set `execution.allowed_tools`
+to an empty array unless the test is intentionally asserting the bridge
+denial boundary.
+
+### Metadata
+
+- Reproducible: yes before fixture correction
+- Related Files: `packages/personal-pi/test/cli-adapters.test.ts`,
+  `packages/personal-pi/src/adapters/codex-cli.ts`
+
+## [ERR-20260915-006] native-worker-usage-limit
+
+**Logged**: 2026-09-15T16:05:00+08:00
+**Priority**: medium
+**Status**: blocked-external
+**Area**: tooling
+
+### Summary
+
+The read-only native audit Worker could not start because the current Codex
+App Worker surface reported the account usage limit before returning output.
+
+### Error
+
+```text
+native Worker usage limit; no Worker output returned
+```
+
+### Context
+
+- The attempt used the validated native `gpt-5.6-sol` high-reasoning route.
+- It was read-only, used synthetic repository metadata only, made no file or
+  provider change, and did not read or emit credentials.
+- The root Agent retained the pre-declared fallback and completed the audit
+  locally; the attempt was not retried.
+
+### Suggested Fix
+
+Treat a native Worker usage-limit result as a bounded failed attempt. Continue
+with the root Agent only when the task packet already declares that fallback;
+do not silently lower reasoning, widen providers, or retry indefinitely.
+
+### Metadata
+
+- Reproducible: provider/account state dependent
+- Related Files: `packages/personal-pi/src/adapters/codex-cli.ts`,
+  `docs/stage-gates/evidence/external-worker-inventory-2026-09-15.json`
+
 ## [ERR-20260913-001] vitest-cache-permission
 
 **Logged**: 2026-09-13T07:20:00+08:00

@@ -1,4 +1,5 @@
 import { type ChildProcessWithoutNullStreams, type SpawnOptions, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { StringDecoder } from "node:string_decoder";
 import { validateResultContract } from "../result.ts";
@@ -16,6 +17,26 @@ export interface ExternalUsage {
 	output_tokens?: number;
 	total_tokens?: number;
 	cost_usd?: number;
+}
+
+export type InputTokenAccountingMode =
+	| "provider_total_fail_closed"
+	| "fixed_overhead_calibrated"
+	| "fixed_overhead_mismatch"
+	| "unavailable";
+
+/**
+ * Provider usage is kept as reported. A calibrated fixed provider overhead may
+ * be projected out for the PPH task budget, but the effective provider ceiling
+ * remains recorded so a large runtime context cannot be silently discarded.
+ */
+export interface InputTokenAccounting {
+	mode: InputTokenAccountingMode;
+	provider_input_tokens: number | null;
+	provider_fixed_input_tokens: number | null;
+	pph_projected_input_tokens: number | null;
+	pph_projected_input_budget: number | null;
+	effective_provider_input_budget: number | null;
 }
 
 export interface ToolObservation {
@@ -36,6 +57,7 @@ export interface CliObservation {
 	pending_mutations: Map<string, string>;
 	provider?: string;
 	model?: string;
+	session_id?: string;
 	stop_reason?: string;
 	final_text?: string;
 	usage?: ExternalUsage;
@@ -77,9 +99,11 @@ export interface ExternalWorkerObservation {
 	platform_accepted_model: string | null;
 	observed_runtime_model: string | null;
 	provider: string | null;
+	session_id_sha256: string | null;
 	status: string;
 	elapsed_ms: number;
 	input_tokens: number | null;
+	input_accounting: InputTokenAccounting;
 	output_tokens: number | null;
 	cost_usd: number | null;
 	model_calls: number;
@@ -124,6 +148,57 @@ export function createCliObservation(): CliObservation {
 		timed_out: false,
 		policy_terminated: false,
 	};
+}
+
+export function accountInputTokens(
+	task: Pick<TaskContract, "loop_budget">,
+	usage: ExternalUsage | undefined,
+	providerFixedInputTokens?: number,
+): InputTokenAccounting {
+	const providerInputTokens = usage?.input_tokens;
+	const fixed = providerFixedInputTokens ?? null;
+	const pphBudget = task.loop_budget?.max_input_tokens ?? null;
+	const effectiveProviderBudget = fixed !== null && pphBudget !== null ? fixed + pphBudget : pphBudget;
+	if (providerInputTokens === undefined)
+		return {
+			mode: "unavailable",
+			provider_input_tokens: null,
+			provider_fixed_input_tokens: fixed,
+			pph_projected_input_tokens: null,
+			pph_projected_input_budget: pphBudget,
+			effective_provider_input_budget: effectiveProviderBudget,
+		};
+	if (fixed === null)
+		return {
+			mode: "provider_total_fail_closed",
+			provider_input_tokens: providerInputTokens,
+			provider_fixed_input_tokens: null,
+			pph_projected_input_tokens: null,
+			pph_projected_input_budget: pphBudget,
+			effective_provider_input_budget: effectiveProviderBudget,
+		};
+	const projected = providerInputTokens - fixed;
+	if (projected < 0)
+		return {
+			mode: "fixed_overhead_mismatch",
+			provider_input_tokens: providerInputTokens,
+			provider_fixed_input_tokens: fixed,
+			pph_projected_input_tokens: null,
+			pph_projected_input_budget: pphBudget,
+			effective_provider_input_budget: effectiveProviderBudget,
+		};
+	return {
+		mode: "fixed_overhead_calibrated",
+		provider_input_tokens: providerInputTokens,
+		provider_fixed_input_tokens: fixed,
+		pph_projected_input_tokens: projected,
+		pph_projected_input_budget: pphBudget,
+		effective_provider_input_budget: effectiveProviderBudget,
+	};
+}
+
+function sessionDigest(sessionId: string | undefined): string | null {
+	return sessionId ? createHash("sha256").update(sessionId).digest("hex").slice(0, 16) : null;
 }
 
 function errorMessage(error: unknown): string {
@@ -425,17 +500,21 @@ export function externalObservation(
 	observation: CliObservation,
 	status: string,
 	elapsedMs: number,
+	inputAccounting?: InputTokenAccounting,
 ): ExternalWorkerObservation {
 	const observedModel = observation.model ?? null;
+	const accounting = inputAccounting ?? accountInputTokens({ loop_budget: undefined }, observation.usage);
 	return {
 		backend,
 		requested_model: requestedModel,
-		platform_accepted_model: observation.exit_code === 0 ? requestedModel : null,
+		platform_accepted_model: observedModel,
 		observed_runtime_model: observedModel,
 		provider: observation.provider ?? null,
+		session_id_sha256: sessionDigest(observation.session_id),
 		status,
 		elapsed_ms: elapsedMs,
 		input_tokens: observation.usage?.input_tokens ?? null,
+		input_accounting: accounting,
 		output_tokens: observation.usage?.output_tokens ?? null,
 		cost_usd: observation.usage?.cost_usd ?? null,
 		model_calls: observation.model_calls,
@@ -450,12 +529,25 @@ export function safeEvidence(
 	observation: CliObservation,
 	provider?: string,
 	model?: string,
+	inputAccounting?: InputTokenAccounting,
 ): string[] {
 	const evidence = [`${backend}:process`, `${backend}:events=${observation.parsed_events}`];
 	if (provider) evidence.push(`${backend}:provider=${provider}`);
 	if (model) evidence.push(`${backend}:model=${model}`);
+	const sessionId = sessionDigest(observation.session_id);
+	if (sessionId) evidence.push(`${backend}:session_id_sha256=${sessionId}`);
 	if (observation.usage?.input_tokens !== undefined)
 		evidence.push(`${backend}:input_tokens=${observation.usage.input_tokens}`);
+	const accounting = inputAccounting ?? accountInputTokens({ loop_budget: undefined }, observation.usage);
+	evidence.push(`${backend}:input_accounting=${accounting.mode}`);
+	if (accounting.provider_fixed_input_tokens !== null)
+		evidence.push(`${backend}:provider_fixed_input_tokens=${accounting.provider_fixed_input_tokens}`);
+	if (accounting.pph_projected_input_tokens !== null)
+		evidence.push(`${backend}:pph_projected_input_tokens=${accounting.pph_projected_input_tokens}`);
+	if (accounting.pph_projected_input_budget !== null)
+		evidence.push(`${backend}:pph_projected_input_budget=${accounting.pph_projected_input_budget}`);
+	if (accounting.effective_provider_input_budget !== null)
+		evidence.push(`${backend}:effective_provider_input_budget=${accounting.effective_provider_input_budget}`);
 	if (observation.usage?.output_tokens !== undefined)
 		evidence.push(`${backend}:output_tokens=${observation.usage.output_tokens}`);
 	if (observation.tool_calls > 0) evidence.push(`${backend}:tool_calls=${observation.tool_calls}`);

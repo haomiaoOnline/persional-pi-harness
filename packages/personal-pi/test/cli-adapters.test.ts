@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+	accountInputTokens,
 	type CliObservation,
 	CodexCliWorkerAdapter,
 	createCliObservation,
@@ -217,6 +218,7 @@ describe("external CLI Worker adapters", () => {
 		expect(captured?.env.OPENAI_API_KEY).toBeUndefined();
 		expect(adapter.getLastObservation()?.observed_runtime_model).toBeNull();
 		expect(adapter.getLastObservation()?.input_tokens).toBe(40);
+		expect(adapter.getLastObservation()?.input_accounting.mode).toBe("provider_total_fail_closed");
 
 		const actionTask = makeV3Task("adapter-codex-action", {
 			execution: { ...makeV3Task("adapter-codex-action").execution, allowed_tools: ["read"] },
@@ -224,5 +226,133 @@ describe("external CLI Worker adapters", () => {
 		const refused = await adapter.execute(requestFor(actionTask, "codex-test"));
 		expect(refused.status).toBe("failure");
 		expect(refused.evidence).toContain("policy_refusal");
+	});
+
+	test("separates measured Codex fixed overhead from the PPH projected task budget", async () => {
+		const task = makeV3Task("adapter-codex-accounting", {
+			execution: { ...makeV3Task("adapter-codex-accounting").execution, allowed_tools: [] },
+			loop_budget: { ...makeV3Task("adapter-codex-accounting").loop_budget!, max_input_tokens: 20 },
+		});
+		const adapter = new CodexCliWorkerAdapter({
+			worker_id: "codex-accounting",
+			provider_fixed_input_tokens: 30,
+			run_process: async (options) => {
+				const observation = createCliObservation();
+				observation.exit_code = 0;
+				options.on_event({ type: "turn.started" }, observation);
+				options.on_event(
+					{ type: "item.completed", item: { type: "agent_message", text: successText("ACCOUNTING_OK") } },
+					observation,
+				);
+				options.on_event({ type: "turn.completed", usage: { input_tokens: 45, output_tokens: 10 } }, observation);
+				return { observation };
+			},
+		});
+		const result = await adapter.execute(requestFor(task, "codex-accounting"));
+		expect(result.status).toBe("success");
+		const observation = adapter.getLastObservation();
+		expect(observation?.input_tokens).toBe(45);
+		expect(observation?.input_accounting).toMatchObject({
+			mode: "fixed_overhead_calibrated",
+			provider_fixed_input_tokens: 30,
+			pph_projected_input_tokens: 15,
+			pph_projected_input_budget: 20,
+			effective_provider_input_budget: 50,
+		});
+		expect(result.evidence).toContain("codex-cli:provider_fixed_input_tokens=30");
+		expect(result.evidence).toContain("codex-cli:pph_projected_input_tokens=15");
+	});
+
+	test("fails closed when fixed overhead is absent or the projected budget is exceeded", async () => {
+		const task = makeV3Task("adapter-codex-budget", {
+			execution: { ...makeV3Task("adapter-codex-budget").execution, allowed_tools: [] },
+			loop_budget: { ...makeV3Task("adapter-codex-budget").loop_budget!, max_input_tokens: 20 },
+		});
+		const runWithInput = (inputTokens: number) => async (options: JsonlProcessOptions) => {
+			const observation = createCliObservation();
+			observation.exit_code = 0;
+			options.on_event({ type: "turn.started" }, observation);
+			options.on_event(
+				{ type: "item.completed", item: { type: "agent_message", text: successText("BUDGET") } },
+				observation,
+			);
+			options.on_event(
+				{ type: "turn.completed", usage: { input_tokens: inputTokens, output_tokens: 1 } },
+				observation,
+			);
+			return { observation };
+		};
+		const noCalibration = new CodexCliWorkerAdapter({
+			worker_id: "codex-no-calibration",
+			run_process: runWithInput(21),
+		});
+		const noCalibrationResult = await noCalibration.execute(requestFor(task, "codex-no-calibration"));
+		expect(noCalibrationResult.status).toBe("failure");
+		expect(noCalibrationResult.evidence).toContain("loop_budget_exhausted");
+
+		const exceeded = new CodexCliWorkerAdapter({
+			worker_id: "codex-exceeded",
+			provider_fixed_input_tokens: 30,
+			run_process: runWithInput(51),
+		});
+		const exceededResult = await exceeded.execute(requestFor(task, "codex-exceeded"));
+		expect(exceededResult.status).toBe("failure");
+		expect(exceededResult.errors.join(" ")).toContain("max_input_tokens");
+		expect(exceeded.getLastObservation()?.input_accounting.mode).toBe("fixed_overhead_calibrated");
+	});
+
+	test("keeps Codex malformed output and timeout as bounded results", async () => {
+		const malformedTask = makeV3Task("adapter-codex-malformed", {
+			execution: { ...makeV3Task("adapter-codex-malformed").execution, allowed_tools: [] },
+		});
+		const malformed = new CodexCliWorkerAdapter({
+			worker_id: "codex-malformed",
+			run_process: async (options) => {
+				const observation = createCliObservation();
+				observation.exit_code = 0;
+				options.on_event({ type: "turn.started" }, observation);
+				options.on_event(
+					{ type: "item.completed", item: { type: "agent_message", text: "not-json" } },
+					observation,
+				);
+				options.on_event({ type: "turn.completed", usage: { input_tokens: 10, output_tokens: 1 } }, observation);
+				return { observation };
+			},
+		});
+		const malformedResult = await malformed.execute(requestFor(malformedTask, "codex-malformed"));
+		expect(malformedResult.status).toBe("failure");
+		expect(malformedResult.summary).toContain("malformed");
+
+		const timeout = new CodexCliWorkerAdapter({
+			worker_id: "codex-timeout",
+			run_process: async () => {
+				const observation = createCliObservation();
+				observation.timed_out = true;
+				observation.exit_code = null;
+				return { observation };
+			},
+		});
+		const timeoutTask = makeV3Task("adapter-codex-timeout", {
+			execution: { ...makeV3Task("adapter-codex-timeout").execution, allowed_tools: [] },
+		});
+		const timeoutResult = await timeout.execute(requestFor(timeoutTask, "codex-timeout"));
+		expect(timeoutResult.status).toBe("timeout");
+	});
+
+	test("projects token accounting without accepting an unmeasured provider total", () => {
+		const task = makeV3Task("accounting-pure", {
+			loop_budget: { ...makeV3Task("accounting-pure").loop_budget!, max_input_tokens: 100 },
+		});
+		expect(accountInputTokens(task, { input_tokens: 250 })).toMatchObject({
+			mode: "provider_total_fail_closed",
+			provider_input_tokens: 250,
+			pph_projected_input_tokens: null,
+		});
+		expect(accountInputTokens(task, { input_tokens: 250 }, 200)).toMatchObject({
+			mode: "fixed_overhead_calibrated",
+			pph_projected_input_tokens: 50,
+			effective_provider_input_budget: 300,
+		});
+		expect(accountInputTokens(task, { input_tokens: 150 }, 200).mode).toBe("fixed_overhead_mismatch");
 	});
 });

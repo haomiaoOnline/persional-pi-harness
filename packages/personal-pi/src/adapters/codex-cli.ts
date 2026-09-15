@@ -10,6 +10,7 @@ import type {
 } from "../types.ts";
 import { PiWorker, type WorkerAdapter } from "../worker.ts";
 import {
+	accountInputTokens,
 	buildExternalPrompt,
 	type CliObservation,
 	createSanitizedEnvironment,
@@ -30,6 +31,8 @@ export interface CodexCliWorkerAdapterOptions {
 	timeout_ms?: number;
 	home_dir?: string;
 	codex_home?: string;
+	/** Measured Codex fixed input overhead; never inferred from a failed run. */
+	provider_fixed_input_tokens?: number;
 	run_process?: (options: JsonlProcessOptions) => Promise<JsonlProcessResult>;
 }
 
@@ -95,12 +98,20 @@ function captureUsage(event: Record<string, unknown>, observation: CliObservatio
 	};
 }
 
-function checkObservedBudget(task: TaskContract, observation: CliObservation): string | undefined {
+function checkObservedBudget(
+	task: TaskContract,
+	observation: CliObservation,
+	providerFixedInputTokens?: number,
+): string | undefined {
 	const budget = task.loop_budget;
 	const usage = observation.usage;
 	if (!budget || !usage) return undefined;
-	if (usage.input_tokens !== undefined && usage.input_tokens > budget.max_input_tokens)
-		return `loop budget exhausted: max_input_tokens (${usage.input_tokens} > ${budget.max_input_tokens})`;
+	const accounting = accountInputTokens(task, usage, providerFixedInputTokens);
+	if (accounting.mode === "fixed_overhead_mismatch")
+		return `input token accounting mismatch: provider input ${accounting.provider_input_tokens} is below calibrated fixed overhead ${accounting.provider_fixed_input_tokens}`;
+	const taskInputTokens = accounting.pph_projected_input_tokens ?? accounting.provider_input_tokens;
+	if (taskInputTokens !== null && taskInputTokens > budget.max_input_tokens)
+		return `loop budget exhausted: max_input_tokens (${taskInputTokens} > ${budget.max_input_tokens}; provider_total=${accounting.provider_input_tokens}; fixed_overhead=${accounting.provider_fixed_input_tokens ?? "none"})`;
 	if (usage.output_tokens !== undefined && usage.output_tokens > budget.max_output_tokens)
 		return `loop budget exhausted: max_output_tokens (${usage.output_tokens} > ${budget.max_output_tokens})`;
 	if (usage.cost_usd !== undefined && usage.cost_usd > budget.max_cost_usd)
@@ -134,6 +145,7 @@ export class CodexCliWorkerAdapter implements WorkerAdapter {
 	private readonly timeout_ms: number;
 	private readonly home_dir: string;
 	private readonly codex_home: string;
+	private readonly provider_fixed_input_tokens?: number;
 	private readonly run_process: (options: JsonlProcessOptions) => Promise<JsonlProcessResult>;
 	private last_observation?: ExternalWorkerObservation;
 
@@ -144,6 +156,12 @@ export class CodexCliWorkerAdapter implements WorkerAdapter {
 		this.timeout_ms = options.timeout_ms ?? 90_000;
 		this.home_dir = options.home_dir ?? homedir();
 		this.codex_home = options.codex_home ?? resolve(this.home_dir, ".codex");
+		if (
+			options.provider_fixed_input_tokens !== undefined &&
+			(!Number.isSafeInteger(options.provider_fixed_input_tokens) || options.provider_fixed_input_tokens < 0)
+		)
+			throw new TypeError("provider_fixed_input_tokens must be a non-negative safe integer");
+		this.provider_fixed_input_tokens = options.provider_fixed_input_tokens;
 		this.run_process = options.run_process ?? runJsonlProcess;
 	}
 
@@ -202,6 +220,19 @@ export class CodexCliWorkerAdapter implements WorkerAdapter {
 			on_event: (event, observation) => {
 				const record = asRecord(event);
 				if (!record) return;
+				if (record.type === "thread.started") {
+					const sessionId =
+						typeof record.thread_id === "string"
+							? record.thread_id
+							: typeof record.threadId === "string"
+								? record.threadId
+								: typeof record.session_id === "string"
+									? record.session_id
+									: undefined;
+					if (sessionId) observation.session_id = sessionId;
+				}
+				if (typeof record.provider === "string") observation.provider = record.provider;
+				if (typeof record.model === "string") observation.model = record.model;
 				if (record.type === "turn.started" || record.type === "turn_start") {
 					turns += 1;
 					observation.model_calls += 1;
@@ -220,7 +251,7 @@ export class CodexCliWorkerAdapter implements WorkerAdapter {
 				}
 				if (record.type === "turn.completed") {
 					captureUsage(record, observation);
-					const budgetViolation = checkObservedBudget(request.task, observation);
+					const budgetViolation = checkObservedBudget(request.task, observation, this.provider_fixed_input_tokens);
 					if (budgetViolation) {
 						observation.budget_violation = budgetViolation;
 						return { terminate: true, reason: budgetViolation };
@@ -233,7 +264,8 @@ export class CodexCliWorkerAdapter implements WorkerAdapter {
 		});
 		const observation = processResult.observation;
 		const elapsed = Date.now() - started;
-		const evidence = safeEvidence(this.backend, observation);
+		const inputAccounting = accountInputTokens(request.task, observation.usage, this.provider_fixed_input_tokens);
+		const evidence = safeEvidence(this.backend, observation, undefined, undefined, inputAccounting);
 		let output: WorkerExecutionOutput;
 		if (processResult.budget_error) {
 			this.last_observation = externalObservation(
@@ -242,6 +274,7 @@ export class CodexCliWorkerAdapter implements WorkerAdapter {
 				observation,
 				"BLOCKED",
 				elapsed,
+				inputAccounting,
 			);
 			throw processResult.budget_error;
 		}
@@ -301,6 +334,7 @@ export class CodexCliWorkerAdapter implements WorkerAdapter {
 			observation,
 			output.status,
 			elapsed,
+			inputAccounting,
 		);
 		return output;
 	}
