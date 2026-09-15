@@ -252,6 +252,7 @@ async function runRealProviderE2E() {
 				current_snapshot: snapshot,
 			});
 			results.push({
+				case: item.id,
 				...executionSummary(execution, adapter),
 				expected_status: "success",
 				expected_task_state: "DONE",
@@ -268,12 +269,11 @@ async function runRealProviderE2E() {
 			});
 		}
 	}
-	const failedCase = results[1];
-	if (failedCase && !failedCase.conformance_match) {
-		const retryId = "provider-e2e-2-follow-up";
+	for (const failedCase of results.filter((candidate) => !candidate.conformance_match)) {
+		const retryId = `${failedCase.case ?? "provider-e2e-follow-up"}-follow-up`;
 		const retryTask = taskFor(
 			retryId,
-			'Output exactly one JSON object with exactly these top-level keys: status, summary, changed_files, artifacts, evidence, errors, work_receipt. Set status to "success", summary to "PHASE7_PROVIDER_E2E_2_FOLLOW_UP", changed_files to [], artifacts to [], evidence to [], errors to [], and work_receipt to exactly {"work_attempted":false,"effects_count":0,"artifacts_created":[],"state_changed":false,"no_op":true,"no_op_reason":"read-only follow-up","evidence_refs":[]}. Do not omit evidence_refs. This is the single bounded follow-up for a malformed first response. Do not call tools.',
+			'Output exactly one JSON object with exactly these top-level keys: status, summary, changed_files, artifacts, evidence, errors, work_receipt. Set status to "success", summary to "PHASE7_PROVIDER_E2E_FOLLOW_UP", changed_files to [], artifacts to [], evidence to [], errors to [], and work_receipt to exactly {"work_attempted":false,"effects_count":0,"artifacts_created":[],"state_changed":false,"no_op":true,"no_op_reason":"read-only follow-up","evidence_refs":[]}. Do not omit evidence_refs. This is the single bounded follow-up for a malformed first response. Do not call tools.',
 		);
 		const retryAdapter = workerFor(retryId);
 		const retrySnapshot = captureWorkspaceSnapshot(evidenceCommit, [], []);
