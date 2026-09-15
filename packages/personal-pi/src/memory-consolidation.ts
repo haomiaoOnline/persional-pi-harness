@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { validateResultContract, workReceiptErrors } from "./result.ts";
 import { validateTaskContract } from "./schema.ts";
-import { TriggerGateway } from "./triggers.ts";
+import { type ScheduleDefinition, TriggerGateway } from "./triggers.ts";
 import type { DecisionRecord, EvidenceRecord, JsonValue, ResultContract, RunRecord, TaskContract } from "./types.ts";
 
 export interface ColdEvidenceArchive {
@@ -161,6 +161,13 @@ function consolidationTask(input: ConsolidationInput, idempotencyKey: string): T
 	};
 }
 
+function validatedConsolidationTask(input: ConsolidationInput, idempotencyKey: string): TaskContract {
+	const task = consolidationTask(input, idempotencyKey);
+	if (!validateTaskContract(task).valid)
+		throw new MemoryConsolidationError("generated consolidation Task Contract is invalid");
+	return task;
+}
+
 function validateCompletedInput(input: ConsolidationInput): void {
 	if (!validateTaskContract(input.task).valid) throw new MemoryConsolidationError("source Task Contract is invalid");
 	if (input.run.task_id !== input.task.id || input.result.task_id !== input.task.id)
@@ -211,29 +218,7 @@ export class MemoryConsolidator {
 		validateCompletedInput(input);
 		const at = input.at ?? this.now();
 		const idempotencyKey = `memory:${input.task.id}:${input.run.id}:${input.evidence.id}`;
-		const before = this.hotPath();
-		const previous = this.recordsByKey.get(idempotencyKey);
-		if (previous) {
-			const noOp = this.makeRecord({
-				idempotencyKey,
-				taskId: input.task.id,
-				runId: input.run.id,
-				consolidationTaskId: previous.consolidation_task_id,
-				status: "NO_OP",
-				summary: "no new completed-task content",
-				compactDecisions: [],
-				archivedEvidenceRefs: [],
-				before,
-				reason: "duplicate consolidation idempotency key",
-				at,
-			});
-			return structuredClone(noOp);
-		}
-
-		const generatedTask = consolidationTask(input, idempotencyKey);
-		const contractValidation = validateTaskContract(generatedTask);
-		if (!contractValidation.valid)
-			throw new MemoryConsolidationError("generated consolidation Task Contract is invalid");
+		const generatedTask = validatedConsolidationTask(input, idempotencyKey);
 		const triggerResult = this.trigger.createFromWebhook(
 			{
 				source: "memory-consolidation",
@@ -247,9 +232,73 @@ export class MemoryConsolidator {
 			},
 			() => generatedTask,
 		);
-		const consolidationTaskId = triggerResult.task?.id ?? `memory-consolidation-${input.task.id}`;
+		return this.consolidateAfterTrigger(input, at, triggerResult.task?.id ?? generatedTask.id);
+	}
+
+	/** 受控 schedule 入口；未命中 schedule 返回 undefined，不创建 Run。 */
+	consolidateFromSchedule(
+		schedule: ScheduleDefinition,
+		at: Date,
+		input: ConsolidationInput,
+	): ConsolidationRecord | undefined {
+		validateCompletedInput(input);
+		const receivedAt = at.toISOString();
+		const triggerKey = `schedule:${schedule.id}:${receivedAt.slice(0, 16)}`;
+		const generatedTask = validatedConsolidationTask(input, triggerKey);
+		const triggerResult = this.trigger.createFromSchedule(schedule, at, () => generatedTask);
+		if (!triggerResult.created) {
+			if (triggerResult.reason !== "duplicate idempotency_key") return undefined;
+			const idempotencyKey = `memory:${input.task.id}:${input.run.id}:${input.evidence.id}`;
+			const previous = this.recordsByKey.get(idempotencyKey);
+			if (!previous) return undefined;
+			return structuredClone(
+				this.makeRecord({
+					idempotencyKey,
+					taskId: input.task.id,
+					runId: input.run.id,
+					consolidationTaskId: previous.consolidation_task_id,
+					status: "NO_OP",
+					summary: "no new completed-task content",
+					compactDecisions: [],
+					archivedEvidenceRefs: [],
+					before: this.hotPath(),
+					reason: "duplicate scheduled consolidation idempotency key",
+					at: receivedAt,
+				}),
+			);
+		}
+		return this.consolidateAfterTrigger(input, receivedAt, triggerResult.task?.id ?? generatedTask.id);
+	}
+
+	private consolidateAfterTrigger(
+		input: ConsolidationInput,
+		at: string,
+		consolidationTaskId: string,
+	): ConsolidationRecord {
+		const idempotencyKey = `memory:${input.task.id}:${input.run.id}:${input.evidence.id}`;
+		const before = this.hotPath();
+		const previous = this.recordsByKey.get(idempotencyKey);
+		if (previous) {
+			return structuredClone(
+				this.makeRecord({
+					idempotencyKey,
+					taskId: input.task.id,
+					runId: input.run.id,
+					consolidationTaskId: previous.consolidation_task_id,
+					status: "NO_OP",
+					summary: "no new completed-task content",
+					compactDecisions: [],
+					archivedEvidenceRefs: [],
+					before,
+					reason: "duplicate consolidation idempotency key",
+					at,
+				}),
+			);
+		}
+
 		const key = contentKey(input);
 		if (this.seenContent.has(key)) {
+			const archiveReference = this.archive.archive(input.evidence);
 			const noOp = this.makeRecord({
 				idempotencyKey,
 				taskId: input.task.id,
@@ -258,7 +307,7 @@ export class MemoryConsolidator {
 				status: "NO_OP",
 				summary: "no new completed-task content",
 				compactDecisions: [],
-				archivedEvidenceRefs: [],
+				archivedEvidenceRefs: [archiveReference],
 				before,
 				reason: "content already consolidated",
 				at,
