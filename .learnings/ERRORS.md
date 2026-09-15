@@ -805,3 +805,144 @@ failure classified as environment-bounded rather than as a code regression.
 
 - Reproducible: yes in the default sandbox
 - Related Files: `packages/personal-pi/vitest.config.ts`, `packages/personal-pi/dist/`, `scripts/coding-agent-consumer.test.mjs`
+
+## [ERR-20260915-006] codex-identity-probe-wrapper
+
+**Logged**: 2026-09-15T11:35:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tooling
+
+### Summary
+
+A one-off redaction wrapper for a read-only Codex CLI identity probe failed
+because shell quoting changed the JavaScript regular-expression literal.
+
+### Error
+
+```text
+SyntaxError: Invalid regular expression flags
+Expression expected
+```
+
+### Context
+
+- The first probe exited before emitting JSONL; the wrapper itself did not
+  expose raw stderr or credential data.
+- No repository source, session, credential, or external service state was
+  changed.
+
+### Suggested Fix
+
+Prefer a bounded script with fewer shell-level escape layers, and emit only
+allowlisted identity fields plus digests.
+
+### Metadata
+
+- Reproducible: no
+- Related Files: `packages/personal-pi/src/adapters/codex-cli.ts`
+
+## [ERR-20260915-007] rollout-metadata-inventory-wrapper
+
+**Logged**: 2026-09-15T11:37:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tooling
+
+### Summary
+
+A one-off read-only rollout inventory wrapper had one missing closing brace in
+an inline JavaScript arrow function.
+
+### Error
+
+```text
+SyntaxError: Unexpected token ')'
+Expression expected
+```
+
+### Context
+
+- The wrapper stopped before opening any rollout file and emitted no session
+  identifiers or metadata.
+- No repository source, credential, account, or external service state was
+  changed.
+
+### Suggested Fix
+
+Use a bounded script file or validate inline JavaScript syntax before scanning
+state directories.
+
+### Metadata
+
+- Reproducible: no
+- Related Files: `/Users/chenglong/.codex/sessions/`
+
+## [ERR-20260915-008] codex-log-query-wrapper
+
+**Logged**: 2026-09-15T11:41:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tooling
+
+### Summary
+
+A one-off read-only SQLite log query wrapper failed because shell escaping
+altered a JavaScript regular-expression literal.
+
+### Error
+
+```text
+SyntaxError: Invalid regular expression: Unterminated group
+```
+
+### Context
+
+- The query stopped before reading log rows and emitted no log body, identity,
+  credential, or account data.
+- No repository source, session, credential, or external service state was
+  changed.
+
+### Suggested Fix
+
+Use exact substring checks for bounded log classification and keep SQL strings
+free of unnecessary shell escape layers.
+
+### Metadata
+
+- Reproducible: no
+- Related Files: `/Users/chenglong/.codex/logs_2.sqlite`
+
+## [ERR-20260915-009] codex-log-identity-extractor
+
+**Logged**: 2026-09-15T11:46:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tooling
+
+### Summary
+
+A second bounded SQLite log extractor hit the same shell-escaping failure
+while constructing an inline JavaScript regular expression.
+
+### Error
+
+```text
+SyntaxError: Invalid regular expression: Unterminated group
+```
+
+### Context
+
+- The extractor stopped before emitting log bodies or identity values.
+- The subsequent exact-token extractor emitted only allowlisted model/provider
+  tokens and digests; no credential or account data was exposed.
+
+### Suggested Fix
+
+Avoid regular expressions in shell-embedded JavaScript when exact tokenization
+is sufficient; keep the query output bounded and redact before emission.
+
+### Metadata
+
+- Reproducible: no
+- Related Files: `/Users/chenglong/.codex/logs_2.sqlite`
