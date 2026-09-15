@@ -1,5 +1,41 @@
 # Errors
 
+## [ERR-20260915-011] phase12-verifier-argv
+
+**Logged**: 2026-09-15T16:50:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: tests
+
+### Summary
+
+The first bounded Codex smoke after the Result Contract prompt fix returned a
+successful Worker result, but the independent verifier marked it FAIL because
+its argument destructuring treated the `--verify` mode flag as the record path.
+
+### Error
+
+```text
+independent verifier: FAIL; Worker result itself was success and contract-valid
+```
+
+### Context
+
+- Codex process/session, fixed-overhead accounting, result identity, and
+  Work Receipt all passed in this attempt.
+- The benchmark was correctly not continued while verification was red.
+- No raw model response or credential was read or recorded.
+
+### Suggested Fix
+
+Parse the verifier mode flag explicitly before reading the record path, rerun
+one bounded smoke, and do not classify the prior attempt as Worker failure.
+
+### Metadata
+
+- Reproducible: yes before verifier correction
+- Related Files: `packages/personal-pi/scripts/phase-12-real-heterogeneous.mjs`
+
 ## [ERR-20260915-010] codex-real-result-contract-shape
 
 **Logged**: 2026-09-15T16:35:00+08:00

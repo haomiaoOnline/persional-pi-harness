@@ -472,7 +472,11 @@ async function runMode(mode, assignments, caseDefinitions) {
 }
 
 function verifyRecord() {
-	const [, , recordPath, taskId, workerId] = process.argv;
+	const [, , mode, recordPath, taskId, workerId] = process.argv;
+	if (mode !== "--verify") {
+		process.exitCode = 1;
+		return;
+	}
 	try {
 		const record = JSON.parse(readFileSync(recordPath, "utf8"));
 		const receipt = record.work_receipt;
