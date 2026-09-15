@@ -1,0 +1,256 @@
+{
+  "schema_version": "1.0",
+  "captured_at": "2026-09-15T09:44:56Z",
+  "purpose": "Codex Identity Surface Compatibility Closure; T13 excluded",
+  "repository": {
+    "path": "/Users/chenglong/github/persional-pi-harness",
+    "branch": "feature/t1-task-contract",
+    "head_before_capture": "d0b8457abf4d235438af8d1956fb0de6ad7360bc",
+    "ahead_of_origin_main_before_capture": 28,
+    "working_tree_clean_before_investigation": true,
+    "local_change_during_investigation": ".learnings/ERRORS.md only; no source, adapter, or historical gate evidence was changed",
+    "push_merge_tag_or_t13": false
+  },
+  "safety_boundary": {
+    "data_class": "synthetic_public_conformance_only",
+    "provider_allowlist": ["openai-codex-cli"],
+    "repository_data_sent": false,
+    "credentials_read_or_recorded": false,
+    "account_identifier_read_or_recorded": false,
+    "external_side_effects": false,
+    "reset_credits_consumed": 0,
+    "global_codex_binary_overwritten": false,
+    "global_codex_state_write_allowed": false,
+    "provider_allowlist_changed": false,
+    "candidate_install_roots": [
+      "/private/tmp/codex-identity-candidate-01550-alpha-3-10",
+      "/private/tmp/codex-identity-install-01550-alpha-3-10"
+    ]
+  },
+  "identity_policy": {
+    "requested_is_not_observed": true,
+    "accepted_and_observed_must_be_bound_to_same_run": true,
+    "inference_from_command_or_config_forbidden": true,
+    "required_identity_fields": [
+      "platform_accepted_model",
+      "observed_runtime_model",
+      "provider"
+    ],
+    "accepted_surface_order": [
+      "exec_json_event_stream",
+      "official_app_server_session_event_stream",
+      "strictly_bound_persisted_run_metadata"
+    ]
+  },
+  "official_sources_inspected": [
+    "https://www.npmjs.com/package/@openai/codex?activeTab=versions",
+    "https://github.com/openai/codex/releases/tag/rust-v0.155.0-alpha.3.10",
+    "https://developers.openai.com/codex/cli/reference",
+    "https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md"
+  ],
+  "version_inventory": [
+    {
+      "surface": "global_standalone_binary",
+      "binary": "/Users/chenglong/.local/bin/codex",
+      "version": "codex-cli 0.154.0",
+      "sha256": "4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc",
+      "release_maturity": "stable",
+      "status": "baseline_preserved"
+    },
+    {
+      "surface": "official_npm_candidate",
+      "package": "@openai/codex@0.155.0-alpha.3.10",
+      "platform_package": "@openai/codex-darwin-arm64@0.155.0-alpha.3.10",
+      "release_tag": "rust-v0.155.0-alpha.3.10",
+      "release_commit": "f5e8906",
+      "release_maturity": "pre-release",
+      "tarball": "/private/tmp/codex-identity-candidate-01550-alpha-3-10/openai-codex-0.155.0-alpha.3.10.tgz",
+      "tarball_sha256": "85d0a207affdbe53917c6640be78612227a3f703999e94cd839c9940a3ca3f00",
+      "binary": "/private/tmp/codex-identity-install-01550-alpha-3-10/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+      "version_observed": "codex-cli 0.155.0-alpha.3.10",
+      "binary_sha256": "eaa295b38d26ba04e95a9086f2393e66a31f06f23c94d1e26fecd4445c6869e8",
+      "status": "rejected_no_compatible_identity_surface"
+    },
+    {
+      "surface": "installed_chatgpt_desktop_bundle",
+      "binary": "/Applications/ChatGPT.app/Contents/Resources/codex",
+      "version": "codex-cli 0.154.0-alpha.6.2",
+      "sha256": "ecad78dbf98adb89ec475edac86630406cbe59d9f3070b17d88065f136b94bcb",
+      "release_maturity": "installed_pre-release_bundle",
+      "status": "static_only_no_identity_contract"
+    }
+  ],
+  "schema_inspection": {
+    "stable_0_1540": {
+      "generated_with": "codex app-server generate-json-schema --experimental",
+      "schema_files": {
+        "ServerNotification.json": "eb4317b57ce7cad32d6ab8a5b7d39eb765c8fb8f67acbc808dd6e55959411c93",
+        "v2/ThreadStartedNotification.json": "c600ab867702bb8a17079c7ba1fefb409a3e14dafb250776545c9b041129c7cb",
+        "v2/ThreadStartParams.json": "25f490368ec6df52a2a3b82a5469d2413307eb93439121b309f415b5648eee7a",
+        "v2/TurnStartParams.json": "b36fb37326b1cf69f75c8b306f1f886d53a57c4b1b985e08e298e2407ea2ad02"
+      },
+      "session_configured_method_present": false,
+      "thread_model_provider_fields_present": true,
+      "thread_model_semantics": "Configured/latest persisted state; explicitly not per-turn execution telemetry.",
+      "turn_identity_fields_present": false
+    },
+    "npm_0_1550_alpha_3_10": {
+      "generated_with": "candidate codex app-server generate-json-schema --experimental",
+      "schema_files": {
+        "ServerNotification.json": "49a787f49a8ba46034fbea8664f4cbfe10211abd57e34b8281430a7dc033b42b",
+        "v2/ThreadStartedNotification.json": "c600ab867702bb8a17079c7ba1fefb409a3e14dafb250776545c9b041129c7cb",
+        "v2/ThreadStartParams.json": "25f490368ec6df52a2a3b82a5469d2413307eb93439121b309f415b5648eee7a",
+        "v2/TurnStartParams.json": "b36fb37326b1cf69f75c8b306f1f886d53a57c4b1b985e08e298e2407ea2ad02"
+      },
+      "session_configured_method_present": false,
+      "thread_model_provider_fields_present": true,
+      "thread_model_semantics": "Configured/latest persisted state; explicitly not per-turn execution telemetry.",
+      "turn_identity_fields_present": false,
+      "selected_identity_schema_equal_to_stable": true
+    },
+    "desktop_0_1540_alpha_6_2": {
+      "generated_with": "installed desktop bundled codex app-server generate-json-schema --experimental",
+      "schema_files": {
+        "ServerNotification.json": "eb4317b57ce7cad32d6ab8a5b7d39eb765c8fb8f67acbc808dd6e55959411c93",
+        "v2/ThreadStartedNotification.json": "c600ab867702bb8a17079c7ba1fefb409a3e14dafb250776545c9b041129c7cb",
+        "v2/ThreadStartParams.json": "25f490368ec6df52a2a3b82a5469d2413307eb93439121b309f415b5648eee7a",
+        "v2/TurnStartParams.json": "b36fb37326b1cf69f75c8b306f1f886d53a57c4b1b985e08e298e2407ea2ad02"
+      },
+      "session_configured_method_present": false,
+      "thread_model_provider_fields_present": true,
+      "thread_model_semantics": "Configured/latest persisted state; explicitly not per-turn execution telemetry.",
+      "turn_identity_fields_present": false
+    },
+    "conditional_model_notification_exclusions": [
+      {
+        "method": "model/rerouted",
+        "fields": ["fromModel", "toModel", "reason", "threadId", "turnId"],
+        "sufficiency": "reroute-only model transition; no provider and no normal accepted/observed event"
+      },
+      {
+        "method": "model/safetyBuffering/updated",
+        "fields": ["model", "fasterModel", "threadId", "turnId"],
+        "sufficiency": "conditional safety-buffering state; no provider and not a general execution identity attestation"
+      }
+    ]
+  },
+  "surface_help_inspection": {
+    "exec_json": {
+      "stable_supported": true,
+      "candidate_supported": true,
+      "output_schema_semantics": "Constrains final response shape; not execution telemetry."
+    },
+    "app_server": {
+      "maturity": "experimental",
+      "stdio_supported": true,
+      "generated_schema_supported": true,
+      "public_session_configured_event_supported": false
+    },
+    "debug_app_server_send_message_v2": {
+      "available_in_stable_and_candidate": true,
+      "documented_behavior": "Initializes app-server, starts a thread, sends a turn, and streams server notifications.",
+      "machine_readable_identity_output_contract": "not exposed by help or generated public schema",
+      "accepted_for_type_b_identity": false
+    }
+  },
+  "real_probe_results": {
+    "stable_exec_baseline": {
+      "source": "prior evidence/type-b-identity-attestation-2026-09-15.json",
+      "version": "codex-cli 0.154.0",
+      "execution_path": "codex exec --ephemeral --json",
+      "event_count": 5,
+      "event_types": ["thread.started", "turn.started", "item.completed", "item.completed", "turn.completed"],
+      "thread_id_sha256_prefix_16": "b1e6b714c0c5c4d2",
+      "identity_fields_seen": [],
+      "requested_model": "gpt-5.6-sol",
+      "platform_accepted_model": "unknown",
+      "observed_runtime_model": "unknown",
+      "provider": "unknown",
+      "attestation": "NO_ATTESTATION",
+      "historical_record_preserved": true
+    },
+    "stable_app_server_global_home_preflight": {
+      "execution_path": "codex app-server --stdio",
+      "status": "STARTUP_BLOCKED_NO_GLOBAL_WRITE",
+      "stdout_event_count": 0,
+      "stderr_sha256_prefix_16": "4430b7a238887b69",
+      "error_class": "failed to initialize sqlite state runtime under real CODEX_HOME",
+      "identity_fields_seen": [],
+      "global_state_modified": false
+    },
+    "stable_app_server_isolated_home": {
+      "execution_path": "codex app-server --stdio",
+      "code_home": "/private/tmp/codex-app-server-home-01540-20260915",
+      "timeout_ms": 15000,
+      "stdout_event_count": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_signal": "SIGTERM",
+      "identity_fields_seen": [],
+      "attestation": "NO_ATTESTATION_TIMEOUT"
+    },
+    "npm_candidate_exec_preflight": {
+      "version": "codex-cli 0.155.0-alpha.3.10",
+      "execution_path": "candidate codex exec --ephemeral --json",
+      "event_count": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "2d8b902fb51c4fb0108c58a40b037f3ed52641f00cdae67901d7cbda9b4b8473",
+      "exit_code": 1,
+      "error_class": "failed to initialize in-process app-server client: Operation not permitted",
+      "identity_fields_seen": [],
+      "attestation": "NO_EXECUTION"
+    },
+    "npm_candidate_isolated_exec": {
+      "version": "codex-cli 0.155.0-alpha.3.10",
+      "execution_path": "candidate codex exec --ephemeral --json",
+      "code_home": "/private/tmp/codex-exec-home-01550-alpha-3-10-20260915",
+      "requested_model": "gpt-5.6-sol",
+      "event_count": 10,
+      "event_types": ["thread.started", "turn.started", "item.completed", "error"],
+      "thread_id_sha256_prefix_16": "58af1726fbe32194",
+      "top_level_turn_id_sha256_prefix_16": null,
+      "identity_fields_seen": [],
+      "platform_accepted_model": "unknown",
+      "observed_runtime_model": "unknown",
+      "provider": "unknown",
+      "stdout_sha256": "240df0e3bc4fce647ac6c00dd12b0349c8cc149fa1e148d4b741b7bc390e637c",
+      "stderr_sha256": "2fab5bbd25d4b4f207382269a77f74bd2246fb3d2c7494a7dc50a33795d439b8",
+      "timeout_ms": 30000,
+      "exit_code": null,
+      "exit_signal": "SIGTERM",
+      "model_execution_completed": false,
+      "attestation": "NO_ATTESTATION"
+    }
+  },
+  "adapter_and_revalidation": {
+    "adapter": "CodexCliWorkerAdapter",
+    "code_changed": false,
+    "identity_inference_added": false,
+    "missing_identity_fail_closed_preserved": true,
+    "fixture_or_schema_test_added": false,
+    "targeted_adapter_tests_rerun": true,
+    "targeted_adapter_test_result": "10/10 PASS",
+    "bound_coverage_test_rerun": true,
+    "bound_coverage_test_result": "7/7 PASS; audit passed with uncovered_paths=[]",
+    "personal_pi_regression_rerun": true,
+    "personal_pi_regression_result": "3 files, 23/23 PASS",
+    "protocol_isolation_rerun": true,
+    "protocol_isolation_result": "PASS",
+    "full_heterogeneous_benchmark_rerun": false,
+    "historical_type_b_evidence_preserved": true,
+    "reason": "No tested official surface emitted a permitted same-run model/provider identity; an adapter inference patch would violate the policy."
+  },
+  "decision": {
+    "requested_model": "gpt-5.6-sol",
+    "platform_accepted_model": "unknown",
+    "observed_runtime_model": "unknown",
+    "provider": "unknown",
+    "candidate_status": "NO_COMPATIBLE_IDENTITY_SURFACE_FOUND",
+    "phase_12_status": "PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN",
+    "phase_12_exit": "BLOCKED",
+    "aggregate_status": "NOT_READY_FOR_T13",
+    "blocker": "No tested official Codex CLI version or app-server/debug execution surface produced machine-verifiable model/provider identity bound to the same Type B run/session/turn. The public Thread.model and Thread.modelProvider fields remain configured/latest thread state, not per-turn execution telemetry.",
+    "minimum_human_action": "Provide a supported Codex execution surface/build that emits model/provider metadata in the same Type B run/session/turn; no credentials need to be shared.",
+    "t13_entered": false
+  }
+}

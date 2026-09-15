@@ -272,3 +272,51 @@ sharing credentials.
 
 **Phase 12 remains `PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN` and its exit is
 BLOCKED. The aggregate remains `NOT READY FOR T13`; T13 was not entered.**
+
+## Codex Identity Surface Compatibility Closure — 2026-09-15 latest
+
+The bounded compatibility investigation is recorded in
+[`evidence/type-b-identity-surface-compatibility-2026-09-15.json`](./evidence/type-b-identity-surface-compatibility-2026-09-15.json).
+It did not alter the global Codex installation, Provider allowlist, adapter
+code, historical Type B execution, or heterogeneous benchmark.
+
+The installed stable binary remains `/Users/chenglong/.local/bin/codex`
+(`codex-cli 0.154.0`). The only newer official package found was the
+pre-release `@openai/codex@0.155.0-alpha.3.10`; it was installed under
+`/private/tmp` with its macOS arm64 binary and tested without copying or
+reading credentials. The installed ChatGPT Desktop bundle was also checked
+(`codex-cli 0.154.0-alpha.6.2`). Both candidate schemas expose the same
+configured/latest thread `model`/`modelProvider` fields as stable 0.154.0 and
+explicitly describe the model as **not per-turn execution telemetry**. Their
+public `ServerNotification` schemas contain no `SessionConfigured` or
+`session/configured` event. The conditional `model/rerouted` and
+`model/safetyBuffering/updated` notifications were also excluded: they lack a
+provider field and are not a general accepted/observed identity attestation.
+
+The real isolated alpha `codex exec --ephemeral --json` process emitted ten
+events (`thread.started`, `turn.started`, `item.completed`, `error`) and a
+hashed thread binding, but no model/provider field and no completed model turn.
+The stable app-server was also probed without allowing writes to real
+`~/.codex`; its global-home startup was blocked by the state-runtime write
+boundary, while the temporary-home stdio probe produced no protocol output
+within 15 seconds. `codex debug app-server send-message-v2` is available but
+has no machine-readable identity output contract in help or the generated
+schema. These results are evidence of a surface gap, not a reason to infer
+identity from requested model, config, desktop state, or logs.
+
+No Thin Adapter change is justified: `CodexCliWorkerAdapter` remains
+fail-closed for missing identity. Targeted revalidation after the no-source
+change passed: adapter tests `10/10`, Bound Coverage integration `7/7` with
+`uncovered_paths=[]`, Personal PI regression `23/23`, and protocol isolation
+`PASS`. The full Type B benchmark was not rerun; the previous Type B smoke and
+`A/B/A/B/A` record remain historical evidence.
+
+| Field | Current result |
+| --- | --- |
+| `requested_model` | `gpt-5.6-sol` |
+| `platform_accepted_model` | `unknown` |
+| `observed_runtime_model` | `unknown` |
+| `provider` | `unknown` |
+
+**Phase 12 remains `PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN` with exit
+`BLOCKED`. The aggregate remains `NOT READY FOR T13`; T13 was not entered.**

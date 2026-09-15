@@ -913,6 +913,40 @@ free of unnecessary shell escape layers.
 - Reproducible: no
 - Related Files: `/Users/chenglong/.codex/logs_2.sqlite`
 
+## [ERR-20260915-010] app-server-probe-wrapper
+
+**Logged**: 2026-09-15T12:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tooling
+
+### Summary
+
+The first inline Node app-server probe did not start because an outer template
+literal consumed an inner JavaScript template literal during shell construction.
+
+### Error
+
+```text
+SyntaxError: Unexpected identifier 'initialize'
+```
+
+### Context
+
+- The probe stopped before spawning Codex; no app-server request was sent.
+- No repository runtime, account, credential, or external service state was changed.
+
+### Suggested Fix
+
+Avoid nested template literals in shell-embedded JavaScript; use ordinary string
+concatenation or a bounded temporary script when an interactive protocol probe
+needs dynamic request IDs.
+
+### Metadata
+
+- Reproducible: no
+- Related Files: `/private/tmp/codex-app-schema-01540-20260915`
+
 ## [ERR-20260915-009] codex-log-identity-extractor
 
 **Logged**: 2026-09-15T11:46:00+08:00

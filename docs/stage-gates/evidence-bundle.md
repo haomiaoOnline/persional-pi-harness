@@ -295,3 +295,38 @@ model/provider identity bound to the same CLI run/session/turn. The minimum
 human action is to use a supported Codex CLI build or execution surface that
 emits that metadata and capture one bounded synthetic smoke. T13 remains out
 of scope; no push, merge, or tag was performed.
+
+## Codex Identity Surface Compatibility Closure — 2026-09-15 latest
+
+The bounded version/surface investigation is captured in
+[`evidence/type-b-identity-surface-compatibility-2026-09-15.json`](./evidence/type-b-identity-surface-compatibility-2026-09-15.json).
+The stable global binary is still `codex-cli 0.154.0`; no global update was
+attempted. The official npm `0.155.0-alpha.3.10` macOS arm64 candidate was
+installed under `/private/tmp` and its binary/schema were checked. The
+installed desktop bundle `0.154.0-alpha.6.2` was checked as an additional
+official surface. All tested public schemas omit `SessionConfigured` and
+describe `Thread.model` as configured/latest state rather than per-turn
+execution telemetry. Conditional model notifications (`model/rerouted` and
+`model/safetyBuffering/updated`) were checked but do not provide provider and
+are not general accepted/observed identity telemetry.
+
+The isolated alpha real process emitted ten JSONL events with a hashed thread
+binding but no model/provider identity and no completed model turn. App-server
+stdio could not use the real home without a prohibited global state write, and
+the temporary-home probe timed out without protocol output. The documented
+debug app-server helper has no separate machine-readable identity contract.
+No adapter, Provider policy, account, credential, benchmark, or T13 scope was
+changed. Targeted revalidation passed: adapter `10/10`, Bound Coverage `7/7`
+with `uncovered_paths=[]`, Personal PI regression `23/23`, and protocol
+isolation `PASS`. The full heterogeneous benchmark was not rerun. The
+four-tuple remains:
+
+```text
+requested_model          = gpt-5.6-sol
+platform_accepted_model  = unknown
+observed_runtime_model   = unknown
+provider                 = unknown
+```
+
+Phase 12 remains `PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN` / exit `BLOCKED`.
+The Phase 0–12 aggregate remains **NOT READY FOR T13**; T13 was not entered.
