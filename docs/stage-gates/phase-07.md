@@ -81,3 +81,14 @@ This is E2/local control-plane evidence, not a claim of a production
 background service. The required T7.2 disposable self-development run,
 real-provider Worker pipeline and long-running Trigger/Routine cycle remain
 unavailable. **Phase 7 remains PARTIAL / REOPENED**.
+
+## External Evidence Closure update — 2026-09-15
+
+Phase 3's real Worker hard gate remained unsatisfied after the capability and
+auth inventory. Consequently this round created no disposable self-development
+worktree, made no self-change, and ran no real Provider E2E or accelerated
+Trigger/Routine cycle. The three existing child-process paths remain explicitly
+E2/local evidence. **Phase 7 remains BLOCKED_EXTERNAL / PARTIAL / REOPENED.**
+
+The exact prerequisite and release conditions are in
+[`evidence/external-worker-inventory-2026-09-15.md`](./evidence/external-worker-inventory-2026-09-15.md).

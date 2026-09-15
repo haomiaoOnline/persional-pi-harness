@@ -1,0 +1,227 @@
+{
+  "schema_version": "1.0",
+  "captured_at": "2026-09-15T11:18:35+08:00",
+  "purpose": "External Evidence Closure capability, authentication, quota, and adapter inventory",
+  "repository": {
+    "path": "/Users/chenglong/github/persional-pi-harness",
+    "branch": "feature/t1-task-contract",
+    "evidence_base_sha": "2a7d50b5f0bffef88c969c61e7032797a5f374b3",
+    "origin_main": "71b3e44297d20b43faf31a677c2f5224a9e57481",
+    "ahead_origin_main": 13,
+    "working_tree_at_capture": "clean"
+  },
+  "safety_boundary": {
+    "data_class": "internal",
+    "provider_allowlist": ["openai"],
+    "allowed_mutation": "evidence-only documentation and .learnings entry",
+    "actions_not_taken": [
+      "no login or OAuth flow",
+      "no quota reset redemption",
+      "no purchase, recharge, plan change, or account setting change",
+      "no credential value read, printed, copied, exported, or persisted",
+      "no provider switch for repository data",
+      "no production deployment, push, merge, or T13 tag"
+    ]
+  },
+  "root_cause": {
+    "classification": "model_specific_account_quota",
+    "confidence": "high",
+    "summary": "The native Worker failure is attributable to the Codex account base-model weekly limit for gpt-5.6-luna, not to a Personal PI Result/Receipt failure.",
+    "current_usage": {
+      "ordinary_usage_allowed": true,
+      "codex_primary_used_percent": 33,
+      "codex_secondary_used_percent": 78,
+      "base_model_inference_normal_model_slug": "gpt-5.6-luna",
+      "base_model_inference_primary_used_percent": 100,
+      "base_model_inference_primary_window_minutes": 10080,
+      "base_model_inference_resets_at": "2026-09-16T12:20:07+08:00",
+      "reset_credits_consumed": 0,
+      "source": "codex_app.get_usage_limits"
+    },
+    "historical_native_attempts": {
+      "count": 2,
+      "result": "usage-limited before an auditable Worker result",
+      "platform_accepted_model": "unknown",
+      "observed_runtime_model": "unknown",
+      "source": "docs/stage-gates/v3.1-delta-audit.md and phase-03.md"
+    },
+    "caveat": "The original platform error payload was not re-emitted in this run; the current quota snapshot and the prior bounded audit records are the available evidence."
+  },
+  "inventory": [
+    {
+      "id": "personal-pi-adapter-surface",
+      "surface": "personal_pi_package",
+      "status": "blocked",
+      "worker_types_declared": ["pi", "codex", "claude", "local_model", "cli"],
+      "adapter_contract": "packages/personal-pi/src/worker.ts: WorkerAdapter + PiWorker",
+      "configured_manifest_entries": [
+        "packages/personal-pi/examples/worker-plugins/codex-cli.plugin_manifest.yaml -> adapters/codex-cli.ts",
+        "packages/personal-pi/examples/worker-plugins/claude-cli.plugin_manifest.yaml -> adapters/claude-cli.ts"
+      ],
+      "adapter_files_present": false,
+      "runtime_adapter_evidence": "Tests inject PiWorker callbacks; no external CLI/API adapter is wired.",
+      "auth_status": "unknown",
+      "provider": "unknown",
+      "release_condition": "An authorized backend and an actual adapter must be available before a real task can enter the pipeline."
+    },
+    {
+      "id": "pph-and-pi-cli",
+      "surface": "local_cli",
+      "status": "unavailable_for_personal_pi",
+      "repo_bin": "pph -> packages/coding-agent/dist/bundle/cli.js",
+      "repo_dist_present": false,
+      "path_command_probe": "pph, pi, codex, claude, gemini absent from PATH",
+      "global_pi_package": {
+        "package": "@earendil-works/pi-coding-agent",
+        "version": "0.84.2",
+        "direct_cli_probe": "0.84.2",
+        "identity": "upstream pi, not pph",
+        "path": "/Users/chenglong/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
+      },
+      "auth_status": "unknown",
+      "provider": "not inferred from package presence",
+      "adapter_status": "missing"
+    },
+    {
+      "id": "codex-app-native-worker",
+      "surface": "native_subagent",
+      "backend": "multi_agent_v1__spawn_agent",
+      "status": "usage_limited_for_gpt_5_6_luna_route",
+      "schema_capability": "tool schema exposed in current runtime",
+      "catalog_candidates_observed": ["gpt-5.6-luna", "gpt-5.6-sol"],
+      "provider": "openai",
+      "credential_path_type": "Codex App session",
+      "terms_status": "allowed",
+      "auth_status": "authenticated_for_usage_read",
+      "observed_runtime_model": "unknown",
+      "personal_pi_adapter": "missing",
+      "note": "A gpt-5.6-sol alternative was not invoked: doing so would spend quota without providing a Personal PI adapter path, and the current hard gate is already sufficient to classify the prior gpt-5.6-luna failure."
+    },
+    {
+      "id": "opencodex-local-proxy",
+      "surface": "local_http_runtime",
+      "package": "@bitkyc08/opencodex",
+      "version": "2.54.0",
+      "direct_cli_probe": "opencodex 2.54.0",
+      "configured_port": 10100,
+      "listener_observed": true,
+      "http_probe": "GET /v1/models and GET / both failed to connect",
+      "status": "unavailable_or_unstable",
+      "provider": "unknown_third_party_proxy",
+      "terms_status": "unknown",
+      "auth_status": "unknown",
+      "personal_pi_adapter": "missing",
+      "note": "The listener observation and failed HTTP probes are not enough to claim a usable backend. Repository data was not sent."
+    },
+    {
+      "id": "arkcli",
+      "surface": "local_cli",
+      "package": "@volcengine/ark-cli",
+      "version": "1.0.3",
+      "direct_cli_probe": "arkcli version 1.0.3",
+      "path_command_probe": "arkcli absent from PATH",
+      "configured_auth_metadata": "metadata files present; contents not read",
+      "status": "not_eligible_for_internal_repository_data",
+      "provider": "volcengine_ark",
+      "terms_status": "not_in_project_allowlist",
+      "auth_status": "unknown",
+      "personal_pi_adapter": "missing"
+    },
+    {
+      "id": "claude-cli",
+      "surface": "local_cli",
+      "official_binary": "absent from PATH",
+      "openclaude_package": {
+        "package": "@aryanjsx/openclaude",
+        "package_version": "0.1.5",
+        "direct_runtime_version_output": "99.0.0 (Claude Code)",
+        "identity_consistency": "mismatch; not treated as official Claude CLI evidence"
+      },
+      "configured_auth_metadata": "a Claude config marker exists; contents not read",
+      "status": "unavailable_or_unknown",
+      "provider": "unknown",
+      "auth_status": "unknown",
+      "personal_pi_adapter": "missing"
+    },
+    {
+      "id": "gemini",
+      "surface": "local_cli_or_app",
+      "official_cli": "absent from PATH",
+      "official_api_key_env": "absent_or_empty",
+      "antigravity_app": "present",
+      "antigravity_policy": "manual_only and blocked for automatic third-party use",
+      "status": "not_eligible",
+      "provider": "google_or_google_antigravity",
+      "terms_status": "blocked_for_antigravity",
+      "auth_status": "unauthenticated_for_official_api_probe",
+      "personal_pi_adapter": "missing"
+    },
+    {
+      "id": "ollama",
+      "surface": "local_model_backend",
+      "app": "present",
+      "api": "http://127.0.0.1:11434/api/tags",
+      "http_probe": "connection refused",
+      "status": "unavailable",
+      "provider": "local",
+      "auth_status": "not_applicable",
+      "personal_pi_adapter": "missing"
+    },
+    {
+      "id": "openai-api-environment",
+      "surface": "repository_process",
+      "base_url_host": "ark.cn-beijing.volces.com",
+      "api_key_env": "empty_or_absent",
+      "status": "unauthenticated",
+      "provider": "not_safe_to_infer_from_base_url_only",
+      "terms_status": "unknown",
+      "personal_pi_adapter": "missing"
+    }
+  ],
+  "phase_gate_results": {
+    "phase_3": {
+      "status": "BLOCKED_EXTERNAL",
+      "real_tasks_executed": 0,
+      "required_real_tasks": 5,
+      "matrix": [
+        "success: NOT_RUN",
+        "prohibited_action_or_overreach: NOT_RUN",
+        "structured_failure: NOT_RUN",
+        "controlled_timeout: NOT_RUN",
+        "INSUFFICIENT_CONTEXT: NOT_RUN"
+      ],
+      "idempotency_receipt_coverage": "NOT_RUN through a real backend",
+      "blocker": "EXT-WORKER-ADAPTER-001: no authorized executable adapter path"
+    },
+    "phase_7": {
+      "status": "BLOCKED_EXTERNAL",
+      "real_provider_e2e": "NOT_RUN (0/3)",
+      "disposable_self_development": "NOT_RUN",
+      "accelerated_trigger_routine": "NOT_RUN",
+      "blocker": "Phase 3 real Worker hard gate is not satisfied; local E2 remains local evidence only"
+    },
+    "phase_12": {
+      "status": "BLOCKED_EXTERNAL",
+      "second_backend_conformance": "NOT_RUN",
+      "real_single_multi_benchmark": "NOT_RUN",
+      "existing_baseline": "same local-process Worker kind twice; 3 tasks; verified success 1.0 in both modes",
+      "blocker": "EXT-WORKER-BACKEND-002: no second authorized backend with a Personal PI adapter"
+    }
+  },
+  "regression_confirmation": [
+    {"command": "/usr/local/bin/npm run test --workspace=@personal-pi/core", "status": "PASS", "summary": "32 files / 174 tests"},
+    {"command": "/usr/local/bin/npm run build --workspace=@personal-pi/core", "status": "PASS", "summary": "TypeScript build"},
+    {"command": "/usr/local/bin/npm run check:protocol-isolation --workspace=@personal-pi/core", "status": "PASS", "summary": "protocol metadata isolation"},
+    {"command": "/usr/local/bin/npm run test:scripts", "status": "PASS", "summary": "29 tests"},
+    {"command": "/usr/local/bin/npm run test:personal-pi-regression", "status": "PASS", "summary": "3 files / 23 tests"}
+  ],
+  "redaction": {
+    "credential_values_recorded": false,
+    "token_cookie_authorization_values_recorded": false,
+    "account_identifiers_recorded": false,
+    "credential_file_contents_read": false,
+    "model_and_binary_metadata_only": true
+  },
+  "final_decision": "NOT READY FOR T13",
+  "t13_entered": false
+}

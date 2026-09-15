@@ -494,3 +494,78 @@ published package metadata as part of the PPH v3.1 delta.
 - Reproducible: yes under the isolated workspace aggregate invocation
 - Related Files: `packages/client/test/unix.test.ts`,
   `packages/server/src/server.ts`
+
+## [ERR-20260915-004] history-probe-parser
+
+**Logged**: 2026-09-15T11:25:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tooling
+
+### Summary
+
+A one-off read-only Node.js parser used to extract historical Worker failure
+messages stopped before processing because of an extra closing brace.
+
+### Error
+
+```text
+SyntaxError: Unexpected token '}'
+Expression expected
+```
+
+### Context
+
+- The parser was an inline `node` script over bounded local rollout JSONL files.
+- No repository, credential, account, or external service state was changed.
+- The preceding inventory and usage-limit evidence remained valid.
+
+### Suggested Fix
+
+Keep bounded extraction scripts small, validate syntax before scanning large
+JSONL files, and filter structured fields before emitting any output.
+
+### Metadata
+
+- Reproducible: no
+- Related Files: `/Users/chenglong/.codex/sessions/2026/09/14/`
+
+## [ERR-20260915-005] sandboxed-repository-verification
+
+**Logged**: 2026-09-15T11:18:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: tests
+
+### Summary
+
+The first verification attempt could not write Vitest temporary bundles or
+ignored Personal PI build artifacts because the actual checkout is outside the
+default writable sandbox root.
+
+### Error
+
+```text
+EPERM: operation not permitted, open packages/personal-pi/node_modules/.vite-temp/...
+TS5033: Could not write file packages/personal-pi/dist/...
+```
+
+### Context
+
+- The affected commands were the existing Personal PI test/build and
+  regression commands; no source file was changed.
+- The same commands were rerun with narrowly scoped repository verification
+  permission and passed.
+- The unprivileged script-suite attempt also failed only while `npm pack`
+  tried to write npm logs under the user cache; the rerun passed 29/29.
+
+### Suggested Fix
+
+When verifying this checkout from a restricted session, request only the
+filesystem permission needed by the existing test/build command and keep the
+failure classified as environment-bounded rather than as a code regression.
+
+### Metadata
+
+- Reproducible: yes in the default sandbox
+- Related Files: `packages/personal-pi/vitest.config.ts`, `packages/personal-pi/dist/`, `scripts/coding-agent-consumer.test.mjs`

@@ -90,3 +90,17 @@ authorized second Worker backend/provider, external benchmark, or production
 pool lease evidence is available. Existing injected 429/500 circuit-breaker
 and cache clear→rebuild tests remain local evidence only. T13 remains out of
 scope.
+
+## External Evidence Closure update — 2026-09-15
+
+The inventory found no second backend that is both authorized for this internal
+repository and callable through a Personal PI adapter. The global `pi`,
+OpenCodex and ArkCLI packages are not sufficient evidence: the first is
+upstream `pi` rather than `pph`, the local proxy did not answer its read-only
+HTTP probe, and Ark is outside the current provider allowlist. The static
+Codex/Claude manifests also point to absent adapter files.
+
+Second-backend conformance and the real same-budget Single/Multi benchmark are
+therefore **NOT RUN**. The existing three-task, same-kind local baseline is
+retained without generalizing its result. **Phase 12 remains
+BLOCKED_EXTERNAL / PARTIAL / REOPENED.**

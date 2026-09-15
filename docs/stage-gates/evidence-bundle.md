@@ -182,3 +182,17 @@ evidence file. The exact upstream TypeScript failure remains visible to
 
 This is a final v3.1 audit result, not a T13 authorization. **NOT READY FOR
 T13; STOP.**
+
+## External Evidence Closure inventory — 2026-09-15
+
+The sanitized capability/auth/quota inventory is available in
+[`evidence/external-worker-inventory-2026-09-15.md`](./evidence/external-worker-inventory-2026-09-15.md)
+and machine-readable form in
+[`evidence/external-worker-inventory-2026-09-15.json`](./evidence/external-worker-inventory-2026-09-15.json).
+
+Its hard-gate result is unchanged: no executable authorized Personal PI
+adapter, no five-task real Worker run, no real self-development/long-cycle
+pipeline, and no second real Worker backend. The current Codex App snapshot
+identifies the prior native route's `gpt-5.6-luna` weekly model limit at 100%;
+reset credits were not consumed. Local regression confirmation passed, and all
+real-provider rows remain `BLOCKED_EXTERNAL`.

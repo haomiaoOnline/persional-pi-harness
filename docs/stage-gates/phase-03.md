@@ -83,3 +83,21 @@ The strict five-task matrix remains **BLOCKED_EXTERNAL**: no authorized real
 Provider/credential path is available, and the two native Worker attempts
 stopped at the account usage limit before producing usable evidence. **Phase 3
 remains PARTIAL / REOPENED**.
+
+## External Evidence Closure update — 2026-09-15
+
+The sanitized inventory is recorded in
+[`evidence/external-worker-inventory-2026-09-15.md`](./evidence/external-worker-inventory-2026-09-15.md)
+and its JSON companion. The current Codex App usage snapshot shows the
+`base_model_inference` weekly window for `gpt-5.6-luna` at `100%`, while the
+overall Codex allowance remains available. This confirms the prior native
+Worker blocker as a model-specific account quota condition; the historical
+attempts still have `observed_runtime_model=unknown`.
+
+The repository has no executable `adapters/codex-cli.ts` or
+`adapters/claude-cli.ts`; both manifest entries are static examples and tests
+use injected callback adapters. No authorized Personal PI adapter became
+available in this inventory. The real matrix is therefore `0/5`, with success,
+prohibited action, structured failure, controlled timeout and
+`INSUFFICIENT_CONTEXT` all **NOT RUN** through a real backend. **Phase 3 remains
+BLOCKED_EXTERNAL / PARTIAL / REOPENED.**
