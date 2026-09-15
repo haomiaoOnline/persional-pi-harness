@@ -104,3 +104,38 @@ Second-backend conformance and the real same-budget Single/Multi benchmark are
 therefore **NOT RUN**. The existing three-task, same-kind local baseline is
 retained without generalizing its result. **Phase 12 remains
 BLOCKED_EXTERNAL / PARTIAL / REOPENED.**
+
+## Worker Adapter enablement update — 2026-09-15
+
+Type A now has a checked-in plugin manifest and executable adapter:
+`pi-agent-deepseek-v4-flash.plugin_manifest.yaml` → `adapters/pi-agent.ts`.
+The adapter contract, permission gate, exact provider/model observation and
+Work Receipt behavior pass the Personal PI adapter tests; real Phase 3 and
+Phase 7 evidence is recorded in the two machine-readable files linked below.
+This is one genuine backend type and is not counted twice as two workers.
+
+The Codex CLI adapter is also present, but its real probe is not yet a second
+conforming backend. A real `codex exec` process returned `CODEX_PROBE_OK` with
+the requested `gpt-5.6-sol`, while the Personal PI adapter intentionally kept
+`platform_accepted_model=unknown` and `observed_runtime_model=unknown` because
+the CLI did not echo identity. The bounded adapter probe observed `30118`
+input tokens against a `1500` Task Contract limit and returned
+`loop_budget_exhausted`; it was not retried after the latest Codex weekly
+usage reached `95%` and the `gpt-5.6-luna` base-model weekly window remained
+at `100%`. No extra account was selected and no reset credit was consumed.
+
+Consequently:
+
+- Type A plugin conformance and the real Type A evidence are **PASS**.
+- Type B conformance is **BLOCKED_EXTERNAL** until a user-selected Codex
+  profile can produce trustworthy runtime identity within a bounded contract.
+- Heterogeneous same-budget Single/Multi benchmarking is **NOT RUN**. The
+  existing same-kind local three-task baseline remains E2/local evidence only;
+  pool lease, 429/500 circuit breaker and cache rebuild tests were not
+  reclassified as external proof.
+
+The minimum human action, if Type B is to be resumed, is to manually select or
+sign in to the extra Codex account/profile in the local Codex CLI and confirm
+availability without sharing any credential. This remains outside the current
+run. **Phase 12 remains `BLOCKED_EXTERNAL / PARTIAL / REOPENED`; T13 is not
+entered.**

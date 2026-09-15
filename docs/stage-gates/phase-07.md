@@ -92,3 +92,49 @@ E2/local evidence. **Phase 7 remains BLOCKED_EXTERNAL / PARTIAL / REOPENED.**
 
 The exact prerequisite and release conditions are in
 [`evidence/external-worker-inventory-2026-09-15.md`](./evidence/external-worker-inventory-2026-09-15.md).
+
+## Real Provider / self-development update — 2026-09-15
+
+After the Type A Phase 3 gate, the committed runner
+`packages/personal-pi/scripts/phase-7-real-worker.mjs` executed the real
+`PI Agent + opencodex + ArkCoding/deepseek-v4-flash-ga-260731` route using only
+synthetic/public conformance input. The run is bound to
+`3567eb29ce0753a864510ad707fafbe615cd4e4c`; full sanitized records are in
+[`evidence/phase-07-real-worker-2026-09-15.json`](./evidence/phase-07-real-worker-2026-09-15.json).
+
+### T7.1 real Provider E2E
+
+Three independent pipeline executions reached `DONE` with `PASS/strong`
+verification. The first initial attempt was intentionally retained as a real
+malformed-Result failure (`unsupported fields: evidence_refs`); its one
+declared follow-up produced a valid `PHASE7_PROVIDER_E2E_FOLLOW_UP` result.
+The other two initial attempts passed. Final conformance is `3/3`, with no
+unbounded retry or provider expansion.
+
+### T7.2 disposable self-development
+
+One real Worker write was permitted, and only in a detached disposable
+worktree: `packages/personal-pi/test/self-development-marker.test.ts`. The
+new marker test passed through targeted Vitest; the Controller then continued
+to dispatch the following real trigger task. The sanitized patch is retained
+at [`evidence/phase-07-self-development-2026-09-15.patch`](./evidence/phase-07-self-development-2026-09-15.patch), SHA-256
+`6a0f9d0b5eea1904298c2d2943828b0080c3bdb2fc585422d416c95031f3e8c6`. The
+worktree was removed after capture and the patch was not applied to this
+branch.
+
+### T7.3 / T7.4 / T7.5 accelerated cycle
+
+`TriggerGateway.createFromSchedule` created one task at controlled timestamp
+`2040-01-01T08:07:00.000Z`; replaying the same schedule produced
+`duplicate idempotency_key` and no second task. That triggered task then went
+through the real Type A Worker pipeline to `DONE`/`PASS`. `RoutineCapture`
+captured and reused a topic parameter in memory with the explicit approval
+flag required by its contract. `MemoryConsolidator` archived one raw Evidence
+record, produced a compact record with token delta `44`, and the same schedule
+retry returned legal `NO_OP`. This is controlled accelerated-time and
+production-equivalent trigger logic, not a claim that an always-on production
+service was deployed; no production Playbook was persisted.
+
+The updated bounded result is **`PASS_REAL_TYPE_A_BOUNDED`**. Phase 7 remains
+not a T13 promotion decision because Type B and the repository-level inherited
+gate are still unresolved.

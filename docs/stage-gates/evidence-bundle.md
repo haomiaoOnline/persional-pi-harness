@@ -196,3 +196,30 @@ pipeline, and no second real Worker backend. The current Codex App snapshot
 identifies the prior native route's `gpt-5.6-luna` weekly model limit at 100%;
 reset credits were not consumed. Local regression confirmation passed, and all
 real-provider rows remain `BLOCKED_EXTERNAL`.
+
+## External Evidence Closure — 2026-09-15 latest
+
+The previous external inventory is superseded for current runtime status by the
+reconciliation in [`evidence/external-worker-inventory-2026-09-15.md`](./evidence/external-worker-inventory-2026-09-15.md).
+The PPH CLI is now available at version `0.85.1` through the repository's
+generated, git-ignored bundle; upstream `pi 0.84.2` remains untouched.
+
+The first real backend is now proven through the Personal PI Controller:
+
+- Phase 3: `PASS_REAL_WORKER_TYPE_A`, five real PI/DeepSeek cases with
+  sanitized Task/Run/Contract/Evidence/Trace identifiers and validated Work
+  Receipts.
+- Phase 7: `PASS_REAL_TYPE_A_BOUNDED`, three real Provider E2E cases (one
+  malformed initial result followed once), a real disposable-worktree write
+  and targeted test, and a controlled Trigger/Routine/Memory cycle.
+- Raw machine records: `evidence/phase-03-real-worker-2026-09-15.json` and
+  `evidence/phase-07-real-worker-2026-09-15.json`; self-development patch:
+  `evidence/phase-07-self-development-2026-09-15.patch`.
+
+The Type A evidence is synthetic/public-only and does not authorize the
+third-party provider for internal repository data. Codex Type B remains
+`BLOCKED_EXTERNAL`: the real CLI process did not echo model identity and the
+adapter rejected observed `30118` input tokens against a `1500` bounded task.
+No extra account, reset credit, purchase, push, merge or T13 action occurred.
+The existing same-kind local Single/Multi benchmark is not promoted to an
+heterogeneous result. Final decision: **NOT READY FOR T13; STOP**.

@@ -1099,4 +1099,39 @@ The first two attempts to add the reconciliation document were rejected by `appl
 
 Rebuilt the patch from the complete document content with one explicit add-line prefix per source line, then verified the resulting file and `git diff --check`.
 
+## [ERR-20260915-033] real Worker adapter evidence boundaries
+
+**Logged**: 2026-09-15T15:07:55+08:00
+**Priority**: high
+**Status**: resolved locally; Type B remains explicitly blocked
+**Area**: Personal PI external Worker / evidence
+
+### Symptoms
+
+- Real PI Agent output intermittently omitted or added Result Contract fields;
+  the adapter observed malformed responses such as missing `evidence_refs` or
+  unsupported `evidence_refs` and refused them.
+- A real Codex CLI process returned a successful probe, but did not echo a
+  trustworthy runtime model. The Personal PI adapter observed roughly `30118`
+  input tokens against a deliberately low `1500` Task Contract limit.
+
+### Resolution
+
+- Kept the PI adapter fail-closed, recorded the initial malformed result, and
+  allowed only one explicit follow-up per failed Phase 7 E2E case. The final
+  Type A evidence reached 3/3 without unbounded retry.
+- Kept Codex `platform_accepted_model` and `observed_runtime_model` as
+  `unknown`, classified the adapter result as loop-budget blocked, and did not
+  spend a reset credit or switch accounts after the Codex weekly usage became
+  high.
+- Restricted all real provider probes to synthetic/public conformance input;
+  no repository data or credential values crossed the adapter boundary.
+
+### Remaining boundary
+
+An executable CLI, a successful process probe, or a model string in a request
+is not enough to prove a second Personal PI Worker backend. Type B still needs
+an explicitly selected usable Codex profile, trustworthy runtime identity, and
+the same-contract conformance/benchmark evidence. No T13 work was started.
+
 ---

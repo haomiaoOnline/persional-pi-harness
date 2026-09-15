@@ -101,3 +101,30 @@ available in this inventory. The real matrix is therefore `0/5`, with success,
 prohibited action, structured failure, controlled timeout and
 `INSUFFICIENT_CONTEXT` all **NOT RUN** through a real backend. **Phase 3 remains
 BLOCKED_EXTERNAL / PARTIAL / REOPENED.**
+
+## Real Worker evidence update — 2026-09-15
+
+`PiAgentWorkerAdapter` is now wired through the existing `WorkerAdapter` →
+`PiWorker` → `PersonalPiPipeline` boundary. The real route was fixed to the
+observed `opencodex` provider and exact model
+`ArkCoding/deepseek-v4-flash-ga-260731`; provider/model identity was accepted
+only when echoed by PI JSON events. The probe payloads were synthetic/public
+conformance prompts with filesystem writes, network and credentials denied.
+
+Machine-readable evidence: [`evidence/phase-03-real-worker-2026-09-15.json`](./evidence/phase-03-real-worker-2026-09-15.json), executed against
+`348e0fd8aa1419e62ce4186edd43c6eb6708b9c9`.
+
+| Case | Real Result | Task state | Independent Verification | Evidence meaning |
+| --- | --- | --- | --- | --- |
+| normal success | `success` | `DONE` | `PASS/strong` | normal no-op receipt |
+| prohibited write | `failure` | `FAILED` | expected `FAIL/none` | controller refusal for `write_file` |
+| structured failure | `failure` | `FAILED` | expected `FAIL/none` | controlled failure was preserved |
+| controlled timeout | `timeout` | `FAILED` | `PASS/strong` | bounded timeout was recorded |
+| insufficient context | `INSUFFICIENT_CONTEXT` | `BLOCKED` | `PASS/strong` | exact requested context was preserved |
+
+All five cases had a sanitized task/run/contract/evidence/trace record; each
+carried an idempotency key and a validated Work Receipt. No external side
+effect or deduplication action was authorized, so effect-journal evidence
+remains explicitly local/contract-level. This closes the first real Worker
+Type A subgate as **`PASS_REAL_WORKER_TYPE_A`**. It does not close Phase 12's
+second-backend requirement or the repository-wide inherited gate.

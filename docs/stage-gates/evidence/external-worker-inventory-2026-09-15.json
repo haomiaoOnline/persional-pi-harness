@@ -1,13 +1,14 @@
 {
   "schema_version": "1.0",
-  "captured_at": "2026-09-15T11:18:35+08:00",
+  "captured_at": "2026-09-15T15:07:55+08:00",
   "purpose": "External Evidence Closure capability, authentication, quota, and adapter inventory",
   "repository": {
     "path": "/Users/chenglong/github/persional-pi-harness",
     "branch": "feature/t1-task-contract",
-    "evidence_base_sha": "2a7d50b5f0bffef88c969c61e7032797a5f374b3",
+    "evidence_base_sha": "3567eb29ce0753a864510ad707fafbe615cd4e4c",
+    "previous_inventory_sha": "71e202075e60157eba214c8ada994c584269d770",
     "origin_main": "71b3e44297d20b43faf31a677c2f5224a9e57481",
-    "ahead_origin_main": 13,
+    "ahead_origin_main": 19,
     "working_tree_at_capture": "clean"
   },
   "safety_boundary": {
@@ -21,7 +22,13 @@
       "no credential value read, printed, copied, exported, or persisted",
       "no provider switch for repository data",
       "no production deployment, push, merge, or T13 tag"
-    ]
+    ],
+    "real_probe_boundary": {
+      "data_class": "synthetic_public_conformance_only",
+      "provider_allowlist": ["synthetic-only-opencodex", "openai-codex-cli-probe-only"],
+      "repository_data_sent": false,
+      "external_side_effects_authorized": false
+    }
   },
   "root_cause": {
     "classification": "model_specific_account_quota",
@@ -29,14 +36,14 @@
     "summary": "The native Worker failure is attributable to the Codex account base-model weekly limit for gpt-5.6-luna, not to a Personal PI Result/Receipt failure.",
     "current_usage": {
       "ordinary_usage_allowed": true,
-      "codex_primary_used_percent": 33,
-      "codex_secondary_used_percent": 78,
+      "codex_primary_used_percent": 46,
+      "codex_secondary_used_percent": 95,
       "base_model_inference_normal_model_slug": "gpt-5.6-luna",
       "base_model_inference_primary_used_percent": 100,
       "base_model_inference_primary_window_minutes": 10080,
-      "base_model_inference_resets_at": "2026-09-16T12:20:07+08:00",
+      "base_model_inference_resets_at": "2026-09-16T12:20:06+08:00",
       "reset_credits_consumed": 0,
-      "source": "codex_app.get_usage_limits"
+      "source": "codex_app.get_usage_limits; latest read-only snapshot in this run"
     },
     "historical_native_attempts": {
       "count": 2,
@@ -51,26 +58,33 @@
     {
       "id": "personal-pi-adapter-surface",
       "surface": "personal_pi_package",
-      "status": "blocked",
+      "status": "type_a_real_evidence_available; internal-provider-scope-restricted",
       "worker_types_declared": ["pi", "codex", "claude", "local_model", "cli"],
       "adapter_contract": "packages/personal-pi/src/worker.ts: WorkerAdapter + PiWorker",
       "configured_manifest_entries": [
         "packages/personal-pi/examples/worker-plugins/codex-cli.plugin_manifest.yaml -> adapters/codex-cli.ts",
-        "packages/personal-pi/examples/worker-plugins/claude-cli.plugin_manifest.yaml -> adapters/claude-cli.ts"
+        "packages/personal-pi/examples/worker-plugins/claude-cli.plugin_manifest.yaml -> adapters/claude-cli.ts",
+        "packages/personal-pi/examples/worker-plugins/pi-agent-deepseek-v4-flash.plugin_manifest.yaml -> adapters/pi-agent.ts",
+        "packages/personal-pi/examples/worker-plugins/codex-cli-existing-session.plugin_manifest.yaml -> adapters/codex-cli.ts"
       ],
-      "adapter_files_present": false,
-      "runtime_adapter_evidence": "Tests inject PiWorker callbacks; no external CLI/API adapter is wired.",
-      "auth_status": "unknown",
-      "provider": "unknown",
-      "release_condition": "An authorized backend and an actual adapter must be available before a real task can enter the pipeline."
+      "adapter_files_present": true,
+      "runtime_adapter_evidence": "PiAgentWorkerAdapter and CodexCliWorkerAdapter are implemented; Type A real evidence is recorded in phase-03 and phase-07 JSON.",
+      "auth_status": "Pi route succeeded with runtime event identity; credential values not inspected",
+      "provider": "opencodex for synthetic/public probes only",
+      "release_condition": "Do not use the third-party route for internal repository data until provider terms and project allowlist are explicitly resolved."
     },
     {
       "id": "pph-and-pi-cli",
       "surface": "local_cli",
-      "status": "unavailable_for_personal_pi",
+      "status": "available_for_adapter_execution",
       "repo_bin": "pph -> packages/coding-agent/dist/bundle/cli.js",
-      "repo_dist_present": false,
-      "path_command_probe": "pph, pi, codex, claude, gemini absent from PATH",
+      "repo_dist_present": true,
+      "path_command_probe": "pph=0.85.1; pi=0.84.2; codex=0.154.0-alpha.6.2",
+      "pph_version": "0.85.1",
+      "global_entry": "/Users/chenglong/.npm-global/bin/pph",
+      "entry_target": "/Users/chenglong/github/persional-pi-harness/packages/coding-agent/dist/bundle/cli.js",
+      "bundle_provenance": "generated PPH CLI bundle from the repository; bundle path is git-ignored build output",
+      "shell_probes": ["login shell", "/private/tmp"],
       "global_pi_package": {
         "package": "@earendil-works/pi-coding-agent",
         "version": "0.84.2",
@@ -80,13 +94,13 @@
       },
       "auth_status": "unknown",
       "provider": "not inferred from package presence",
-      "adapter_status": "missing"
+      "adapter_status": "PPH CLI available; CLI availability is not itself a Worker adapter"
     },
     {
       "id": "codex-app-native-worker",
       "surface": "native_subagent",
       "backend": "multi_agent_v1__spawn_agent",
-      "status": "usage_limited_for_gpt_5_6_luna_route",
+      "status": "usage_limited_for_gpt_5_6_luna_route; no account switch",
       "schema_capability": "tool schema exposed in current runtime",
       "catalog_candidates_observed": ["gpt-5.6-luna", "gpt-5.6-sol"],
       "provider": "openai",
@@ -98,6 +112,25 @@
       "note": "A gpt-5.6-sol alternative was not invoked: doing so would spend quota without providing a Personal PI adapter path, and the current hard gate is already sufficient to classify the prior gpt-5.6-luna failure."
     },
     {
+      "id": "codex-cli-worker-adapter",
+      "surface": "local_cli",
+      "binary": "/Applications/ChatGPT.app/Contents/Resources/codex",
+      "version": "0.154.0-alpha.6.2",
+      "adapter": "packages/personal-pi/src/adapters/codex-cli.ts",
+      "status": "process_probe_pass_adapter_budget_blocked",
+      "provider": "openai Codex CLI session",
+      "terms_status": "allowed for the existing session",
+      "auth_status": "existing session observed; extra account was not selected or logged in",
+      "requested_model": "gpt-5.6-sol",
+      "platform_accepted_model": "unknown",
+      "observed_runtime_model": "unknown",
+      "process_probe": "real codex exec returned CODEX_PROBE_OK",
+      "adapter_probe": "real adapter process completed but rejected observed input 30118 > Task Contract max_input_tokens 1500",
+      "adapter_result": "failure / loop_budget_exhausted",
+      "retry_policy": "no retry; latest Codex weekly usage is 95% and no reset credit was consumed",
+      "personal_pi_conformance": "blocked; runtime identity unknown and Task-tool bridge is intentionally absent"
+    },
+    {
       "id": "opencodex-local-proxy",
       "surface": "local_http_runtime",
       "package": "@bitkyc08/opencodex",
@@ -106,12 +139,12 @@
       "configured_port": 10100,
       "listener_observed": true,
       "http_probe": "GET /v1/models and GET / both failed to connect",
-      "status": "unavailable_or_unstable",
+      "status": "usable_for_synthetic_pi_probe; provider-terms-scope-unresolved",
       "provider": "unknown_third_party_proxy",
       "terms_status": "unknown",
       "auth_status": "unknown",
-      "personal_pi_adapter": "missing",
-      "note": "The listener observation and failed HTTP probes are not enough to claim a usable backend. Repository data was not sent."
+      "personal_pi_adapter": "PiAgentWorkerAdapter",
+      "note": "The bare HTTP probes failed, but the configured PI route produced real event/provider/model evidence for synthetic prompts. This does not authorize internal repository data."
     },
     {
       "id": "arkcli",
@@ -180,36 +213,40 @@
   ],
   "phase_gate_results": {
     "phase_3": {
-      "status": "BLOCKED_EXTERNAL",
-      "real_tasks_executed": 0,
+      "status": "PASS_REAL_WORKER_TYPE_A",
+      "real_tasks_executed": 5,
       "required_real_tasks": 5,
       "matrix": [
-        "success: NOT_RUN",
-        "prohibited_action_or_overreach: NOT_RUN",
-        "structured_failure: NOT_RUN",
-        "controlled_timeout: NOT_RUN",
-        "INSUFFICIENT_CONTEXT: NOT_RUN"
+        "success: PASS",
+        "prohibited_action_or_overreach: expected refusal PASS",
+        "structured_failure: expected failure PASS",
+        "controlled_timeout: expected timeout PASS",
+        "INSUFFICIENT_CONTEXT: expected blocked PASS"
       ],
-      "idempotency_receipt_coverage": "NOT_RUN through a real backend",
-      "blocker": "EXT-WORKER-ADAPTER-001: no authorized executable adapter path"
+      "idempotency_receipt_coverage": "5/5 real protocol tasks carried idempotency key and validated Work Receipt; external side-effect dedupe was not exercised",
+      "evidence": "evidence/phase-03-real-worker-2026-09-15.json",
+      "blocker": null
     },
     "phase_7": {
-      "status": "BLOCKED_EXTERNAL",
-      "real_provider_e2e": "NOT_RUN (0/3)",
-      "disposable_self_development": "NOT_RUN",
-      "accelerated_trigger_routine": "NOT_RUN",
-      "blocker": "Phase 3 real Worker hard gate is not satisfied; local E2 remains local evidence only"
+      "status": "PASS_REAL_TYPE_A_BOUNDED",
+      "real_provider_e2e": "PASS (3/3 after one bounded follow-up; initial malformed response retained)",
+      "disposable_self_development": "PASS (one write in detached disposable worktree; targeted test PASS; patch retained)",
+      "accelerated_trigger_routine": "PASS (Trigger duplicate gate, real pipeline, RoutineCapture reuse, Memory consolidation and NO_OP retry)",
+      "evidence": "evidence/phase-07-real-worker-2026-09-15.json",
+      "blocker": "No claim of production deployment or long-running always-on service; provider route remains synthetic/public-only"
     },
     "phase_12": {
       "status": "BLOCKED_EXTERNAL",
-      "second_backend_conformance": "NOT_RUN",
+      "type_a_conformance": "PASS through local contract tests and real Phase 3/7 evidence",
+      "codex_cli_process_probe": "PASS, but runtime model unknown",
+      "second_backend_conformance": "BLOCKED_EXTERNAL",
       "real_single_multi_benchmark": "NOT_RUN",
       "existing_baseline": "same local-process Worker kind twice; 3 tasks; verified success 1.0 in both modes",
-      "blocker": "EXT-WORKER-BACKEND-002: no second authorized backend with a Personal PI adapter"
+      "blocker": "EXT-WORKER-BACKEND-002: Codex adapter has no trustworthy runtime model identity and its low-budget probe rejected fixed CLI context overhead; no second backend benchmark run"
     }
   },
   "regression_confirmation": [
-    {"command": "/usr/local/bin/npm run test --workspace=@personal-pi/core", "status": "PASS", "summary": "32 files / 174 tests"},
+    {"command": "/usr/local/bin/npm run test --workspace=@personal-pi/core", "status": "PASS", "summary": "33 files / 181 tests"},
     {"command": "/usr/local/bin/npm run build --workspace=@personal-pi/core", "status": "PASS", "summary": "TypeScript build"},
     {"command": "/usr/local/bin/npm run check:protocol-isolation --workspace=@personal-pi/core", "status": "PASS", "summary": "protocol metadata isolation"},
     {"command": "/usr/local/bin/npm run test:scripts", "status": "PASS", "summary": "29 tests"},
@@ -220,7 +257,9 @@
     "token_cookie_authorization_values_recorded": false,
     "account_identifiers_recorded": false,
     "credential_file_contents_read": false,
-    "model_and_binary_metadata_only": true
+    "model_and_binary_metadata_only": true,
+    "raw_provider_output_recorded": false,
+    "account_switch_or_login_performed": false
   },
   "final_decision": "NOT READY FOR T13",
   "t13_entered": false

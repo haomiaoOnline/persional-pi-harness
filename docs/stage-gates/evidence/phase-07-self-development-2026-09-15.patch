@@ -1,0 +1,13 @@
+diff --git a/packages/personal-pi/test/self-development-marker.test.ts b/packages/personal-pi/test/self-development-marker.test.ts
+new file mode 100644
+index 000000000..40816a51c
+--- /dev/null
++++ b/packages/personal-pi/test/self-development-marker.test.ts
+@@ -0,0 +1,7 @@
++import { describe, expect, it } from "vitest";
++
++describe("PHASE7_SELF_DEVELOPMENT_MARKER", () => {
++  it("PHASE7_SELF_DEVELOPMENT_MARKER", () => {
++    expect("PHASE7_SELF_DEVELOPMENT_MARKER").toEqual("PHASE7_SELF_DEVELOPMENT_MARKER");
++  });
++});

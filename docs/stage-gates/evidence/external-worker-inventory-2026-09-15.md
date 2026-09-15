@@ -76,3 +76,50 @@ Personal PI regression: 3 files / 23 tests PASS
 ## Evidence boundary
 
 Existing local child-process E2E、local callback adapters、same-kind local Single/Multi、injected 429/500 circuit-breaker tests 和 cache rebuild tests继续保留为 local/contract evidence；它们不能升级为 real Provider、real self-development 或 second-backend evidence。Known-Upstream-Failure gate 与 inherited client entry baseline 仍单独登记，不与本次 external blocker 混合。
+
+## Reconciliation and Type A enablement — 2026-09-15
+
+本轮已重新核对实际 checkout：
+
+| 项目 | 当前证据 |
+| --- | --- |
+| branch / HEAD | `feature/t1-task-contract` / `3567eb29ce0753a864510ad707fafbe615cd4e4c` |
+| working tree / worktrees | clean；disposable self-development worktree 已移除 |
+| `pph` | `/Users/chenglong/.npm-global/bin/pph`，版本 `0.85.1` |
+| entry target | `/Users/chenglong/github/persional-pi-harness/packages/coding-agent/dist/bundle/cli.js` |
+| bundle provenance | repo 生成的 git-ignored `dist` 产物；`pi` 仍为 upstream `0.84.2`，没有被覆盖 |
+| shell probes | login shell 与 `/private/tmp` 均可发现 `pph` |
+| inherited build issue | 仍只有登记的 `packages/ai/src/api/google-shared.ts:402` TS2322 |
+
+因此原来的 “pph CLI missing” blocker 已解除，但 **CLI 可用不等于 Personal PI Worker Adapter 已存在**。本轮新增的薄适配器与 manifest 为：
+
+- `packages/personal-pi/src/adapters/pi-cli.ts`：`PiAgentWorkerAdapter`，固定 `opencodex` + `ArkCoding/deepseek-v4-flash-ga-260731`，通过现有 `PiWorker`、Task Contract、Lease/Result/Receipt/Pipeline 边界。
+- `packages/personal-pi/src/adapters/codex-cli.ts`：Codex CLI 探针适配器；不接收 Task tools，也不把未知 runtime model 冒充为请求模型。
+- `packages/personal-pi/src/adapters/cli-runtime.ts` 与 `pi-permission-gate.ts`：脱敏环境、JSONL 观测、tool/permission/path fail-closed gate。
+
+### Type A: local PI Agent + DeepSeek route
+
+PI 的真实 JSON probe 和 Personal PI pipeline probe 均观察到：`provider=opencodex`、
+`platform_accepted_model=ArkCoding/deepseek-v4-flash-ga-260731`、
+`observed_runtime_model=ArkCoding/deepseek-v4-flash-ga-260731`。所有真实 probe 只使用合成/public conformance 文本；没有发送仓库内容、凭证、账号标识或外部业务数据。完整记录见：
+
+- [`phase-03-real-worker-2026-09-15.json`](./phase-03-real-worker-2026-09-15.json)：5/5 任务进入真实 PI process，分别覆盖 success、预期拒绝、structured failure、controlled timeout、`INSUFFICIENT_CONTEXT`；idempotency key 与 Work Receipt 均经过 Controller 验证。
+- [`phase-07-real-worker-2026-09-15.json`](./phase-07-real-worker-2026-09-15.json)：3/3 real Provider E2E（第 1 项初次 malformed，单次 follow-up PASS）、一次 disposable self-development、accelerated Trigger/Routine/Memory cycle。
+
+因此 Phase 3 的 **Worker Type A subgate = PASS**，Phase 7 的 **bounded Type A evidence = PASS**。这不是生产 Provider/always-on deployment 结论；`opencodex` 的 terms/allowlist 对 internal repository data 仍未解析，Type A 证据仅限 synthetic/public probe。
+
+### Type B: Codex CLI remains unresolved
+
+现有 Codex CLI binary/process 可执行，先前最小真实 process probe 返回 `CODEX_PROBE_OK`；但 Personal PI adapter 的一次低预算探针观察到约 `30118` input tokens，而 Task Contract 只允许 `1500`，适配器按 loop budget fail-closed，结果为 `loop_budget_exhausted`。该运行没有可靠回显 platform/runtime model，因此两者均保持 `unknown`。本轮最新 Codex usage snapshot 为 overall primary `46%`、weekly `95%`，`base_model_inference/gpt-5.6-luna` weekly `100%`；没有消费 reset credit，也没有切换或登录额外账号。
+
+要继续验证 Type B，最小 human action 是用户在本机 Codex CLI 交互界面手动选择/登录额外账号或 profile，并只确认“该 profile 可用”；不要把凭证、cookie 或 token 发给我们。之后才可在一次有界、能覆盖 CLI 固定上下文开销的 probe 中重新验证实际模型身份。当前不自动执行这个动作。
+
+## Updated gate decision
+
+| Phase | 当前结果 |
+| --- | --- |
+| Phase 3 | `PASS_REAL_WORKER_TYPE_A`；5/5 real conformance cases，真实 backend 为 PI + DeepSeek route |
+| Phase 7 | `PASS_REAL_TYPE_A_BOUNDED`；3/3 E2E、self-development、accelerated trigger/routine/memory 均有记录 |
+| Phase 12 | `BLOCKED_EXTERNAL`；Codex Type B 尚未通过 model identity/adapter conformance，未跑异构 benchmark |
+
+原始 blocker、quota 根因和安全限制保留在本文前半部分作为历史盘点；本节是对当前 checkout 的最新 reconciliation，不把 PPH CLI、包存在或单纯 process probe 误报成第二 Worker backend。
