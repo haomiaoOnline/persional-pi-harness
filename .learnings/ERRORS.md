@@ -1,5 +1,46 @@
 # Errors
 
+## [ERR-20260915-010] codex-real-result-contract-shape
+
+**Logged**: 2026-09-15T16:35:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: backend
+
+### Summary
+
+The bounded real Codex Type B smoke completed with a valid process/session and
+within the calibrated token ceiling, but its returned JSON was rejected by
+the Result Contract validator with `/: must be string`.
+
+### Error
+
+```text
+Result Contract validation: /: must be string
+```
+
+### Context
+
+- The adapter preserved the failure as a legal no-op Result/Receipt and did
+  not coerce invalid output into success.
+- No raw model response was recorded; only the validator diagnostic and
+  bounded runtime metadata were retained.
+- The likely contract ambiguity is that the task asked for a small JSON/list
+  payload while the top-level `summary` field is required to be a string.
+
+### Suggested Fix
+
+Make the external contract prompt explicitly state that `summary` is always a
+string and include a compact exact top-level Result/Receipt shape. Keep strict
+parsing and rerun one bounded smoke before any benchmark.
+
+### Metadata
+
+- Reproducible: yes in the two bounded real smoke attempts
+- Related Files: `packages/personal-pi/src/adapters/cli-runtime.ts`,
+  `packages/personal-pi/src/adapters/codex-cli.ts`,
+  `docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json`
+
 ## [ERR-20260915-009] codex-accounting-test-budget-type
 
 **Logged**: 2026-09-15T16:25:00+08:00
