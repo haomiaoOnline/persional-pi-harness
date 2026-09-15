@@ -140,7 +140,7 @@ availability without sharing any credential. This remains outside the current
 run. **Phase 12 remains `BLOCKED_EXTERNAL / PARTIAL / REOPENED`; T13 is not
 entered.**
 
-## Codex Type B execution and heterogeneous benchmark — 2026-09-15 latest
+## Codex Type B execution and heterogeneous benchmark — 2026-09-15 historical record
 
 The user-confirmed Codex session was re-probed within the requested bounded
 scope. The machine record is
@@ -226,3 +226,49 @@ CLI did not provide trustworthy platform/provider/runtime model identity. This
 is an explicit evidence limitation, not a guessed `gpt-5.6-sol` claim.
 The aggregate result therefore remains **NOT READY FOR T13**. T13 was not
 entered.
+
+## Codex Type B Model Identity Attestation Closure — 2026-09-15
+
+The prior Type B smoke and `A/B/A/B/A` benchmark remain preserved in their
+original machine record. This closure pass only investigated whether Codex
+CLI 0.154.0 exposes a trustworthy runtime identity; it did not rerun the
+benchmark or change the Provider allowlist. The bounded diagnostic evidence is
+[`evidence/type-b-identity-attestation-2026-09-15.json`](./evidence/type-b-identity-attestation-2026-09-15.json).
+
+The evidence standard is explicit: the requested model is not the observed
+model, and an identity value must come from the same real execution/session
+and be machine-verifiably bound to it. The fresh `codex exec --ephemeral
+--json` probe emitted five JSONL events. Its only session binding was a
+hashed `thread_id`; the event shapes contained no `model`, `model_provider`,
+`provider`, accepted-model, or observed-model field. Stdout/stderr were kept
+as digests only (`d6ee957b6ad426fd` / `8058b5e473f7bab0`), and the raw stream
+was not retained.
+
+The installed CLI help and generated schemas do not close this gap. The
+public app-server `Thread.model` field is documented as configured/latest
+persisted state and explicitly not per-turn execution telemetry. The internal
+`SessionConfiguredEventMsg` schema contains `model` and
+`model_provider_id`, but that event was not present in this JSONL execution
+and no corresponding persisted metadata exists for the ephemeral probe.
+Recent local desktop state/log entries were also rejected: they contain
+desktop configuration or shared-process records, not a binding to this Type B
+CLI run.
+
+| Field | Attestation result |
+| --- | --- |
+| `requested_model` | `gpt-5.6-sol` |
+| `platform_accepted_model` | `unknown` |
+| `observed_runtime_model` | `unknown` |
+| `provider` | `unknown` |
+
+No adapter change is safe or justified: `CodexCliWorkerAdapter` continues to
+fail closed when the CLI emits no identity. No Type B code tests were rerun
+because no source changed; the existing `10/10` adapter conformance, real
+smoke, and heterogeneous benchmark remain historical execution evidence and
+are not rewritten. The minimum human action is to use a supported Codex CLI
+build or execution surface that emits model/provider metadata bound to the
+same Type B run/session/turn, then capture one synthetic bounded smoke without
+sharing credentials.
+
+**Phase 12 remains `PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN` and its exit is
+BLOCKED. The aggregate remains `NOT READY FOR T13`; T13 was not entered.**

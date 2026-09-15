@@ -256,3 +256,42 @@ core suite and Bound Coverage (`uncovered_paths=[]`). The final aggregate
 root test passed on rerun; the normal check retains only the precise inherited
 `google-shared.ts:402` baseline. Final decision remains **NOT READY FOR T13;
 STOP**.
+
+## Codex Type B Model Identity Attestation Closure — 2026-09-15
+
+The historical Type B execution and heterogeneous benchmark above is retained
+as-is. This bounded, read-only closure investigation is captured in
+[`evidence/type-b-identity-attestation-2026-09-15.json`](./evidence/type-b-identity-attestation-2026-09-15.json).
+
+The installed `/Users/chenglong/.local/bin/codex` was verified as
+`codex-cli 0.154.0`. A fresh synthetic `codex exec --ephemeral --json`
+execution emitted five events: `thread.started`, `turn.started`, two
+`item.completed` events, and `turn.completed`. The stream exposed only a
+hashed thread binding and usage keys. It exposed no actual accepted model,
+observed model, or provider field. Its stdout/stderr were represented by
+the safe digest prefixes `d6ee957b6ad426fd` and `8058b5e473f7bab0`; raw
+output and sensitive state were not retained.
+
+The generated public app-server schema offers `Thread.model` and
+`Thread.modelProvider`, but defines the model as configured/latest persisted
+state rather than per-turn execution telemetry. The internal
+`SessionConfiguredEventMsg` offers `model` and `model_provider_id`, but it was
+not emitted by this JSONL path and was not persisted for the ephemeral run.
+Recent desktop state and shared logs were not accepted because they could not
+be bound to the Type B CLI process/session. No adapter or source change was
+made, no Provider allowlist was widened, and no full benchmark was rerun.
+
+```text
+requested_model          = gpt-5.6-sol
+platform_accepted_model  = unknown
+observed_runtime_model   = unknown
+provider                 = unknown
+Phase 12                 = PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN (exit BLOCKED)
+Aggregate                = NOT READY FOR T13
+```
+
+The sole open blocker is the absence of machine-verifiable Type B
+model/provider identity bound to the same CLI run/session/turn. The minimum
+human action is to use a supported Codex CLI build or execution surface that
+emits that metadata and capture one bounded synthetic smoke. T13 remains out
+of scope; no push, merge, or tag was performed.

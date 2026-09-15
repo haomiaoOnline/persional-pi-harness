@@ -1,0 +1,194 @@
+{
+  "schema_version": "1.0",
+  "captured_at": "2026-09-15T09:06:40Z",
+  "purpose": "Codex Type B model identity attestation closure; T13 excluded",
+  "repository": {
+    "path": "/Users/chenglong/github/persional-pi-harness",
+    "branch": "feature/t1-task-contract",
+    "head_sha": "6b334f168059e84c7bc5bf5f4e77c56a493265fc",
+    "ahead_of_origin_main": 26,
+    "working_tree_clean_before_capture": false,
+    "working_tree_clean_note": "Only the self-improvement log had local additions before this evidence patch; no source or prior gate evidence was changed.",
+    "push_merge_tag_or_t13": false
+  },
+  "safety_boundary": {
+    "data_class": "synthetic_public_conformance_only",
+    "provider_allowlist": [
+      "openai-codex-cli",
+      "opencodex-synthetic-only"
+    ],
+    "repository_data_sent": false,
+    "credentials_read_or_recorded": false,
+    "account_identifier_read_or_recorded": false,
+    "external_side_effects": false,
+    "reset_credits_consumed": 0,
+    "provider_allowlist_changed": false,
+    "global_codex_upgrade_attempted": false
+  },
+  "identity_policy": {
+    "requested_is_not_observed": true,
+    "accepted_and_observed_must_be_bound_to_same_run": true,
+    "accepted_observed_mismatch_action": "FAIL_OR_BLOCKED",
+    "inference_from_command_or_config_forbidden": true,
+    "required_fields": [
+      "platform_accepted_model",
+      "observed_runtime_model",
+      "provider"
+    ]
+  },
+  "codex_runtime": {
+    "binary": "/Users/chenglong/.local/bin/codex",
+    "version": "codex-cli 0.154.0",
+    "execution_path": "codex exec --ephemeral --json",
+    "requested_model": "gpt-5.6-sol",
+    "platform_accepted_model": "unknown",
+    "observed_runtime_model": "unknown",
+    "provider": "unknown",
+    "identity_status": "BLOCKED_EXTERNAL",
+    "identity_granularity": "none",
+    "identity_source_result": "The real JSONL stream contained no accepted-model, observed-model, or provider field."
+  },
+  "real_jsonl_probe": {
+    "probe_id": "codex-cli-identity-attestation-2026-09-15-01",
+    "input_class": "synthetic_public_no_tool_prompt",
+    "process_exit_code": 0,
+    "stdout_bytes": 635,
+    "stdout_sha256_prefix_16": "d6ee957b6ad426fd",
+    "stderr_bytes": 5096,
+    "stderr_sha256_prefix_16": "8058b5e473f7bab0",
+    "event_count": 5,
+    "event_types": [
+      "thread.started",
+      "turn.started",
+      "item.completed",
+      "item.completed",
+      "turn.completed"
+    ],
+    "event_shapes": [
+      {
+        "type": "thread.started",
+        "top_level_keys": [
+          "thread_id",
+          "type"
+        ],
+        "thread_id_sha256_prefix_16": "b1e6b714c0c5c4d2"
+      },
+      {
+        "type": "turn.started",
+        "top_level_keys": [
+          "type"
+        ]
+      },
+      {
+        "type": "item.completed",
+        "item_type": "error",
+        "item_keys": [
+          "id",
+          "message",
+          "type"
+        ]
+      },
+      {
+        "type": "item.completed",
+        "item_type": "agent_message",
+        "item_keys": [
+          "id",
+          "text",
+          "type"
+        ]
+      },
+      {
+        "type": "turn.completed",
+        "top_level_keys": [
+          "type",
+          "usage"
+        ],
+        "usage_keys": [
+          "cache_write_input_tokens",
+          "cached_input_tokens",
+          "input_tokens",
+          "output_tokens",
+          "reasoning_output_tokens"
+        ]
+      }
+    ],
+    "identity_fields_seen": [],
+    "binding_fields_seen": [
+      "thread_id",
+      "usage"
+    ],
+    "attestation_result": "NO_ATTESTATION",
+    "raw_output_retained": false
+  },
+  "cli_schema_and_help_inspection": {
+    "commands_inspected": [
+      "codex --help",
+      "codex exec --help",
+      "codex exec resume --help",
+      "codex exec fork --help",
+      "codex app-server --help",
+      "codex app-server generate-json-schema --help",
+      "codex app-server generate-internal-json-schema --help",
+      "codex features list",
+      "codex migrate-rollouts --help"
+    ],
+    "exec_jsonl_supported": true,
+    "exec_ephemeral_supported": true,
+    "exec_output_schema_semantics": "Constrains the final response shape; it is not runtime model telemetry.",
+    "supported_identity_verbose_or_debug_flag_found": false,
+    "public_app_server_schema": {
+      "thread_start_response_fields": [
+        "model",
+        "modelProvider",
+        "thread"
+      ],
+      "thread_model_semantics": "Current configured or latest persisted model; explicitly not per-turn execution telemetry.",
+      "accepted_for_type_b_observed_identity": false
+    },
+    "internal_rollout_schema": {
+      "event": "SessionConfiguredEventMsg",
+      "fields_found": [
+        "model",
+        "model_provider_id",
+        "session_id",
+        "thread_id"
+      ],
+      "description_boundary": "Session configuration acknowledgement, not a discovered Type B execution event.",
+      "present_in_this_exec_jsonl": false,
+      "available_as_persisted_metadata_for_ephemeral_probe": false,
+      "accepted_for_observed_runtime_identity": false
+    }
+  },
+  "local_state_and_log_inspection": {
+    "recent_rollout_jsonl_files_scanned": 4,
+    "session_configured_records_found": 0,
+    "desktop_state_config_values_seen": {
+      "model": "gpt-5.6-luna",
+      "provider": "openai",
+      "usable_as_type_b_observed_identity": false,
+      "reason": "Desktop session/config state is not the Type B CLI execution stream."
+    },
+    "shared_log_marker_rows_seen_in_recent_window": 20,
+    "shared_log_binding_to_type_b_probe": "not_established",
+    "shared_log_acceptance": "Rejected for attestation because the rows belong to the desktop process/log context and are not bound to the probe JSONL thread digest.",
+    "sensitive_log_bodies_retained": false
+  },
+  "adapter_and_revalidation": {
+    "adapter": "CodexCliWorkerAdapter",
+    "code_changed": false,
+    "reason": "No supported machine-readable identity field was emitted or persisted for this execution path; adding inference would violate the identity policy.",
+    "historical_type_b_evidence_preserved": true,
+    "targeted_code_tests_rerun": false,
+    "targeted_code_tests_note": "No source change was made; the existing Type B conformance and Phase 12 evidence remain historical evidence.",
+    "full_heterogeneous_benchmark_rerun": false,
+    "minimal_identity_revalidation": "not_completed_because_identity_attestation_is_unavailable"
+  },
+  "decision": {
+    "phase_12_status": "PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN",
+    "phase_12_exit": "BLOCKED",
+    "aggregate_status": "NOT_READY_FOR_T13",
+    "blocker": "Codex CLI 0.154.0 --json does not expose platform_accepted_model, observed_runtime_model, or provider in the real execution stream; the available config/internal-schema/log values cannot be bound to this Type B run as execution identity.",
+    "minimum_human_action": "Use a supported Codex CLI build or execution surface that emits model/provider metadata bound to the same Type B run/session/turn, then capture one synthetic bounded smoke without sharing credentials.",
+    "t13_entered": false
+  }
+}
