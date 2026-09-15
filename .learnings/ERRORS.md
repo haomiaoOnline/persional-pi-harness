@@ -378,3 +378,76 @@ and extract it without modifying the main repository index or worktree list.
 
 - Reproducible: yes
 - Related Files: `scripts/known-upstream-failure-gate.mjs`, `.husky/pre-commit`
+
+## [ERR-20260915-001] coding-agent-concurrent-suite-isolation
+
+**Logged**: 2026-09-15T00:45:00+08:00
+**Priority**: medium
+**Status**: environment-bounded
+**Area**: tests
+
+### Summary
+
+The complete coding-agent suite showed three failures in the concurrent
+session test file when run with the default file-parallel execution and an
+isolated HOME. The same file passed all seven tests when run from the
+coding-agent package root with one Vitest worker and file parallelism disabled.
+
+### Error
+
+```text
+agent-session-concurrent.test.ts: expected session.isStreaming to be true, received false
+agent-session-concurrent.test.ts: Test timed out in 30000ms
+Unhandled rejection: No API key found for anthropic
+```
+
+### Context
+
+- Full isolated run: 265/273 files and 2236/2293 tests passed; 3 tests and 2
+  unhandled errors were reported in this file.
+- Serial diagnostic: `agent-session-concurrent.test.ts` passed 1 file/7 tests.
+- The v3.1 Personal PI implementation does not modify this coding-agent
+  session surface, and no real or fake provider credential was added.
+
+### Suggested Fix
+
+Keep the concurrent suite result disclosed as an environment-specific
+diagnostic until the shared auth/runtime test isolation is repaired upstream.
+Use the serial package-root command for attribution only; do not turn it into a
+skip or weaken the repository gate.
+
+### Metadata
+
+- Reproducible: yes under the isolated parallel invocation; serial isolation passes
+- Related Files: `packages/coding-agent/test/agent-session-concurrent.test.ts`
+
+## [ERR-20260915-002] schedule-no-match-branch
+
+**Logged**: 2026-09-15T09:02:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: runtime
+
+### Summary
+
+The first scheduled memory-consolidation test exposed an ambiguous `created: false`
+branch. A schedule that did not match was treated like a duplicate idempotency
+retry and incorrectly returned a NO_OP record.
+
+### Root Cause
+
+`TriggerGateway.createFromSchedule` uses `created: false` for both a schedule
+miss and a duplicate. The caller must inspect the explicit reason before
+reconstructing a duplicate record.
+
+### Resolution
+
+`MemoryConsolidator.consolidateFromSchedule` now returns `undefined` for any
+non-duplicate trigger result and only emits the deterministic NO_OP retry for
+`duplicate idempotency_key`.
+
+### Verification
+
+- `memory-consolidation.test.ts`: 1 file / 4 tests PASS
+- Related Files: `packages/personal-pi/src/memory-consolidation.ts`,
+  `packages/personal-pi/test/memory-consolidation.test.ts`

@@ -98,11 +98,18 @@ describe("T7.5 background memory consolidation", () => {
 		const consolidator = new MemoryConsolidator({ archive });
 		const first = consolidator.consolidate(input);
 		const second = consolidator.consolidate({ ...input, at: "2026-09-15T00:01:00.000Z" });
+		const duplicateEvidence = consolidator.consolidate({
+			...input,
+			evidence: { ...input.evidence, id: "evidence-memory-duplicate" },
+		});
 
 		expect(first.status).toBe("CONSOLIDATED");
 		expect(second.status).toBe("NO_OP");
 		expect(second.token_delta).toBe(0);
-		expect(archive.list()).toHaveLength(1);
+		expect(duplicateEvidence.status).toBe("NO_OP");
+		expect(duplicateEvidence.archived_evidence_refs).toHaveLength(1);
+		expect(archive.list()).toHaveLength(2);
+		expect(archive.read(duplicateEvidence.archived_evidence_refs[0] ?? "")?.id).toBe("evidence-memory-duplicate");
 	});
 
 	test("supports a file cold archive that remains readable after the cycle", () => {
@@ -115,5 +122,23 @@ describe("T7.5 background memory consolidation", () => {
 		const fileName = reference.slice("cold://file/".length);
 		expect(readFileSync(join(directory, fileName), "utf8")).toContain("evidence-memory");
 		expect(archive.read(reference)?.id).toBe("evidence-memory");
+	});
+
+	test("reuses Trigger Gateway for a deterministic scheduled cycle and retry", () => {
+		const input = completedInput();
+		const trigger = new TriggerGateway();
+		const consolidator = new MemoryConsolidator({ trigger_gateway: trigger });
+		const at = new Date("2026-09-15T08:00:00.000Z");
+		const schedule = { id: "memory-daily", cron: "* * * * *" };
+
+		const first = consolidator.consolidateFromSchedule(schedule, at, input);
+		const retry = consolidator.consolidateFromSchedule(schedule, at, input);
+		const miss = consolidator.consolidateFromSchedule({ id: "memory-never", cron: "61 * * * *" }, at, input);
+
+		expect(first?.status).toBe("CONSOLIDATED");
+		expect(first?.consolidation_task_id).toContain("memory-consolidation");
+		expect(retry?.status).toBe("NO_OP");
+		expect(retry?.token_delta).toBe(0);
+		expect(miss).toBeUndefined();
 	});
 });
