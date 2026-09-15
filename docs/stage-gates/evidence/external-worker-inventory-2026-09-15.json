@@ -114,21 +114,26 @@
     {
       "id": "codex-cli-worker-adapter",
       "surface": "local_cli",
-      "binary": "/Applications/ChatGPT.app/Contents/Resources/codex",
-      "version": "0.154.0-alpha.6.2",
+      "binary": "/Users/chenglong/.local/bin/codex",
+      "version": "codex-cli 0.154.0",
       "adapter": "packages/personal-pi/src/adapters/codex-cli.ts",
-      "status": "process_probe_pass_adapter_budget_blocked",
-      "provider": "openai Codex CLI session",
+      "status": "real_execution_benchmark_pass_identity_unknown",
+      "historical_status_before_latest": "process_probe_pass_adapter_budget_blocked",
+      "provider": "unknown; the CLI did not echo provider identity",
       "terms_status": "allowed for the existing session",
-      "auth_status": "existing session observed; extra account was not selected or logged in",
+      "auth_status": "authenticated_or_session_available; raw login output was not recorded",
       "requested_model": "gpt-5.6-sol",
       "platform_accepted_model": "unknown",
       "observed_runtime_model": "unknown",
-      "process_probe": "real codex exec returned CODEX_PROBE_OK",
-      "adapter_probe": "real adapter process completed but rejected observed input 30118 > Task Contract max_input_tokens 1500",
-      "adapter_result": "failure / loop_budget_exhausted",
-      "retry_policy": "no retry; latest Codex weekly usage is 95% and no reset credit was consumed",
-      "personal_pi_conformance": "blocked; runtime identity unknown and Task-tool bridge is intentionally absent"
+      "process_probe": "real codex exec returned five JSONL events per bounded execution",
+      "pre_enable_adapter_probe": "real adapter process completed but rejected observed input 30118 > Task Contract max_input_tokens 1500",
+      "latest_adapter_result": "real Type B smoke success; independent verification PASS; valid no-op Work Receipt",
+      "latest_session_id_sha256": ["6fe07e3f178a7673", "c066a65742cafd69", "a505ea494a551e0a"],
+      "input_accounting": "fixed overhead 29705; PPH projected budget 1500; effective provider ceiling 31205",
+      "latest_benchmark": "Type A single 5/5; heterogeneous A/B/A/B/A 5/5; Type B projected input 988; cost unavailable",
+      "latest_evidence": "evidence/phase-12-real-heterogeneous-2026-09-15.json",
+      "retry_policy": "bounded execution; no retry beyond declared run budget; no reset credit consumed",
+      "personal_pi_conformance": "execution-level PASS; formal release status remains PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN and Task-tool bridge is intentionally absent"
     },
     {
       "id": "opencodex-local-proxy",
@@ -236,21 +241,29 @@
       "blocker": "No claim of production deployment or long-running always-on service; provider route remains synthetic/public-only"
     },
     "phase_12": {
-      "status": "BLOCKED_EXTERNAL",
+      "status": "PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN",
+      "historical_status_before_latest_run": "BLOCKED_EXTERNAL",
       "type_a_conformance": "PASS through local contract tests and real Phase 3/7 evidence",
-      "codex_cli_process_probe": "PASS, but runtime model unknown",
-      "second_backend_conformance": "BLOCKED_EXTERNAL",
-      "real_single_multi_benchmark": "NOT_RUN",
-      "existing_baseline": "same local-process Worker kind twice; 3 tasks; verified success 1.0 in both modes",
-      "blocker": "EXT-WORKER-BACKEND-002: Codex adapter has no trustworthy runtime model identity and its low-budget probe rejected fixed CLI context overhead; no second backend benchmark run"
+      "codex_cli_process_probe": "PASS, five JSONL events per real Type B execution; runtime model and provider remain unknown",
+      "second_backend_conformance": "PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN: local 10-case conformance suite plus one real Type B smoke passed; identity gate remains open",
+      "real_single_multi_benchmark": "PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN: Type A single 5/5 and Type A/Type B heterogeneous multi 5/5",
+      "same_task_set": "five synthetic public tasks; same projected context, tool policy, permissions, and loop-budget semantics",
+      "latest_evidence": "evidence/phase-12-real-heterogeneous-2026-09-15.json",
+      "input_accounting": "Codex fixed provider overhead 29705; PPH projected input budget 1500; effective provider ceiling 31205; Type B benchmark projected input 988",
+      "selection_proof": "two candidates stable across three registry reads; explicit pi and codex selections resolve to different adapter/backend paths",
+      "blocker": "EXT-WORKER-BACKEND-002 remains formal: Type B platform_accepted_model and observed_runtime_model are unknown; no model identity guess is permitted",
+      "t13_entered": false
     }
   },
   "regression_confirmation": [
-    {"command": "/usr/local/bin/npm run test --workspace=@personal-pi/core", "status": "PASS", "summary": "33 files / 181 tests"},
+    {"command": "/usr/local/bin/npm run test --workspace=@personal-pi/core", "status": "PASS", "summary": "33 files / 185 tests"},
     {"command": "/usr/local/bin/npm run build --workspace=@personal-pi/core", "status": "PASS", "summary": "TypeScript build"},
     {"command": "/usr/local/bin/npm run check:protocol-isolation --workspace=@personal-pi/core", "status": "PASS", "summary": "protocol metadata isolation"},
     {"command": "/usr/local/bin/npm run test:scripts", "status": "PASS", "summary": "29 tests"},
-    {"command": "/usr/local/bin/npm run test:personal-pi-regression", "status": "PASS", "summary": "3 files / 23 tests"}
+    {"command": "/usr/local/bin/npm run test:personal-pi-regression", "status": "PASS", "summary": "3 files / 23 tests"},
+    {"command": "./test.sh", "status": "PASS", "summary": "isolated root aggregate; coding-agent 266/273 files and 2239/2293 tests, 7 skipped"},
+    {"command": "npm run check", "status": "KNOWN_UPSTREAM_BASELINE", "summary": "all pre-typecheck checks PASS; exact google-shared.ts:402 TS2322 remains"},
+    {"command": "auditBoundCoverage(V3_FEEDBACK_PATHS)", "status": "PASS", "summary": "9 paths; uncovered_paths=[]"}
   ],
   "redaction": {
     "credential_values_recorded": false,

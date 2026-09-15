@@ -1,0 +1,1126 @@
+{
+  "schema_version": "1.0",
+  "captured_at": "2026-09-15T08:25:46.221Z",
+  "purpose": "Phase 12 real heterogeneous Worker closure; T13 excluded",
+  "repository": {
+    "path": "/Users/chenglong/github/persional-pi-harness",
+    "branch": "feature/t1-task-contract",
+    "evidence_base_sha": "b65fc5d95993c7fc9fc7ea4bffac3512237671a9",
+    "working_tree_clean_before_runner": true,
+    "working_tree_clean_after_runner": true
+  },
+  "safety_boundary": {
+    "data_class": "synthetic_public_conformance_only",
+    "provider_allowlist": [
+      "openai-codex-cli",
+      "opencodex-synthetic-only"
+    ],
+    "repository_data_sent": false,
+    "credentials_read_or_recorded": false,
+    "external_side_effects": false,
+    "reset_credits_consumed": 0,
+    "account_switch_or_login_performed": false
+  },
+  "codex_runtime": {
+    "backend": "codex-cli",
+    "binary": "/Users/chenglong/.local/bin/codex",
+    "version": "codex-cli 0.154.0",
+    "login_status": "authenticated_or_session_available",
+    "requested_model": "gpt-5.6-sol",
+    "platform_accepted_model": "unknown",
+    "observed_runtime_model": "unknown",
+    "session_evidence": "per-run session_id_sha256 is recorded below; raw thread/session identifiers are not recorded"
+  },
+  "input_accounting": {
+    "measurement": {
+      "provider_fixed_input_tokens": 29705,
+      "source": "current-session minimal real codex exec --json probe after manual session switch",
+      "probe_observed_input_tokens": 29705,
+      "probe_observed_output_tokens": 11,
+      "probe_runtime_model": "unknown"
+    },
+    "pph_projected_input_budget": 1500,
+    "effective_provider_input_budget": 31205,
+    "rationale": "Keep provider-reported total; subtract only the explicitly measured fixed baseline for PPH task admission; fail closed without calibration."
+  },
+  "conformance": {
+    "local_type_b_adapter_tests": {
+      "status": "PASS",
+      "command": "npm exec --workspace @personal-pi/core vitest -- run test/cli-adapters.test.ts"
+    },
+    "coverage": [
+      "normal success",
+      "permission boundary",
+      "structured/invalid output",
+      "timeout",
+      "budget admission",
+      "receipt/result identity"
+    ],
+    "real_type_b_smoke": {
+      "status": "PASS",
+      "records": [
+        {
+          "case_id": "json-shape",
+          "worker_id": "phase12-type-b-codex-cli",
+          "task_state": "DONE",
+          "result_status": "success",
+          "verification_status": "PASS",
+          "result_identity": {
+            "valid": true,
+            "task_id": "phase12-json-shape",
+            "run_id": "d6f1ca6e-9a0a-4301-bade-33a1875febd3",
+            "worker_id": "phase12-type-b-codex-cli",
+            "lease_epoch": 1
+          },
+          "work_receipt": {
+            "valid": true,
+            "no_op": true,
+            "effects_count": 0,
+            "state_changed": false
+          },
+          "result_errors": [],
+          "evidence": [
+            "codex-cli:process",
+            "codex-cli:events=5",
+            "codex-cli:session_id_sha256=6fe07e3f178a7673",
+            "codex-cli:input_tokens=30202",
+            "codex-cli:input_accounting=fixed_overhead_calibrated",
+            "codex-cli:provider_fixed_input_tokens=29705",
+            "codex-cli:pph_projected_input_tokens=497",
+            "codex-cli:pph_projected_input_budget=1500",
+            "codex-cli:effective_provider_input_budget=31205",
+            "codex-cli:output_tokens=213"
+          ],
+          "trace_outcome": "DONE",
+          "trace_metrics": {
+            "graph_width": 1,
+            "graph_depth": 1,
+            "handoff_count": 0,
+            "peak_active_workers": 1,
+            "retry_depth": 0,
+            "replan_count": 0,
+            "useful_work_ratio": 0,
+            "verification_first_pass_rate": 1,
+            "cost_per_verified_task": 0,
+            "time_per_verified_task": 0,
+            "agent_calls": 1,
+            "coordination_efficiency": 1
+          },
+          "observation": {
+            "backend": "codex-cli",
+            "requested_model": "gpt-5.6-sol",
+            "platform_accepted_model": null,
+            "observed_runtime_model": null,
+            "provider": null,
+            "session_id_sha256": "6fe07e3f178a7673",
+            "status": "success",
+            "elapsed_ms": 24742,
+            "input_tokens": 30202,
+            "input_accounting": {
+              "mode": "fixed_overhead_calibrated",
+              "provider_input_tokens": 30202,
+              "provider_fixed_input_tokens": 29705,
+              "pph_projected_input_tokens": 497,
+              "pph_projected_input_budget": 1500,
+              "effective_provider_input_budget": 31205
+            },
+            "output_tokens": 213,
+            "cost_usd": null,
+            "model_calls": 1,
+            "tool_calls": 0,
+            "timed_out": false
+          }
+        }
+      ]
+    }
+  },
+  "registry_selection": {
+    "candidate_order": [
+      "phase12-type-a-pi-agent",
+      "phase12-type-b-codex-cli"
+    ],
+    "stable_across_three_reads": true,
+    "candidate_count": 2,
+    "candidates": [
+      {
+        "worker_id": "phase12-type-a-pi-agent",
+        "worker_type": "pi",
+        "manifest_id": "pi-agent-deepseek-v4-flash",
+        "adapter_backend": "pi-agent"
+      },
+      {
+        "worker_id": "phase12-type-b-codex-cli",
+        "worker_type": "codex",
+        "manifest_id": "codex-cli-existing-session",
+        "adapter_backend": "codex-cli"
+      }
+    ],
+    "selection_by_explicit_worker_type": {
+      "pi": "phase12-type-a-pi-agent",
+      "codex": "phase12-type-b-codex-cli"
+    }
+  },
+  "benchmark": {
+    "case_set": [
+      {
+        "case_id": "json-shape",
+        "objective": "Return a compact JSON object with keys alpha and beta; use values 1 and 2."
+      },
+      {
+        "case_id": "list-order",
+        "objective": "Return the exact ordered list [\"one\",\"two\",\"three\"] in the summary."
+      },
+      {
+        "case_id": "bounded-explanation",
+        "objective": "Explain in one short sentence why a read-only task has no workspace effect."
+      },
+      {
+        "case_id": "contract-fields",
+        "objective": "State that the controller, not the Worker, owns permissions and model choice."
+      },
+      {
+        "case_id": "verification-note",
+        "objective": "Return a short note saying that an independent verifier must check the result."
+      }
+    ],
+    "single_worker_baseline": {
+      "mode": "single",
+      "selection": {
+        "candidate_order": [
+          "phase12-type-a-pi-agent",
+          "phase12-type-b-codex-cli"
+        ],
+        "stable_across_three_reads": true,
+        "candidate_count": 2,
+        "candidates": [
+          {
+            "worker_id": "phase12-type-a-pi-agent",
+            "worker_type": "pi",
+            "manifest_id": "pi-agent-deepseek-v4-flash",
+            "adapter_backend": "pi-agent"
+          },
+          {
+            "worker_id": "phase12-type-b-codex-cli",
+            "worker_type": "codex",
+            "manifest_id": "codex-cli-existing-session",
+            "adapter_backend": "codex-cli"
+          }
+        ],
+        "selection_by_explicit_worker_type": {
+          "pi": "phase12-type-a-pi-agent",
+          "codex": "phase12-type-b-codex-cli"
+        }
+      },
+      "case_ids": [
+        "json-shape",
+        "list-order",
+        "bounded-explanation",
+        "contract-fields",
+        "verification-note"
+      ],
+      "assignments": [
+        "phase12-type-a-pi-agent",
+        "phase12-type-a-pi-agent",
+        "phase12-type-a-pi-agent",
+        "phase12-type-a-pi-agent",
+        "phase12-type-a-pi-agent"
+      ],
+      "records": [
+        {
+          "case_id": "json-shape",
+          "worker_id": "phase12-type-a-pi-agent",
+          "task_state": "DONE",
+          "result_status": "success",
+          "verification_status": "PASS",
+          "result_identity": {
+            "valid": true,
+            "task_id": "phase12-json-shape",
+            "run_id": "4d18fed6-825b-4b56-8a48-5d88af466768",
+            "worker_id": "phase12-type-a-pi-agent",
+            "lease_epoch": 1
+          },
+          "work_receipt": {
+            "valid": true,
+            "no_op": true,
+            "effects_count": 0,
+            "state_changed": false
+          },
+          "result_errors": [],
+          "evidence": [
+            "pi-agent:process",
+            "pi-agent:events=371",
+            "pi-agent:provider=opencodex",
+            "pi-agent:model=ArkCoding/deepseek-v4-flash-ga-260731",
+            "pi-agent:input_tokens=1062",
+            "pi-agent:input_accounting=provider_total_fail_closed",
+            "pi-agent:output_tokens=358"
+          ],
+          "trace_outcome": "DONE",
+          "trace_metrics": {
+            "graph_width": 1,
+            "graph_depth": 1,
+            "handoff_count": 0,
+            "peak_active_workers": 1,
+            "retry_depth": 0,
+            "replan_count": 0,
+            "useful_work_ratio": 0,
+            "verification_first_pass_rate": 1,
+            "cost_per_verified_task": 0,
+            "time_per_verified_task": 0,
+            "agent_calls": 1,
+            "coordination_efficiency": 1
+          },
+          "observation": {
+            "backend": "pi-agent",
+            "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "provider": "opencodex",
+            "session_id_sha256": null,
+            "status": "success",
+            "elapsed_ms": 7561,
+            "input_tokens": 1062,
+            "input_accounting": {
+              "mode": "provider_total_fail_closed",
+              "provider_input_tokens": 1062,
+              "provider_fixed_input_tokens": null,
+              "pph_projected_input_tokens": null,
+              "pph_projected_input_budget": null,
+              "effective_provider_input_budget": null
+            },
+            "output_tokens": 358,
+            "cost_usd": 0,
+            "model_calls": 1,
+            "tool_calls": 0,
+            "timed_out": false
+          }
+        },
+        {
+          "case_id": "list-order",
+          "worker_id": "phase12-type-a-pi-agent",
+          "task_state": "DONE",
+          "result_status": "success",
+          "verification_status": "PASS",
+          "result_identity": {
+            "valid": true,
+            "task_id": "phase12-list-order",
+            "run_id": "deb98539-a1fd-4fc5-829e-074d58875e7f",
+            "worker_id": "phase12-type-a-pi-agent",
+            "lease_epoch": 1
+          },
+          "work_receipt": {
+            "valid": true,
+            "no_op": true,
+            "effects_count": 0,
+            "state_changed": false
+          },
+          "result_errors": [],
+          "evidence": [
+            "pi-agent:process",
+            "pi-agent:events=402",
+            "pi-agent:provider=opencodex",
+            "pi-agent:model=ArkCoding/deepseek-v4-flash-ga-260731",
+            "pi-agent:input_tokens=1063",
+            "pi-agent:input_accounting=provider_total_fail_closed",
+            "pi-agent:output_tokens=389"
+          ],
+          "trace_outcome": "DONE",
+          "trace_metrics": {
+            "graph_width": 1,
+            "graph_depth": 1,
+            "handoff_count": 0,
+            "peak_active_workers": 1,
+            "retry_depth": 0,
+            "replan_count": 0,
+            "useful_work_ratio": 0,
+            "verification_first_pass_rate": 1,
+            "cost_per_verified_task": 0,
+            "time_per_verified_task": 0,
+            "agent_calls": 1,
+            "coordination_efficiency": 1
+          },
+          "observation": {
+            "backend": "pi-agent",
+            "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "provider": "opencodex",
+            "session_id_sha256": null,
+            "status": "success",
+            "elapsed_ms": 7756,
+            "input_tokens": 1063,
+            "input_accounting": {
+              "mode": "provider_total_fail_closed",
+              "provider_input_tokens": 1063,
+              "provider_fixed_input_tokens": null,
+              "pph_projected_input_tokens": null,
+              "pph_projected_input_budget": null,
+              "effective_provider_input_budget": null
+            },
+            "output_tokens": 389,
+            "cost_usd": 0,
+            "model_calls": 1,
+            "tool_calls": 0,
+            "timed_out": false
+          }
+        },
+        {
+          "case_id": "bounded-explanation",
+          "worker_id": "phase12-type-a-pi-agent",
+          "task_state": "DONE",
+          "result_status": "success",
+          "verification_status": "PASS",
+          "result_identity": {
+            "valid": true,
+            "task_id": "phase12-bounded-explanation",
+            "run_id": "15268396-fe3b-4710-b6b6-b33537646f9f",
+            "worker_id": "phase12-type-a-pi-agent",
+            "lease_epoch": 1
+          },
+          "work_receipt": {
+            "valid": true,
+            "no_op": true,
+            "effects_count": 0,
+            "state_changed": false
+          },
+          "result_errors": [],
+          "evidence": [
+            "pi-agent:process",
+            "pi-agent:events=594",
+            "pi-agent:provider=opencodex",
+            "pi-agent:model=ArkCoding/deepseek-v4-flash-ga-260731",
+            "pi-agent:input_tokens=1058",
+            "pi-agent:input_accounting=provider_total_fail_closed",
+            "pi-agent:output_tokens=581"
+          ],
+          "trace_outcome": "DONE",
+          "trace_metrics": {
+            "graph_width": 1,
+            "graph_depth": 1,
+            "handoff_count": 0,
+            "peak_active_workers": 1,
+            "retry_depth": 0,
+            "replan_count": 0,
+            "useful_work_ratio": 0,
+            "verification_first_pass_rate": 1,
+            "cost_per_verified_task": 0,
+            "time_per_verified_task": 0,
+            "agent_calls": 1,
+            "coordination_efficiency": 1
+          },
+          "observation": {
+            "backend": "pi-agent",
+            "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "provider": "opencodex",
+            "session_id_sha256": null,
+            "status": "success",
+            "elapsed_ms": 11281,
+            "input_tokens": 1058,
+            "input_accounting": {
+              "mode": "provider_total_fail_closed",
+              "provider_input_tokens": 1058,
+              "provider_fixed_input_tokens": null,
+              "pph_projected_input_tokens": null,
+              "pph_projected_input_budget": null,
+              "effective_provider_input_budget": null
+            },
+            "output_tokens": 581,
+            "cost_usd": 0,
+            "model_calls": 1,
+            "tool_calls": 0,
+            "timed_out": false
+          }
+        },
+        {
+          "case_id": "contract-fields",
+          "worker_id": "phase12-type-a-pi-agent",
+          "task_state": "DONE",
+          "result_status": "success",
+          "verification_status": "PASS",
+          "result_identity": {
+            "valid": true,
+            "task_id": "phase12-contract-fields",
+            "run_id": "f7b51e16-dd34-4944-aeaf-9129fbc53e6e",
+            "worker_id": "phase12-type-a-pi-agent",
+            "lease_epoch": 1
+          },
+          "work_receipt": {
+            "valid": true,
+            "no_op": true,
+            "effects_count": 0,
+            "state_changed": false
+          },
+          "result_errors": [],
+          "evidence": [
+            "pi-agent:process",
+            "pi-agent:events=393",
+            "pi-agent:provider=opencodex",
+            "pi-agent:model=ArkCoding/deepseek-v4-flash-ga-260731",
+            "pi-agent:input_tokens=1058",
+            "pi-agent:input_accounting=provider_total_fail_closed",
+            "pi-agent:output_tokens=380"
+          ],
+          "trace_outcome": "DONE",
+          "trace_metrics": {
+            "graph_width": 1,
+            "graph_depth": 1,
+            "handoff_count": 0,
+            "peak_active_workers": 1,
+            "retry_depth": 0,
+            "replan_count": 0,
+            "useful_work_ratio": 0,
+            "verification_first_pass_rate": 1,
+            "cost_per_verified_task": 0,
+            "time_per_verified_task": 0,
+            "agent_calls": 1,
+            "coordination_efficiency": 1
+          },
+          "observation": {
+            "backend": "pi-agent",
+            "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "provider": "opencodex",
+            "session_id_sha256": null,
+            "status": "success",
+            "elapsed_ms": 8428,
+            "input_tokens": 1058,
+            "input_accounting": {
+              "mode": "provider_total_fail_closed",
+              "provider_input_tokens": 1058,
+              "provider_fixed_input_tokens": null,
+              "pph_projected_input_tokens": null,
+              "pph_projected_input_budget": null,
+              "effective_provider_input_budget": null
+            },
+            "output_tokens": 380,
+            "cost_usd": 0,
+            "model_calls": 1,
+            "tool_calls": 0,
+            "timed_out": false
+          }
+        },
+        {
+          "case_id": "verification-note",
+          "worker_id": "phase12-type-a-pi-agent",
+          "task_state": "DONE",
+          "result_status": "success",
+          "verification_status": "PASS",
+          "result_identity": {
+            "valid": true,
+            "task_id": "phase12-verification-note",
+            "run_id": "9d97a1ff-a341-443e-912d-feb0912c1f11",
+            "worker_id": "phase12-type-a-pi-agent",
+            "lease_epoch": 1
+          },
+          "work_receipt": {
+            "valid": true,
+            "no_op": true,
+            "effects_count": 0,
+            "state_changed": false
+          },
+          "result_errors": [],
+          "evidence": [
+            "pi-agent:process",
+            "pi-agent:events=341",
+            "pi-agent:provider=opencodex",
+            "pi-agent:model=ArkCoding/deepseek-v4-flash-ga-260731",
+            "pi-agent:input_tokens=1058",
+            "pi-agent:input_accounting=provider_total_fail_closed",
+            "pi-agent:output_tokens=328"
+          ],
+          "trace_outcome": "DONE",
+          "trace_metrics": {
+            "graph_width": 1,
+            "graph_depth": 1,
+            "handoff_count": 0,
+            "peak_active_workers": 1,
+            "retry_depth": 0,
+            "replan_count": 0,
+            "useful_work_ratio": 0,
+            "verification_first_pass_rate": 1,
+            "cost_per_verified_task": 0,
+            "time_per_verified_task": 0,
+            "agent_calls": 1,
+            "coordination_efficiency": 1
+          },
+          "observation": {
+            "backend": "pi-agent",
+            "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "provider": "opencodex",
+            "session_id_sha256": null,
+            "status": "success",
+            "elapsed_ms": 6887,
+            "input_tokens": 1058,
+            "input_accounting": {
+              "mode": "provider_total_fail_closed",
+              "provider_input_tokens": 1058,
+              "provider_fixed_input_tokens": null,
+              "pph_projected_input_tokens": null,
+              "pph_projected_input_budget": null,
+              "effective_provider_input_budget": null
+            },
+            "output_tokens": 328,
+            "cost_usd": 0,
+            "model_calls": 1,
+            "tool_calls": 0,
+            "timed_out": false
+          }
+        }
+      ],
+      "metrics": {
+        "mode": "single",
+        "worker_count": 1,
+        "verified_success_rate": 1,
+        "time_per_verified_task": 8555.265308400001,
+        "cost_per_verified_task": 0,
+        "cost_unavailable": false,
+        "handoffs": 0,
+        "retries": 0,
+        "verification_first_pass_rate": 1,
+        "coordination_efficiency": 1,
+        "graph_width": 1,
+        "peak_active_workers": 1,
+        "provider_model_token_usage": [
+          {
+            "backend": "pi-agent",
+            "worker_ids": [
+              "phase12-type-a-pi-agent"
+            ],
+            "requested_models": [
+              "ArkCoding/deepseek-v4-flash-ga-260731"
+            ],
+            "platform_accepted_models": [
+              "ArkCoding/deepseek-v4-flash-ga-260731"
+            ],
+            "observed_runtime_models": [
+              "ArkCoding/deepseek-v4-flash-ga-260731"
+            ],
+            "providers": [
+              "opencodex"
+            ],
+            "session_id_sha256": [],
+            "provider_input_tokens": 5299,
+            "output_tokens": 2036,
+            "cost_usd": 0,
+            "cost_available": true,
+            "pph_projected_input_tokens": 0
+          }
+        ]
+      }
+    },
+    "heterogeneous_multi": {
+      "mode": "heterogeneous_multi",
+      "selection": {
+        "candidate_order": [
+          "phase12-type-a-pi-agent",
+          "phase12-type-b-codex-cli"
+        ],
+        "stable_across_three_reads": true,
+        "candidate_count": 2,
+        "candidates": [
+          {
+            "worker_id": "phase12-type-a-pi-agent",
+            "worker_type": "pi",
+            "manifest_id": "pi-agent-deepseek-v4-flash",
+            "adapter_backend": "pi-agent"
+          },
+          {
+            "worker_id": "phase12-type-b-codex-cli",
+            "worker_type": "codex",
+            "manifest_id": "codex-cli-existing-session",
+            "adapter_backend": "codex-cli"
+          }
+        ],
+        "selection_by_explicit_worker_type": {
+          "pi": "phase12-type-a-pi-agent",
+          "codex": "phase12-type-b-codex-cli"
+        }
+      },
+      "case_ids": [
+        "json-shape",
+        "list-order",
+        "bounded-explanation",
+        "contract-fields",
+        "verification-note"
+      ],
+      "assignments": [
+        "phase12-type-a-pi-agent",
+        "phase12-type-b-codex-cli",
+        "phase12-type-a-pi-agent",
+        "phase12-type-b-codex-cli",
+        "phase12-type-a-pi-agent"
+      ],
+      "records": [
+        {
+          "case_id": "json-shape",
+          "worker_id": "phase12-type-a-pi-agent",
+          "task_state": "DONE",
+          "result_status": "success",
+          "verification_status": "PASS",
+          "result_identity": {
+            "valid": true,
+            "task_id": "phase12-json-shape",
+            "run_id": "137a5521-12d8-4aab-9ed1-4045bd92de15",
+            "worker_id": "phase12-type-a-pi-agent",
+            "lease_epoch": 1
+          },
+          "work_receipt": {
+            "valid": true,
+            "no_op": true,
+            "effects_count": 0,
+            "state_changed": false
+          },
+          "result_errors": [],
+          "evidence": [
+            "pi-agent:process",
+            "pi-agent:events=552",
+            "pi-agent:provider=opencodex",
+            "pi-agent:model=ArkCoding/deepseek-v4-flash-ga-260731",
+            "pi-agent:input_tokens=1062",
+            "pi-agent:input_accounting=provider_total_fail_closed",
+            "pi-agent:output_tokens=539"
+          ],
+          "trace_outcome": "DONE",
+          "trace_metrics": {
+            "graph_width": 1,
+            "graph_depth": 1,
+            "handoff_count": 0,
+            "peak_active_workers": 1,
+            "retry_depth": 0,
+            "replan_count": 0,
+            "useful_work_ratio": 0,
+            "verification_first_pass_rate": 1,
+            "cost_per_verified_task": 0,
+            "time_per_verified_task": 0,
+            "agent_calls": 1,
+            "coordination_efficiency": 1
+          },
+          "observation": {
+            "backend": "pi-agent",
+            "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "provider": "opencodex",
+            "session_id_sha256": null,
+            "status": "success",
+            "elapsed_ms": 10472,
+            "input_tokens": 1062,
+            "input_accounting": {
+              "mode": "provider_total_fail_closed",
+              "provider_input_tokens": 1062,
+              "provider_fixed_input_tokens": null,
+              "pph_projected_input_tokens": null,
+              "pph_projected_input_budget": null,
+              "effective_provider_input_budget": null
+            },
+            "output_tokens": 539,
+            "cost_usd": 0,
+            "model_calls": 1,
+            "tool_calls": 0,
+            "timed_out": false
+          }
+        },
+        {
+          "case_id": "list-order",
+          "worker_id": "phase12-type-b-codex-cli",
+          "task_state": "DONE",
+          "result_status": "success",
+          "verification_status": "PASS",
+          "result_identity": {
+            "valid": true,
+            "task_id": "phase12-list-order",
+            "run_id": "9e70b72e-17d7-4183-874c-ded4d8bcec8f",
+            "worker_id": "phase12-type-b-codex-cli",
+            "lease_epoch": 1
+          },
+          "work_receipt": {
+            "valid": true,
+            "no_op": true,
+            "effects_count": 0,
+            "state_changed": false
+          },
+          "result_errors": [],
+          "evidence": [
+            "codex-cli:process",
+            "codex-cli:events=5",
+            "codex-cli:session_id_sha256=c066a65742cafd69",
+            "codex-cli:input_tokens=30200",
+            "codex-cli:input_accounting=fixed_overhead_calibrated",
+            "codex-cli:provider_fixed_input_tokens=29705",
+            "codex-cli:pph_projected_input_tokens=495",
+            "codex-cli:pph_projected_input_budget=1500",
+            "codex-cli:effective_provider_input_budget=31205",
+            "codex-cli:output_tokens=230"
+          ],
+          "trace_outcome": "DONE",
+          "trace_metrics": {
+            "graph_width": 1,
+            "graph_depth": 1,
+            "handoff_count": 0,
+            "peak_active_workers": 1,
+            "retry_depth": 0,
+            "replan_count": 0,
+            "useful_work_ratio": 0,
+            "verification_first_pass_rate": 1,
+            "cost_per_verified_task": 0,
+            "time_per_verified_task": 0,
+            "agent_calls": 1,
+            "coordination_efficiency": 1
+          },
+          "observation": {
+            "backend": "codex-cli",
+            "requested_model": "gpt-5.6-sol",
+            "platform_accepted_model": null,
+            "observed_runtime_model": null,
+            "provider": null,
+            "session_id_sha256": "c066a65742cafd69",
+            "status": "success",
+            "elapsed_ms": 27267,
+            "input_tokens": 30200,
+            "input_accounting": {
+              "mode": "fixed_overhead_calibrated",
+              "provider_input_tokens": 30200,
+              "provider_fixed_input_tokens": 29705,
+              "pph_projected_input_tokens": 495,
+              "pph_projected_input_budget": 1500,
+              "effective_provider_input_budget": 31205
+            },
+            "output_tokens": 230,
+            "cost_usd": null,
+            "model_calls": 1,
+            "tool_calls": 0,
+            "timed_out": false
+          }
+        },
+        {
+          "case_id": "bounded-explanation",
+          "worker_id": "phase12-type-a-pi-agent",
+          "task_state": "DONE",
+          "result_status": "success",
+          "verification_status": "PASS",
+          "result_identity": {
+            "valid": true,
+            "task_id": "phase12-bounded-explanation",
+            "run_id": "823fb217-51af-450d-a23c-4965538809f0",
+            "worker_id": "phase12-type-a-pi-agent",
+            "lease_epoch": 1
+          },
+          "work_receipt": {
+            "valid": true,
+            "no_op": true,
+            "effects_count": 0,
+            "state_changed": false
+          },
+          "result_errors": [],
+          "evidence": [
+            "pi-agent:process",
+            "pi-agent:events=297",
+            "pi-agent:provider=opencodex",
+            "pi-agent:model=ArkCoding/deepseek-v4-flash-ga-260731",
+            "pi-agent:input_tokens=1058",
+            "pi-agent:input_accounting=provider_total_fail_closed",
+            "pi-agent:output_tokens=284"
+          ],
+          "trace_outcome": "DONE",
+          "trace_metrics": {
+            "graph_width": 1,
+            "graph_depth": 1,
+            "handoff_count": 0,
+            "peak_active_workers": 1,
+            "retry_depth": 0,
+            "replan_count": 0,
+            "useful_work_ratio": 0,
+            "verification_first_pass_rate": 1,
+            "cost_per_verified_task": 0,
+            "time_per_verified_task": 0,
+            "agent_calls": 1,
+            "coordination_efficiency": 1
+          },
+          "observation": {
+            "backend": "pi-agent",
+            "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "provider": "opencodex",
+            "session_id_sha256": null,
+            "status": "success",
+            "elapsed_ms": 3910,
+            "input_tokens": 1058,
+            "input_accounting": {
+              "mode": "provider_total_fail_closed",
+              "provider_input_tokens": 1058,
+              "provider_fixed_input_tokens": null,
+              "pph_projected_input_tokens": null,
+              "pph_projected_input_budget": null,
+              "effective_provider_input_budget": null
+            },
+            "output_tokens": 284,
+            "cost_usd": 0,
+            "model_calls": 1,
+            "tool_calls": 0,
+            "timed_out": false
+          }
+        },
+        {
+          "case_id": "contract-fields",
+          "worker_id": "phase12-type-b-codex-cli",
+          "task_state": "DONE",
+          "result_status": "success",
+          "verification_status": "PASS",
+          "result_identity": {
+            "valid": true,
+            "task_id": "phase12-contract-fields",
+            "run_id": "ba4f3f2f-1e3a-4286-a684-728b30586b77",
+            "worker_id": "phase12-type-b-codex-cli",
+            "lease_epoch": 1
+          },
+          "work_receipt": {
+            "valid": true,
+            "no_op": true,
+            "effects_count": 0,
+            "state_changed": false
+          },
+          "result_errors": [],
+          "evidence": [
+            "No tools were called and no files were modified.",
+            "codex-cli:process",
+            "codex-cli:events=5",
+            "codex-cli:session_id_sha256=a505ea494a551e0a",
+            "codex-cli:input_tokens=30198",
+            "codex-cli:input_accounting=fixed_overhead_calibrated",
+            "codex-cli:provider_fixed_input_tokens=29705",
+            "codex-cli:pph_projected_input_tokens=493",
+            "codex-cli:pph_projected_input_budget=1500",
+            "codex-cli:effective_provider_input_budget=31205",
+            "codex-cli:output_tokens=159"
+          ],
+          "trace_outcome": "DONE",
+          "trace_metrics": {
+            "graph_width": 1,
+            "graph_depth": 1,
+            "handoff_count": 0,
+            "peak_active_workers": 1,
+            "retry_depth": 0,
+            "replan_count": 0,
+            "useful_work_ratio": 0,
+            "verification_first_pass_rate": 1,
+            "cost_per_verified_task": 0,
+            "time_per_verified_task": 0,
+            "agent_calls": 1,
+            "coordination_efficiency": 1
+          },
+          "observation": {
+            "backend": "codex-cli",
+            "requested_model": "gpt-5.6-sol",
+            "platform_accepted_model": null,
+            "observed_runtime_model": null,
+            "provider": null,
+            "session_id_sha256": "a505ea494a551e0a",
+            "status": "success",
+            "elapsed_ms": 23327,
+            "input_tokens": 30198,
+            "input_accounting": {
+              "mode": "fixed_overhead_calibrated",
+              "provider_input_tokens": 30198,
+              "provider_fixed_input_tokens": 29705,
+              "pph_projected_input_tokens": 493,
+              "pph_projected_input_budget": 1500,
+              "effective_provider_input_budget": 31205
+            },
+            "output_tokens": 159,
+            "cost_usd": null,
+            "model_calls": 1,
+            "tool_calls": 0,
+            "timed_out": false
+          }
+        },
+        {
+          "case_id": "verification-note",
+          "worker_id": "phase12-type-a-pi-agent",
+          "task_state": "DONE",
+          "result_status": "success",
+          "verification_status": "PASS",
+          "result_identity": {
+            "valid": true,
+            "task_id": "phase12-verification-note",
+            "run_id": "514008fa-a0f4-450e-bcf0-ee6639720515",
+            "worker_id": "phase12-type-a-pi-agent",
+            "lease_epoch": 1
+          },
+          "work_receipt": {
+            "valid": true,
+            "no_op": true,
+            "effects_count": 0,
+            "state_changed": false
+          },
+          "result_errors": [],
+          "evidence": [
+            "pi-agent:process",
+            "pi-agent:events=184",
+            "pi-agent:provider=opencodex",
+            "pi-agent:model=ArkCoding/deepseek-v4-flash-ga-260731",
+            "pi-agent:input_tokens=1058",
+            "pi-agent:input_accounting=provider_total_fail_closed",
+            "pi-agent:output_tokens=171"
+          ],
+          "trace_outcome": "DONE",
+          "trace_metrics": {
+            "graph_width": 1,
+            "graph_depth": 1,
+            "handoff_count": 0,
+            "peak_active_workers": 1,
+            "retry_depth": 0,
+            "replan_count": 0,
+            "useful_work_ratio": 0,
+            "verification_first_pass_rate": 1,
+            "cost_per_verified_task": 0,
+            "time_per_verified_task": 0,
+            "agent_calls": 1,
+            "coordination_efficiency": 1
+          },
+          "observation": {
+            "backend": "pi-agent",
+            "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+            "provider": "opencodex",
+            "session_id_sha256": null,
+            "status": "success",
+            "elapsed_ms": 4166,
+            "input_tokens": 1058,
+            "input_accounting": {
+              "mode": "provider_total_fail_closed",
+              "provider_input_tokens": 1058,
+              "provider_fixed_input_tokens": null,
+              "pph_projected_input_tokens": null,
+              "pph_projected_input_budget": null,
+              "effective_provider_input_budget": null
+            },
+            "output_tokens": 171,
+            "cost_usd": 0,
+            "model_calls": 1,
+            "tool_calls": 0,
+            "timed_out": false
+          }
+        }
+      ],
+      "metrics": {
+        "mode": "heterogeneous_multi",
+        "worker_count": 2,
+        "verified_success_rate": 1,
+        "time_per_verified_task": 11062.185925000002,
+        "cost_per_verified_task": null,
+        "cost_unavailable": true,
+        "handoffs": 0,
+        "retries": 0,
+        "verification_first_pass_rate": 1,
+        "coordination_efficiency": 1,
+        "graph_width": 2,
+        "peak_active_workers": 2,
+        "provider_model_token_usage": [
+          {
+            "backend": "pi-agent",
+            "worker_ids": [
+              "phase12-type-a-pi-agent"
+            ],
+            "requested_models": [
+              "ArkCoding/deepseek-v4-flash-ga-260731"
+            ],
+            "platform_accepted_models": [
+              "ArkCoding/deepseek-v4-flash-ga-260731"
+            ],
+            "observed_runtime_models": [
+              "ArkCoding/deepseek-v4-flash-ga-260731"
+            ],
+            "providers": [
+              "opencodex"
+            ],
+            "session_id_sha256": [],
+            "provider_input_tokens": 3178,
+            "output_tokens": 994,
+            "cost_usd": 0,
+            "cost_available": true,
+            "pph_projected_input_tokens": 0
+          },
+          {
+            "backend": "codex-cli",
+            "worker_ids": [
+              "phase12-type-b-codex-cli"
+            ],
+            "requested_models": [
+              "gpt-5.6-sol"
+            ],
+            "platform_accepted_models": [
+              null
+            ],
+            "observed_runtime_models": [
+              null
+            ],
+            "providers": [
+              null
+            ],
+            "session_id_sha256": [
+              "c066a65742cafd69",
+              "a505ea494a551e0a"
+            ],
+            "provider_input_tokens": 60398,
+            "output_tokens": 389,
+            "cost_usd": 0,
+            "cost_available": false,
+            "pph_projected_input_tokens": 988
+          }
+        ]
+      }
+    },
+    "metrics_note": "No superiority claim; metrics are reported from the bounded sample. Cost is null when the runtime did not return cost."
+  },
+  "phase_gate": {
+    "status": "PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN",
+    "type_a_backend": "pi-agent/opencodex/ArkCoding-deepseek-v4-flash-ga-260731",
+    "type_b_backend": "codex-cli/current authenticated session",
+    "model_identity_limit": "Type B observed_runtime_model=unknown; no model guess was made",
+    "t13_entered": false
+  },
+  "post_run_verification": {
+    "captured_on": "2026-09-15 (Asia/Taipei)",
+    "local_type_b_conformance_test_count": 10,
+    "aggregate_root": {
+      "command": "./test.sh",
+      "status": "PASS",
+      "attempts": [
+        {
+          "status": "FAILED",
+          "reason": "one existing coding-agent footer-data-provider reftable watcher test timed out under the first isolated run",
+          "follow_up": "targeted test passed 8/8; no coding-agent file was changed"
+        },
+        {
+          "status": "PASS",
+          "summary": "all reached workspace suites passed; coding-agent 266/273 files and 2239/2293 tests, 7 skipped"
+        }
+      ],
+      "final_status": "PASS"
+    },
+    "normal_check": {
+      "command": "npm run check",
+      "status": "KNOWN_UPSTREAM_BASELINE",
+      "exit_code": 2,
+      "pre_typecheck_checks": "PASS",
+      "exact_failure": "packages/ai/src/api/google-shared.ts(402,10): error TS2322: Type FinishReason.TOO_MANY_TOOL_CALLS is not assignable to type never.",
+      "known_upstream_gate_policy": "exact fingerprint only; no broad bypass"
+    },
+    "bound_coverage": {
+      "command": "auditBoundCoverage(V3_FEEDBACK_PATHS)",
+      "status": "PASS",
+      "passed": true,
+      "path_count": 9,
+      "uncovered_paths": [],
+      "reasons": []
+    }
+  },
+  "final_verdict": "PHASE_12_NOT_CLOSED"
+}

@@ -123,3 +123,42 @@ PI 的真实 JSON probe 和 Personal PI pipeline probe 均观察到：`provider=
 | Phase 12 | `BLOCKED_EXTERNAL`；Codex Type B 尚未通过 model identity/adapter conformance，未跑异构 benchmark |
 
 原始 blocker、quota 根因和安全限制保留在本文前半部分作为历史盘点；本节是对当前 checkout 的最新 reconciliation，不把 PPH CLI、包存在或单纯 process probe 误报成第二 Worker backend。
+
+## Latest Type B reconciliation and heterogeneous run — 2026-09-15
+
+The previous section is retained as the pre-enable snapshot. The current
+machine evidence is
+[`phase-12-real-heterogeneous-2026-09-15.json`](./phase-12-real-heterogeneous-2026-09-15.json),
+bound to implementation SHA `b65fc5d95993c7fc9fc7ea4bffac3512237671a9`.
+
+The real Codex CLI path is now executable through the Personal PI thin adapter:
+`/Users/chenglong/.local/bin/codex`, `codex-cli 0.154.0`, sanitized session
+state `authenticated_or_session_available`, and five JSONL events per bounded
+execution. Only short SHA-256 session digests were retained. The requested
+`gpt-5.6-sol` was not treated as observed identity: both
+`platform_accepted_model` and `observed_runtime_model` remain `unknown`, as
+does the provider echo.
+
+Local Type B conformance is `10/10` PASS. A real Type B smoke reached
+`DONE`/success, passed the independent verifier and carried a valid no-op Work
+Receipt. Registry selection found two candidates stably across three reads and
+resolved explicit `pi` and `codex` requests to different `pi-agent` and
+`codex-cli` backends. The same five synthetic/public tasks then produced Type
+A Single `5/5` and heterogeneous `A/B/A/B/A` `5/5`. Single time per verified
+task was `8555.27 ms`; heterogeneous was `11062.19 ms`; both had first-pass
+verification `1.0`, zero handoffs and zero retries, and heterogeneous cost was
+unavailable. No superiority claim is made.
+
+Accounting is explicit: fixed Codex provider/runtime overhead `29705`, PPH
+projected task budget `1500`, effective provider ceiling `31205`; benchmark
+Type B provider input `60398`, projected input `988`, output `389`, cost
+unavailable. The run sent no repository data, credentials or external effects,
+and consumed no reset credit.
+
+The latest formal state is
+`PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN`: execution and benchmark closure are
+evidenced, but the identity-unknown condition remains
+`EXT-WORKER-BACKEND-002` for release purposes. The final aggregate root test
+passed on rerun; Bound Coverage passed with `uncovered_paths=[]`; the exact
+inherited `google-shared.ts:402` diagnostic remains separately governed by the
+Known-Upstream-Failure policy. **NOT READY FOR T13; T13 was not entered.**

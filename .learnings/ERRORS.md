@@ -4,7 +4,7 @@
 
 **Logged**: 2026-09-15T16:50:00+08:00
 **Priority**: medium
-**Status**: pending
+**Status**: resolved
 **Area**: tests
 
 ### Summary
@@ -31,6 +31,11 @@ independent verifier: FAIL; Worker result itself was success and contract-valid
 Parse the verifier mode flag explicitly before reading the record path, rerun
 one bounded smoke, and do not classify the prior attempt as Worker failure.
 
+### Resolution
+
+The verifier now checks the explicit `--verify` mode before reading the record
+path; the next bounded Type B smoke and its independent verification passed.
+
 ### Metadata
 
 - Reproducible: yes before verifier correction
@@ -40,7 +45,7 @@ one bounded smoke, and do not classify the prior attempt as Worker failure.
 
 **Logged**: 2026-09-15T16:35:00+08:00
 **Priority**: medium
-**Status**: pending
+**Status**: resolved
 **Area**: backend
 
 ### Summary
@@ -69,6 +74,11 @@ Result Contract validation: /: must be string
 Make the external contract prompt explicitly state that `summary` is always a
 string and include a compact exact top-level Result/Receipt shape. Keep strict
 parsing and rerun one bounded smoke before any benchmark.
+
+### Resolution
+
+The prompt now states the strict top-level shape without relaxing the parser;
+the subsequent bounded Codex smoke returned a valid success Result.
 
 ### Metadata
 

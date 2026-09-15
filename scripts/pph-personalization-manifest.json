@@ -87,7 +87,9 @@
 		"docs/stage-gates/evidence/external-worker-inventory-2026-09-15.md",
 		"docs/stage-gates/evidence/phase-03-real-worker-2026-09-15.json",
 		"docs/stage-gates/evidence/phase-07-real-worker-2026-09-15.json",
-		"docs/stage-gates/evidence/phase-07-self-development-2026-09-15.patch"
+		"docs/stage-gates/evidence/phase-07-self-development-2026-09-15.patch",
+		"docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json",
+		"packages/personal-pi/scripts/phase-12-real-heterogeneous.mjs"
 	],
 	"identityProjectionFiles": [
 		"packages/coding-agent/install-lock/package-lock.json",

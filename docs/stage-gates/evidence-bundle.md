@@ -223,3 +223,36 @@ adapter rejected observed `30118` input tokens against a `1500` bounded task.
 No extra account, reset credit, purchase, push, merge or T13 action occurred.
 The existing same-kind local Single/Multi benchmark is not promoted to an
 heterogeneous result. Final decision: **NOT READY FOR T13; STOP**.
+
+## Type B real execution and heterogeneous benchmark — 2026-09-15 latest
+
+The latest bounded machine record is
+[`evidence/phase-12-real-heterogeneous-2026-09-15.json`](./evidence/phase-12-real-heterogeneous-2026-09-15.json),
+with implementation evidence base `b65fc5d95993c7fc9fc7ea4bffac3512237671a9`.
+It records `/Users/chenglong/.local/bin/codex`, `codex-cli 0.154.0`, a
+successful sanitized `authenticated_or_session_available` status, five-event
+JSONL real executions and session digests only. The requested model was
+`gpt-5.6-sol`, but platform-accepted and observed runtime model fields remain
+`unknown`; no raw session ID, credential or provider output was stored.
+
+The adapter is a separate `codex-cli` backend from the Type A
+`pi-agent`/`opencodex` route. Local conformance is `10/10` PASS and the real
+Type B smoke is Result/Receipt/independent-verifier PASS. Registry selection
+is stable across three reads with explicit `pi`→Type A and `codex`→Type B.
+The same five synthetic public tasks ran with identical projected context,
+permissions, tools and loop semantics: Type A single was `5/5`, and
+heterogeneous `A/B/A/B/A` was `5/5`. Single time per verified task was
+`8555.27 ms`; heterogeneous was `11062.19 ms`; verification first pass,
+handoffs, retries and coordination efficiency were `1.0`, `0`, `0` and `1.0`
+respectively. Heterogeneous cost is unavailable because Codex did not return
+cost. Fixed provider input overhead `29705` is separated from PPH projected
+budget `1500`; effective provider ceiling is `31205` and Type B benchmark
+projected input is `988`.
+
+The formal Phase 12 state is
+`PASS_EXECUTION_MODEL_IDENTITY_UNKNOWN`, not `PASS/CLOSED`. Pool lease,
+429/500, cache rebuild and `HANDOFF_READY` checks remain backed by the local
+core suite and Bound Coverage (`uncovered_paths=[]`). The final aggregate
+root test passed on rerun; the normal check retains only the precise inherited
+`google-shared.ts:402` baseline. Final decision remains **NOT READY FOR T13;
+STOP**.
