@@ -333,6 +333,7 @@ function summarizeRecord(caseDefinition, workerId, execution, adapter) {
 				state_changed: result.work_receipt.state_changed,
 			}
 			: null,
+		result_errors: result?.errors ?? [],
 		evidence: result?.evidence ?? [],
 		trace_outcome: execution?.trace.outcome ?? "ERROR",
 		trace_metrics: execution?.trace.metrics.graph_efficiency ?? null,
