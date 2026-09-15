@@ -451,3 +451,46 @@ non-duplicate trigger result and only emits the deterministic NO_OP retry for
 - `memory-consolidation.test.ts`: 1 file / 4 tests PASS
 - Related Files: `packages/personal-pi/src/memory-consolidation.ts`,
   `packages/personal-pi/test/memory-consolidation.test.ts`
+
+## [ERR-20260915-003] workspace-aggregate-client-entry
+
+**Logged**: 2026-09-15T09:24:00+08:00
+**Priority**: medium
+**Status**: environment-bounded
+**Area**: tests
+
+### Summary
+
+The repository's isolated `./test.sh` aggregate run failed in the client
+workspace before the dependent package entry was available, while the
+standalone coding-agent and Personal PI suites passed in their own package
+roots.
+
+### Error
+
+```text
+Failed to resolve entry for package "@earendil-works/pi-agent-core".
+The package may have incorrect main/module/exports specified in its package.json.
+```
+
+### Context
+
+- Aggregate run: agent 711/712, chord 162/162, server 44/44, telemetry 15/15,
+  coding-agent 266/273 files and 2239/2293 tests, Personal PI 173/173 tests.
+- Only `packages/client/test/unix.test.ts` failed (19/19 tests in the file
+  were otherwise reported as passed); the failure occurred while importing
+  `packages/server/src/server.ts` through the workspace package entry.
+- The same client entry-resolution baseline is already recorded in the Phase 0
+  differential evidence and is unrelated to Personal PI v3.1 source changes.
+
+### Suggested Fix
+
+Keep the aggregate failure visible until workspace build ordering or the
+package entry artifact is repaired. Do not skip the client suite or alter
+published package metadata as part of the PPH v3.1 delta.
+
+### Metadata
+
+- Reproducible: yes under the isolated workspace aggregate invocation
+- Related Files: `packages/client/test/unix.test.ts`,
+  `packages/server/src/server.ts`

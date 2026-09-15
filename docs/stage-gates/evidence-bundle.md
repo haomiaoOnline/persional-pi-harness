@@ -126,3 +126,59 @@ No Personal PI file in this audit modifies those areas. They prevent the reposit
 - Machine-readable bound review: `docs/stage-gates/bound-coverage.md`.
 - Source/test implementation: `packages/personal-pi/src/` and `packages/personal-pi/test/` listed in the aggregate audit.
 - Failure/lesson log: `docs/.learnings/ERRORS.md` entry `ERR-20260914-030`.
+
+## v3.1 delta evidence — 2026-09-15
+
+The v3.1 implementation and strict blocker audit are recorded in
+[`evidence/v3.1-runtime-controls-2026-09-15.md`](./evidence/v3.1-runtime-controls-2026-09-15.md).
+The focused implementation/test commits are `3ee22da86`, `ceb796e6b`,
+`14da4fc22` and `4eacafe55`; the v3.0 closure baseline and exact upstream gate
+remain `9ff9b5b49`, `bfde9ffbe` and `58ef53c12` respectively.
+
+### v3.1 package verification
+
+```text
+npm run test --workspace @personal-pi/core
+32 test files; 173 tests PASS
+
+npm run build --workspace @personal-pi/core
+PASS
+
+npm run check:protocol-isolation --workspace @personal-pi/core
+PASS
+
+npm run test:scripts
+29/29 PASS
+
+npm run test:personal-pi-regression
+3 files; 23 tests PASS
+```
+
+The fresh isolated coding-agent package suite is `266/273` files and
+`2239/2293` tests PASS. The isolated root `./test.sh` aggregate still exits 1
+at the inherited client package entry-resolution baseline
+(`packages/client/test/unix.test.ts` → `@earendil-works/pi-agent-core`), while
+the other workspace results and Personal PI suite are recorded in the v3.1
+evidence file. The exact upstream TypeScript failure remains visible to
+`npm run check` and is admitted only by the exact fail-closed gate.
+
+### v3.1 phase result summary
+
+| Phase | v3.1 result |
+| --- | --- |
+| 0 | PPH differential closed (`76` expected identity fixture drifts; unexplained PPH-only `0`); repository aggregate still has inherited client baseline and exact upstream diagnostic under gate |
+| 1 | PASS / CLOSED local core; B1–B12 machine audit pass |
+| 2 | PASS / CLOSED regression confirmation |
+| 3 | T3.2-A local contract PASS; strict five real Worker tasks BLOCKED_EXTERNAL |
+| 4 | T4.2-B local pipeline/runtime PASS |
+| 5 | PASS / CLOSED regression confirmation |
+| 6 | T6.2-A local scoped-context PASS |
+| 7 | T7.5 controlled local consolidation PASS; strict self-development/real long-cycle evidence BLOCKED_EXTERNAL |
+| 8 | PASS / CLOSED regression confirmation |
+| 9 | PASS / CLOSED regression confirmation |
+| 10 | T10.4/T10.5 local runtime/policy PASS |
+| 11 | PASS / CLOSED local evidence scope; real benchmark remains open |
+| 12 | Progressive tools and structured notice PASS locally; two-backend real benchmark BLOCKED_EXTERNAL |
+
+This is a final v3.1 audit result, not a T13 authorization. **NOT READY FOR
+T13; STOP.**

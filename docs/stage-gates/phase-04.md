@@ -54,3 +54,16 @@ No open Personal PI Phase 4 code defect was found. Operational evidence from a l
 ## Evidence collection / final verdict
 
 The verifier metamorphic test, Work Receipt acceptance test, persisted command evidence and exact source locations are the evidence. **PASS / CLOSED**.
+
+## v3.1 delta update — 2026-09-15
+
+`T4.2-B` is implemented in `packages/personal-pi/src/lifecycle-hooks.ts` and
+is integrated around pipeline verification commands. Only deterministic
+`script` and `static_check` hooks can register. `on_start`, `pre_tool_use`,
+`post_tool_use` and `on_cwd_change` are covered; pre-tool failures block the
+current call, cwd changes reload scoped rules, and a missing post-tool checker
+emits warning plus Evidence while allowing the Run to continue. Command risk
+classification is supplied to `pre_tool_use`, and post-tool checks receive
+changed-file context. `lifecycle-hooks.test.ts` and
+`v3.1-pipeline-controls.test.ts` pass. B10 binds a later retry to the existing
+tool budget. **PASS / CLOSED for local implementation/evidence scope**.

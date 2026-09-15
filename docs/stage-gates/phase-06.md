@@ -50,3 +50,13 @@ No production-scale context compaction/cost trend was generated in this audit. T
 ## Evidence collection / final verdict
 
 Evidence: context test suite, pipeline context path, trace token/cache fields and [`bound-coverage.md`](./bound-coverage.md). **PASS / CLOSED**.
+
+## v3.1 delta update — 2026-09-15
+
+`T6.2-A` is implemented in `packages/personal-pi/src/scoped-context.ts`.
+Assembly checks same-scope contradictions before applying explicit
+org → project → directory precedence, handles exclusions at the same
+precedence, and applies `legacy_only` only to an explicitly legacy directory.
+`scoped-context.test.ts` passes the override, conflict-block and legacy
+exception cases. The existing Context Store/Resolver and held-out boundary
+remain unchanged. **PASS / CLOSED for local implementation/evidence scope**.

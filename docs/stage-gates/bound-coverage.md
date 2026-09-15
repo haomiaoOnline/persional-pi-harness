@@ -30,3 +30,27 @@ P0-15 的判定对象是“是否能重新进入先前执行状态”，而不�
 
 **PASS / CLOSED for active v3.0 Personal PI paths.**
 **Repository release gate remains PARTIAL / REOPENED**，原因是完整仓库存在已知上游失败，详见 [`v3-retroactive-audit.md`](./v3-retroactive-audit.md)。
+
+## v3.1 delta bound coverage — 2026-09-15
+
+The v3.1 delta adds no free-running loop. Each new retry, hook rejection,
+scheduled consolidation or Worker notice path is either monotonic and
+local-only, or enters the existing persisted Task/Run budget before it can
+execute work.
+
+| ID | Feedback path | Deterministic bound | Runtime enforcement | Persistence / truth source | Exhaustion / failure | Test evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| B9 | Explore/Plan denied write → phase advance → retry in Act | Monotonic `exploring → planning → acting` (at most two advances); any Run still uses Task `max_attempts` | `PhasedPermissionController` denies non-acting writes/network/credentials/unknown or composed shell; Act still calls Task permission evaluator | Task Contract remains the ceiling; no side effect occurs on a denied phase request | Denied request is retryable only after an explicit next phase; reverse/skip is rejected | `permission-phases.test.ts` |
+| B10 | Hook rejection → retry current verification tool | Task `max_tool_calls` per verification admission; each retry is a new bounded tool admission | `LifecycleHookManager` blocks the current call; pipeline runs `beforeToolCall` before every verification command | Persistent `loop_usage.tool_calls`; Evidence records hook failure | Current command is not invoked; later calls stop at budget exhaustion | `lifecycle-hooks.test.ts`, `v3.1-pipeline-controls.test.ts`, `loop-budget.integration.test.ts` |
+| B11 | Scheduled consolidation → duplicate/retry cycle | Task `max_attempts` plus Trigger Gateway schedule idempotency key | `TriggerGateway.createFromSchedule` gates schedule match and duplicate; `MemoryConsolidator` returns deterministic `NO_OP` | Trigger handled keys, consolidation records and Cold Evidence archive | Duplicate is `NO_OP`; raw Evidence remains archived; schedule miss creates no Task | `memory-consolidation.test.ts` |
+| B12 | `HANDOFF_READY` → Controller wakeup → state/artifact recheck | Existing Task `max_handoffs`; notice itself cannot authorize a handoff | Strict notice validation; handler only wakes Controller and calls both rechecks | Persistent State and Artifact Handoff contract remain the truth | Invalid notice rejected; failed readiness recheck does not create a Worker/chat cycle | `progressive-tools.test.ts` |
+
+### v3.1 machine audit
+
+`auditBoundCoverage(V3_FEEDBACK_PATHS)` remains `passed: true` with no
+uncovered paths. B9–B12 have executable evidence. B9 is intentionally
+side-effect-free before Act, and B12 is a readiness notification rather than
+an execution loop; neither path can bypass the persisted Task budget.
+
+**v3.1 bound result: PASS for the implemented local paths; strict overall
+release result remains NOT READY because external Worker evidence is blocked.**

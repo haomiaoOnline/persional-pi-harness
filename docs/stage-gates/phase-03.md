@@ -67,3 +67,19 @@ exists for the required five real Worker tasks. No mock or local synthetic
 provider is promoted as real evidence. T3.2-A phased permission escalation is
 tracked in [`v3.1-gap-matrix.md`](./v3.1-gap-matrix.md) and is not yet
 implemented at this baseline.
+
+## v3.1 delta update — 2026-09-15
+
+`T3.2-A` is implemented in `packages/personal-pi/src/permission-phases.ts`.
+The controller advances only `exploring → planning → acting`; Explore and Plan
+deny writes, network, credentials, unknown/composed shell and mutating Git;
+Act still delegates to the Task permission ceiling, and simple tasks have a
+deterministic Act fast path. A denied non-Act request is explicitly retryable
+only after an allowed phase advance. `permission-phases.test.ts` passes all
+three cases, and B9 covers the bounded retry path.
+
+This is a local contract test result, not the required real Worker evidence.
+The strict five-task matrix remains **BLOCKED_EXTERNAL**: no authorized real
+Provider/credential path is available, and the two native Worker attempts
+stopped at the account usage limit before producing usable evidence. **Phase 3
+remains PARTIAL / REOPENED**.

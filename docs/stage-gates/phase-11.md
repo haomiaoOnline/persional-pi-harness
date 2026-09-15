@@ -66,3 +66,12 @@ The required larger same-task/tool/permission/budget benchmark with real allowed
 ## Evidence collection / final verdict
 
 Evidence: event-derived fields, trace replay, local three-task baseline and the full table in [`evidence-bundle.md`](./evidence-bundle.md). **PASS / CLOSED** for this local E2 evidence scope.
+
+## v3.1 regression confirmation — 2026-09-15
+
+The consolidation cycle records `hot_path_before`, `hot_path_after` and
+`token_delta`; the progressive-tool review and command-risk evidence remain
+structured rather than Worker-authored termination signals. Trace, metric,
+isolation and full core tests remain PASS. The three-task local Single/Multi
+numbers are retained as a baseline only; they do not satisfy the strict
+two-backend benchmark. **PASS / CLOSED for local evidence scope**.

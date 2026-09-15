@@ -54,3 +54,9 @@ This gate does not claim live LLM/provider accuracy, commercial assessment quali
 ## Evidence collection / final verdict
 
 Evidence: `planning.test.ts`, persisted Decision Records, pipeline plan path, and the command results in [`evidence-bundle.md`](./evidence-bundle.md). **PASS / CLOSED** at the current executable code/test scope.
+
+## v3.1 regression confirmation — 2026-09-15
+
+The v3.1 delta uses the existing plan gate and dispatch records; no new model
+or provider is selected implicitly by the added controls. Planning, full core
+tests and build remain PASS. **PASS / CLOSED for local code/test scope**.

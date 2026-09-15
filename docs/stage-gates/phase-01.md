@@ -62,3 +62,12 @@ The audit is closed only for the implemented Personal PI core. New feedback path
 ## Evidence collection / final verdict
 
 Evidence: task-contract tests, loop-budget integration, source locations above, and the aggregate bundle. **PASS / CLOSED** for this Phase’s Personal PI scope.
+
+## v3.1 regression confirmation — 2026-09-15
+
+The v3.1 additions keep the existing Task Contract and Loop Budget as the
+permission and re-entry ceilings. `auditBoundCoverage(V3_FEEDBACK_PATHS)`
+passes with B1–B12; B9–B12 are documented in [`bound-coverage.md`](./bound-coverage.md).
+The current Personal PI core suite is `32` files / `173` tests PASS, with
+build and protocol-isolation PASS. No v3.1 path adds an implicit retry or
+changes the persisted budget semantics. **PASS / CLOSED for local core scope**.

@@ -84,3 +84,28 @@ passed PPH build/core tests/regression/protocol proofs. Phase 0 is therefore
 **PASS for PPH differential closure under the explicit known-upstream gate**;
 the normal check is not relabeled as green and no `--no-verify` exception is
 used.
+
+## v3.1 regression confirmation — 2026-09-15
+
+The latest standalone isolated coding-agent run remains green at `266/273`
+test files and `2239/2293` tests. The original differential inventory is
+unchanged: all `76` PPH-only failures are expected `pi`/`.pi` → `pph`/`.pph`
+identity-projection fixture drift; actual PPH regression is `0`, and the
+differential has `0` unexplained PPH-only failures. The detailed file/count
+classification is in [`evidence/v3.1-runtime-controls-2026-09-15.md`](./evidence/v3.1-runtime-controls-2026-09-15.md).
+
+The normal `npm run check` still exposes the exact inherited
+`packages/ai/src/api/google-shared.ts:402` TS2322. The pre-commit hook now
+invokes the exact fail-closed Known-Upstream-Failure gate, which verifies the
+pinned revision and source digest, reproduces the error in a pristine archive,
+and requires PPH build/core/regression/protocol proofs before allowing the
+commit. The gate tests are `6/6` and script tests are `29/29`; no v3.1 commit
+used `--no-verify`.
+
+The latest isolated root `./test.sh` remains non-green only because
+`packages/client/test/unix.test.ts` cannot resolve the existing
+`@earendil-works/pi-agent-core` package entry during workspace aggregation.
+This is the same client entry-resolution baseline found in pristine upstream;
+it was not skipped or changed. Current Phase 0 result: **PASS for PPH
+differential and exact known-upstream gate; repository aggregate remains
+PARTIAL / REOPENED**.

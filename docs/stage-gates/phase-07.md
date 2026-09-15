@@ -64,3 +64,20 @@ local child-process E2 paths. A real self-development run that changes and
 re-verifies this project, plus strict real Provider/Worker and long-running
 Trigger/Routine evidence, is still unavailable. T7.5 Background Memory
 Consolidation is a v3.1 delta and is not started at this baseline.
+
+## v3.1 delta update — 2026-09-15
+
+`T7.5` is implemented in `packages/personal-pi/src/memory-consolidation.ts`.
+It reuses `TriggerGateway` and the Task/Run/Result/Work Receipt identity
+checks, summarizes completed work into bounded hot memory, archives raw
+Evidence through an in-memory or file cold archive without deletion, records
+token/context deltas, and treats duplicate content as a deterministic
+`NO_OP`. Both webhook and controlled scheduled paths are tested, including a
+schedule miss that creates no Task and a retry that remains a no-op. The
+controlled local cycle passes all four `memory-consolidation.test.ts` tests;
+B11 covers schedule/retry exhaustion.
+
+This is E2/local control-plane evidence, not a claim of a production
+background service. The required T7.2 disposable self-development run,
+real-provider Worker pipeline and long-running Trigger/Routine cycle remain
+unavailable. **Phase 7 remains PARTIAL / REOPENED**.

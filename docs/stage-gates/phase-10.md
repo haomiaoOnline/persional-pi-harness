@@ -50,3 +50,18 @@ No open Personal PI security test defect was found. A production secret-manager 
 ## Evidence collection / final verdict
 
 Evidence: `security.test.ts`, protocol isolation result, unchanged secret handling policy and core regression. **PASS / CLOSED**.
+
+## v3.1 delta update — 2026-09-15
+
+`T10.4` is implemented in `packages/personal-pi/src/command-risk.ts`.
+Declarative rules classify every command as `safe`, `risky` or `danger` after
+the Task shell whitelist; safe commands auto-run, risky commands require an
+unexpired revision-bound `action_digest` approval, and danger commands remain
+permanently blocked even if the Task declares the shell permission.
+`command-risk.test.ts` and the pipeline controls pass.
+
+`T10.5` is implemented in `packages/personal-pi/src/progressive-tools.ts`.
+The default set contains nine narrow tools, Bash is fallback-only, the review
+checklist is executable, and the controlled sample marks `2/4 = 0.5` shell
+commands as replaceable by narrow tools. `progressive-tools.test.ts` passes.
+**PASS / CLOSED for local implementation/evidence scope**.

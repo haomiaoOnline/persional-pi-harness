@@ -98,7 +98,8 @@ export const V3_FEEDBACK_PATHS: readonly FeedbackPathCoverage[] = [
 		runtime_enforcement: "MemoryConsolidator deduplicates content and returns a legal NO_OP",
 		persistence: "TriggerGateway handled keys, consolidation records and Cold Evidence archive",
 		exhaustion_behavior: "duplicate cycle is NO_OP; raw Evidence remains archived",
-		test_evidence: "memory-consolidation.test.ts: archive preservation and idempotent no-op",
+		test_evidence:
+			"memory-consolidation.test.ts: archive preservation, scheduled success/no-match and idempotent no-op",
 	},
 	{
 		path_id: "handoff-ready-wakeup",

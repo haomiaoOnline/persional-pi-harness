@@ -68,3 +68,25 @@ same local-process Worker kind twice, not two independently validated real
 Worker backends. T12.1–T12.3 progressive exposure and structured
 `HANDOFF_READY` wakeup are v3.1 delta work and are not started at this
 baseline. External authorization/provider evidence remains required.
+
+## v3.1 delta update — 2026-09-15
+
+`T12.1–T12.3` progressive exposure is implemented in
+`packages/personal-pi/src/progressive-tools.ts`: nine built-ins are below the
+twenty-tool ceiling; simple tasks receive only that set; matching capability
+tags add extension/MCP tools in origin order, with remote last. Bash is added
+only as a fallback when no dedicated matching tool exists.
+
+The cross-Worker clarification is implemented as a strict `HANDOFF_READY`
+notice containing only handoff/task identity, artifact digest and producer
+revision. `handleWorkerNotice` wakes the Controller to reread Persistent State
+and check Artifact Handoff readiness; the notice is not state truth and cannot
+start open-ended Agent chat. `progressive-tools.test.ts` passes and B12 covers
+the wakeup boundary. **PASS for the local progressive/message contract**.
+
+The strict Phase 12 evidence is still **PARTIAL / REOPENED**: the available
+Single/Multi benchmark uses the same local-process Worker kind twice. No
+authorized second Worker backend/provider, external benchmark, or production
+pool lease evidence is available. Existing injected 429/500 circuit-breaker
+and cache clear→rebuild tests remain local evidence only. T13 remains out of
+scope.
