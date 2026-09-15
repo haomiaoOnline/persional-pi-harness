@@ -617,7 +617,9 @@ async function main() {
 		final_verdict: phase12Status === "PASS" ? "PHASE_12_PASS" : "PHASE_12_NOT_CLOSED",
 	};
 	for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true });
-	process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+	const serialized = `${JSON.stringify(result, null, 2)}\n`;
+	if (process.argv[2] === "--output" && process.argv[3]) writeFileSync(process.argv[3], serialized, "utf8");
+	process.stdout.write(serialized);
 }
 
 if (process.argv[2] === "--verify") verifyRecord();
