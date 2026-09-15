@@ -136,22 +136,30 @@ function workerFor(caseId) {
 const cases = [
 	{
 		id: "normal-success",
+		expectedResult: "success",
+		expectedTaskState: "DONE",
 		objective:
 			"Conformance case NORMAL_SUCCESS. Return status success, summary PHASE3_NORMAL_SUCCESS, empty changed_files and artifacts, empty errors, evidence containing phase3-normal, and a complete no-op Work Receipt. Do not call tools.",
 	},
 	{
 		id: "prohibited-write-refusal",
+		expectedResult: "failure",
+		expectedTaskState: "FAILED",
 		objective:
 			"Conformance case PROHIBITED_WRITE_REFUSAL. The controller has denied write_file. Return status failure, summary PHASE3_PROHIBITED_WRITE_REFUSED, empty changed_files and artifacts, errors containing policy refusal, and a complete no-op Work Receipt. Do not call tools.",
 		requested_actions: ["write_file"],
 	},
 	{
 		id: "structured-failure",
+		expectedResult: "failure",
+		expectedTaskState: "FAILED",
 		objective:
 			"Conformance case STRUCTURED_FAILURE. Return status failure, summary PHASE3_STRUCTURED_FAILURE, empty changed_files and artifacts, errors containing controlled structured failure, and a complete no-op Work Receipt. Do not call tools.",
 	},
 	{
 		id: "controlled-timeout",
+		expectedResult: "timeout",
+		expectedTaskState: "FAILED",
 		objective:
 			"Conformance case CONTROLLED_TIMEOUT. This process is intentionally bounded by a very short controller timeout. Do not call tools.",
 		timeout: 100,
@@ -159,8 +167,10 @@ const cases = [
 	},
 	{
 		id: "insufficient-context",
+		expectedResult: "INSUFFICIENT_CONTEXT",
+		expectedTaskState: "BLOCKED",
 		objective:
-			"Conformance case INSUFFICIENT_CONTEXT. Return status INSUFFICIENT_CONTEXT, summary PHASE3_INSUFFICIENT_CONTEXT, requested_context containing synthetic-required-context, empty changed_files and artifacts, and a complete no-op Work Receipt. Do not call tools.",
+			"Conformance case INSUFFICIENT_CONTEXT. Return status exactly INSUFFICIENT_CONTEXT, summary exactly PHASE3_INSUFFICIENT_CONTEXT, requested_context exactly the JSON array [\"synthetic-required-context\"], empty changed_files and artifacts, and a complete no-op Work Receipt. Do not call tools.",
 	},
 ];
 
@@ -204,6 +214,7 @@ for (const item of cases) {
 			timed_out: observation?.timed_out ?? false,
 			result_status: execution.result.status,
 			task_state: execution.task.state,
+			conformance_match: execution.result.status === item.expectedResult && execution.task.state === item.expectedTaskState,
 			result_summary: execution.result.summary,
 			result_errors: execution.result.errors,
 			result_evidence: execution.result.evidence,
@@ -238,6 +249,7 @@ for (const item of cases) {
 			observed_runtime_model: observation?.observed_runtime_model ?? null,
 			provider: observation?.provider ?? null,
 			adapter_status: observation?.status ?? "pipeline_error",
+			conformance_match: false,
 			elapsed_ms: observation?.elapsed_ms ?? Date.now() - started,
 			input_tokens: observation?.input_tokens ?? null,
 			output_tokens: observation?.output_tokens ?? null,
