@@ -68,6 +68,6 @@ Evidence: task-contract tests, loop-budget integration, source locations above, 
 The v3.1 additions keep the existing Task Contract and Loop Budget as the
 permission and re-entry ceilings. `auditBoundCoverage(V3_FEEDBACK_PATHS)`
 passes with B1–B12; B9–B12 are documented in [`bound-coverage.md`](./bound-coverage.md).
-The current Personal PI core suite is `32` files / `173` tests PASS, with
+The current Personal PI core suite is `32` files / `174` tests PASS, with
 build and protocol-isolation PASS. No v3.1 path adds an implicit retry or
 changes the persisted budget semantics. **PASS / CLOSED for local core scope**.

@@ -139,7 +139,7 @@ remain `9ff9b5b49`, `bfde9ffbe` and `58ef53c12` respectively.
 
 ```text
 npm run test --workspace @personal-pi/core
-32 test files; 173 tests PASS
+32 test files; 174 tests PASS
 
 npm run build --workspace @personal-pi/core
 PASS
