@@ -1,0 +1,999 @@
+{
+  "schema_version": "phase-15-adaptive-policy.v1",
+  "phase": "Phase 15",
+  "stage": "T15.1/T15.2/T15.3",
+  "baseline": "v3.2",
+  "captured_at": "2026-09-16T00:00:00.000Z",
+  "authority": {
+    "architecture_sha256": "31386a4490498665fbea0d580826acf11f767699a4b991ab03b49b930dc06480",
+    "task_list_sha256": "a48607de82aca989df6279c3b80d6ca27d58032558dcf3c75092eb3b8c24e99b"
+  },
+  "repository": {
+    "branch": "feature/t1-task-contract",
+    "head": "a84dd4c1fc77096b064d5038e5d8e69f6ac04f51",
+    "upstream": null,
+    "origin_main_divergence": {
+      "ahead": 29,
+      "behind": 0
+    },
+    "worktree_dirty": true,
+    "dirty_files": [
+      ".learnings/ERRORS.md",
+      "docs/stage-gates/evidence/agy-cli-candidate-e2e-2026-09-16.json",
+      "docs/stage-gates/evidence/agy-cli-candidate-engineering-log-2026-09-16.md",
+      "docs/stage-gates/evidence/phase-12-level-b-2026-09-15.json",
+      "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json",
+      "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json",
+      "docs/stage-gates/evidence/phase-14-multi-cri-2026-09-15.json",
+      "docs/stage-gates/evidence/phase-15-adaptive-policy-2026-09-16.json",
+      "docs/stage-gates/evidence/post-gate-snapshot-2026-09-15.json",
+      "docs/stage-gates/known_gaps.yaml",
+      "docs/stage-gates/phase-12-v3.2-engineering-log.md",
+      "docs/stage-gates/phase-12-v3.2-gate.md",
+      "docs/stage-gates/phase-13-t13-4-gate.md",
+      "docs/stage-gates/phase-14-engineering-log.md",
+      "docs/stage-gates/phase-14-t14-1-t14-2-gate.md",
+      "docs/stage-gates/phase-15-adaptive-policy-gate.md",
+      "docs/stage-gates/phase-15-engineering-log.md",
+      "packages/personal-pi/adapters/agy-cli.ts",
+      "packages/personal-pi/adapters/hermes-cli.ts",
+      "packages/personal-pi/examples/worker-plugins/agy-cli-existing-session.plugin_manifest.yaml",
+      "packages/personal-pi/examples/worker-plugins/hermes-cli-custom.plugin_manifest.yaml",
+      "packages/personal-pi/package.json",
+      "packages/personal-pi/scripts/agy-cli-real-probe.mjs",
+      "packages/personal-pi/scripts/hermes-worker-bridge.py",
+      "packages/personal-pi/scripts/level-b-worker-process.mjs",
+      "packages/personal-pi/scripts/phase-12-level-b.mjs",
+      "packages/personal-pi/scripts/phase-13-t13-4.mjs",
+      "packages/personal-pi/scripts/phase-14-hermes-e2e.mjs",
+      "packages/personal-pi/scripts/phase-15-adaptive-policy.mjs",
+      "packages/personal-pi/src/adapters/agy-cli.ts",
+      "packages/personal-pi/src/adapters/cli-runtime.ts",
+      "packages/personal-pi/src/adapters/hermes-cli.ts",
+      "packages/personal-pi/src/bound-coverage.ts",
+      "packages/personal-pi/src/external-gaps.ts",
+      "packages/personal-pi/src/graph-intelligence.ts",
+      "packages/personal-pi/src/index.ts",
+      "packages/personal-pi/src/learned-routing.ts",
+      "packages/personal-pi/src/persistence.ts",
+      "packages/personal-pi/src/plan-regression-dataset.ts",
+      "packages/personal-pi/src/policy-calibration.ts",
+      "packages/personal-pi/src/process-worker.ts",
+      "packages/personal-pi/src/provider-resilience.ts",
+      "packages/personal-pi/src/registry.ts",
+      "packages/personal-pi/src/types.ts",
+      "packages/personal-pi/src/worker-pool.ts",
+      "packages/personal-pi/test/adaptive-policy.test.ts",
+      "packages/personal-pi/test/agy-cli-candidate.test.ts",
+      "packages/personal-pi/test/external-gaps.test.ts",
+      "packages/personal-pi/test/hermes-cli-adapter.test.ts",
+      "packages/personal-pi/test/plan-regression-dataset.test.ts",
+      "packages/personal-pi/test/process-worker.test.ts"
+    ],
+    "diff_digest": "28af3add78ebc42ce4126da6e9982ef2ef44bd6af0dfa7c1c66aebffcdadba51",
+    "commit_push_merge_tag_performed": false
+  },
+  "retained_phase_status": {
+    "phase12": "PASS",
+    "phase13_t13_4": "PASS",
+    "p0_multi_worker_mvp": "PASS",
+    "phase14_level_c_multi_cri": "PASS",
+    "codex_gap_01": "OPEN_NON_BLOCKING",
+    "agy_gap_03": "OPEN_NON_BLOCKING",
+    "gemini_route": "STOPPED",
+    "cli_discovery": "P2_TODO"
+  },
+  "policy_calibration": {
+    "schema_version": "t15.1.v1",
+    "kind": "policy_calibration_report",
+    "generated_at": "2026-09-16T00:00:00.000Z",
+    "minimum_sample_size": 3,
+    "observation_count": 16,
+    "case_count": 20,
+    "sources": [
+      "execution_trace",
+      "phase12_heterogeneous_multi",
+      "phase12_single",
+      "phase14_hermes_e2e",
+      "t11.5_single_agent_baseline_and_comparison"
+    ],
+    "metrics": {
+      "useful_work_ratio": {
+        "status": "measured",
+        "unit": "ratio",
+        "sample_count": 13,
+        "cohort_count": 13,
+        "value": 0.23076923076923078,
+        "min": 0,
+        "max": 1,
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis"
+        ]
+      },
+      "coordination_efficiency": {
+        "status": "measured",
+        "unit": "ratio",
+        "sample_count": 19,
+        "cohort_count": 15,
+        "value": 0.9649122807017543,
+        "min": 0.3333333333333333,
+        "max": 1,
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ]
+      },
+      "verification_first_pass_rate": {
+        "status": "measured",
+        "unit": "ratio",
+        "sample_count": 19,
+        "cohort_count": 15,
+        "value": 0.9473684210526315,
+        "min": 0,
+        "max": 1,
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ]
+      },
+      "cost_per_verified_task": {
+        "status": "measured",
+        "unit": "usd_per_verified_task",
+        "sample_count": 5,
+        "cohort_count": 5,
+        "value": 0,
+        "min": 0,
+        "max": 0,
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ]
+      },
+      "time_per_verified_task": {
+        "status": "measured",
+        "unit": "ms_per_verified_task",
+        "sample_count": 19,
+        "cohort_count": 15,
+        "value": 5996.545173263158,
+        "min": 44.99808333333332,
+        "max": 27267,
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ]
+      },
+      "handoff_count": {
+        "status": "measured",
+        "unit": "count",
+        "sample_count": 19,
+        "cohort_count": 15,
+        "value": 0.05263157894736842,
+        "min": 0,
+        "max": 1,
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ]
+      },
+      "retry_depth": {
+        "status": "measured",
+        "unit": "count",
+        "sample_count": 19,
+        "cohort_count": 15,
+        "value": 0.05263157894736842,
+        "min": 0,
+        "max": 1,
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ]
+      },
+      "replan_count": {
+        "status": "measured",
+        "unit": "count",
+        "sample_count": 13,
+        "cohort_count": 13,
+        "value": 0,
+        "min": 0,
+        "max": 0,
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis"
+        ]
+      },
+      "graph_width": {
+        "status": "measured",
+        "unit": "count",
+        "sample_count": 19,
+        "cohort_count": 15,
+        "value": 1.4736842105263157,
+        "min": 1,
+        "max": 3,
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ]
+      },
+      "graph_depth": {
+        "status": "measured",
+        "unit": "count",
+        "sample_count": 13,
+        "cohort_count": 13,
+        "value": 1.2307692307692308,
+        "min": 1,
+        "max": 2,
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis"
+        ]
+      },
+      "agent_calls": {
+        "status": "measured",
+        "unit": "count",
+        "sample_count": 13,
+        "cohort_count": 13,
+        "value": 1,
+        "min": 1,
+        "max": 1,
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis"
+        ]
+      }
+    },
+    "findings": [
+      {
+        "id": "finding-over_decomposition",
+        "category": "over_decomposition",
+        "status": "insufficient_data",
+        "confidence": "insufficient_data",
+        "sample_count": 0,
+        "observed_count": 0,
+        "affected_task_types": [],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json#run",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ],
+        "message": "No sufficiently sized explicit over_decomposition cohort was recorded; no outcome was inferred from failure or coordination alone.",
+        "missing_reason": "explicit over_decomposed labels require at least 3 cases"
+      },
+      {
+        "id": "finding-wrong_worker",
+        "category": "wrong_worker",
+        "status": "insufficient_data",
+        "confidence": "insufficient_data",
+        "sample_count": 0,
+        "observed_count": 0,
+        "affected_task_types": [],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json#run",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ],
+        "message": "No sufficiently sized explicit wrong_worker cohort was recorded; no outcome was inferred from failure or coordination alone.",
+        "missing_reason": "explicit wrong_worker labels require at least 3 cases"
+      },
+      {
+        "id": "finding-unnecessary_handoff",
+        "category": "unnecessary_handoff",
+        "status": "insufficient_data",
+        "confidence": "insufficient_data",
+        "sample_count": 0,
+        "observed_count": 0,
+        "affected_task_types": [],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json#run",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ],
+        "message": "No sufficiently sized explicit unnecessary_handoff cohort was recorded; no outcome was inferred from failure or coordination alone.",
+        "missing_reason": "explicit unnecessary_handoff labels require at least 3 cases"
+      },
+      {
+        "id": "finding-retry_replan_overuse",
+        "category": "retry_replan_overuse",
+        "status": "insufficient_data",
+        "confidence": "insufficient_data",
+        "sample_count": 0,
+        "observed_count": 0,
+        "affected_task_types": [],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json#run",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ],
+        "message": "No sufficiently sized explicit retry_replan_overuse cohort was recorded; no outcome was inferred from failure or coordination alone.",
+        "missing_reason": "explicit retry_replan_overuse labels require at least 3 cases"
+      },
+      {
+        "id": "finding-preclassifier_false_negative",
+        "category": "preclassifier_false_negative",
+        "status": "insufficient_data",
+        "confidence": "insufficient_data",
+        "sample_count": 0,
+        "observed_count": 0,
+        "affected_task_types": [],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json#run",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ],
+        "message": "No sufficiently sized explicit preclassifier_false_negative cohort was recorded; no outcome was inferred from failure or coordination alone.",
+        "missing_reason": "explicit preclassifier_false_negative labels require at least 3 cases"
+      },
+      {
+        "id": "finding-decision-record-missing",
+        "category": "decision_record_missing",
+        "status": "measured",
+        "confidence": "low",
+        "sample_count": 3,
+        "observed_count": 3,
+        "rate": 1,
+        "affected_task_types": [
+          "failure_recovery",
+          "parallel_coding",
+          "parallel_read_analysis"
+        ],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis"
+        ],
+        "message": "3/3 observed cases contain no Decision Record."
+      }
+    ],
+    "recommendations": [
+      {
+        "id": "recommendation-decision-record-gate",
+        "category": "decision_record_missing",
+        "status": "PROPOSED",
+        "confidence": "low",
+        "affected_task_types": [
+          "failure_recovery",
+          "parallel_coding",
+          "parallel_read_analysis"
+        ],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis"
+        ],
+        "before_rule_delta": "No calibration admission rule requires a non-empty Decision Record.",
+        "after_rule_delta": "Require a dispatch Decision Record for route-policy calibration; otherwise mark decision-dependent metrics insufficient_data and do not change routing.",
+        "rationale": "3/3 observed cases contain no Decision Record.",
+        "guardrails": [
+          "This is an evidence-admission rule, not an automatic Task or Persistent State mutation.",
+          "Do not synthesize a missing decision or infer its Worker/model/provider fields."
+        ]
+      },
+      {
+        "id": "recommendation-over_decomposition-insufficient-data",
+        "category": "over_decomposition",
+        "status": "INSUFFICIENT_DATA",
+        "confidence": "insufficient_data",
+        "affected_task_types": [
+          "unknown"
+        ],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json#run",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ],
+        "before_rule_delta": "No explicit over-decomposition labels are available.",
+        "after_rule_delta": "Keep existing decomposition gates unchanged until explicit over-decomposition cases are collected.",
+        "rationale": "Do not infer over-decomposition from graph width alone.",
+        "guardrails": [
+          "Do not infer a route change from missing observations.",
+          "Collect an explicit label and an evidence reference before changing policy."
+        ]
+      },
+      {
+        "id": "recommendation-preclassifier_false_negative-insufficient-data",
+        "category": "preclassifier_false_negative",
+        "status": "INSUFFICIENT_DATA",
+        "confidence": "insufficient_data",
+        "affected_task_types": [
+          "unknown"
+        ],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json#run",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ],
+        "before_rule_delta": "No T2.0-A preclassifier false-negative incidents are present in the supplied execution observations.",
+        "after_rule_delta": "Ingest T2.0-A incidents as a distinct subtype before changing FAST/SLOW policy.",
+        "rationale": "Never merge this subtype into Worker or external-gap failures.",
+        "guardrails": [
+          "Do not infer a route change from missing observations.",
+          "Collect an explicit label and an evidence reference before changing policy."
+        ]
+      },
+      {
+        "id": "recommendation-recovery-overhead-classification",
+        "category": "retry_replan_overuse",
+        "status": "PROPOSED",
+        "confidence": "low",
+        "affected_task_types": [
+          "bounded-explanation",
+          "contract-fields",
+          "failure_recovery",
+          "json-shape",
+          "list-order",
+          "local-child-process-comparison",
+          "parallel_coding",
+          "parallel_read_analysis",
+          "phase14-hermes",
+          "verification-note"
+        ],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ],
+        "before_rule_delta": "Retry or handoff presence may be treated as evidence of overuse.",
+        "after_rule_delta": "Classify retry/handoff as overuse only with an explicit overuse label; preserve recovery traces as a separate cohort.",
+        "rationale": "Observed retry depth average is 0.05263157894736842; coordination efficiency is 0.9649122807017543. Presence alone does not prove waste.",
+        "guardrails": [
+          "Never reduce max_attempts, max_handoffs, or replan budgets from this observation alone.",
+          "Keep Loop Budget and recovery admission as hard controls."
+        ]
+      },
+      {
+        "id": "recommendation-retry_replan_overuse-insufficient-data",
+        "category": "retry_replan_overuse",
+        "status": "INSUFFICIENT_DATA",
+        "confidence": "insufficient_data",
+        "affected_task_types": [
+          "unknown"
+        ],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json#run",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ],
+        "before_rule_delta": "No explicit retry/replan-overuse labels are available.",
+        "after_rule_delta": "Keep retry/replan bounds unchanged until an explicit overuse cohort exists.",
+        "rationale": "Do not classify bounded recovery as overuse.",
+        "guardrails": [
+          "Do not infer a route change from missing observations.",
+          "Collect an explicit label and an evidence reference before changing policy."
+        ]
+      },
+      {
+        "id": "recommendation-unnecessary_handoff-insufficient-data",
+        "category": "unnecessary_handoff",
+        "status": "INSUFFICIENT_DATA",
+        "confidence": "insufficient_data",
+        "affected_task_types": [
+          "unknown"
+        ],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json#run",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ],
+        "before_rule_delta": "No explicit unnecessary-handoff labels are available.",
+        "after_rule_delta": "Keep handoff admission and fencing unchanged until necessity is recorded per case.",
+        "rationale": "Do not classify crash recovery handoff as unnecessary.",
+        "guardrails": [
+          "Do not infer a route change from missing observations.",
+          "Collect an explicit label and an evidence reference before changing policy."
+        ]
+      },
+      {
+        "id": "recommendation-wrong_worker-insufficient-data",
+        "category": "wrong_worker",
+        "status": "INSUFFICIENT_DATA",
+        "confidence": "insufficient_data",
+        "affected_task_types": [
+          "unknown"
+        ],
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.heterogeneous_multi.records[4]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[0]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[1]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[2]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[3]",
+          "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json#benchmark.single.records[4]",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.failure_recovery",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_coding",
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis",
+          "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json#run",
+          "docs/stage-gates/evidence/single-vs-multi-2026-09-14.json"
+        ],
+        "before_rule_delta": "No explicit wrong-Worker labels are available.",
+        "after_rule_delta": "Keep Registry capability, role, reasoning, context, and tier checks unchanged until a labeled cohort exists.",
+        "rationale": "Do not infer wrong Worker from a failed result without a route decision and correction record.",
+        "guardrails": [
+          "Do not infer a route change from missing observations.",
+          "Collect an explicit label and an evidence reference before changing policy."
+        ]
+      }
+    ],
+    "data_gaps": [
+      "over_decomposition: explicit over_decomposed labels require at least 3 cases",
+      "preclassifier_false_negative: explicit preclassifier_false_negative labels require at least 3 cases",
+      "retry_replan_overuse: explicit retry_replan_overuse labels require at least 3 cases",
+      "unnecessary_handoff: explicit unnecessary_handoff labels require at least 3 cases",
+      "wrong_worker: explicit wrong_worker labels require at least 3 cases"
+    ],
+    "boundary": {
+      "mode": "offline_advisory",
+      "llm_required": false,
+      "applies_recommendations_automatically": false,
+      "modifies_task_truth": false
+    }
+  },
+  "learned_routing": {
+    "schema_version": "t15.2.v1",
+    "mode": "advisory_only",
+    "scoring": {
+      "capability_match_weight": 100,
+      "historical_success_rate_weight": 25,
+      "task_type_match_weight": 10,
+      "surplus_cost_tier_penalty": 5,
+      "latency_penalty_divisor_ms": 1000,
+      "missing_history_score": 0,
+      "tie_break": "worker_id_ascending"
+    },
+    "rule_guard": {
+      "candidate_count": 1,
+      "recommendation_count": 1,
+      "high_score": 9007199254740991,
+      "hard_rule_violation_blocked": true,
+      "denial_reasons": [
+        "filesystem write outside scope: outside/scope",
+        "verification strength cannot be reduced below strong",
+        "loop budget exhausted: max_attempts"
+      ],
+      "checked_rules": [
+        "task_identity",
+        "suggestion_authority",
+        "worker_availability",
+        "worker_type",
+        "worker_tier",
+        "capability_tags",
+        "context_limit",
+        "reasoning_depth",
+        "role_boundary",
+        "permissions",
+        "approval",
+        "verification_strength",
+        "loop_budget"
+      ],
+      "runtime_selection_integrated": false,
+      "advisory_only": true
+    },
+    "learned_suggestion_does_not_modify_task_truth": true,
+    "runtime_selection_integrated": false
+  },
+  "plan_regression_dataset": {
+    "summary": {
+      "schema_version": "t15.3.v1",
+      "case_count": 1,
+      "category_counts": {
+        "over_decomposition": 0,
+        "wrong_worker": 0,
+        "unnecessary_handoff": 0,
+        "retry_replan_overuse": 0,
+        "preclassifier_false_negative": 0,
+        "decision_record_missing": 1
+      },
+      "status_counts": {
+        "OPEN": 0,
+        "CORRECTED": 1,
+        "RETIRED": 0
+      },
+      "preclassifier_false_negative_count": 0,
+      "external_gap_registry_mixed": false,
+      "evidence_refs": [
+        "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis.trace.trace"
+      ]
+    },
+    "cases": [
+      {
+        "schema_version": "t15.3.v1",
+        "id": "phase13-empty-decision-record-001",
+        "category": "decision_record_missing",
+        "task_id": "t13-read-synthesis",
+        "execution_ref": {
+          "trace_id": "c44fc7fd-669b-40eb-9f2b-9dee02fc8970"
+        },
+        "decision_ref": "trace:DISPATCH",
+        "predicted_path": "parallel_dispatch_accepted",
+        "actual_outcome": "DONE with an empty Decision Record list",
+        "missed_signal": "decision_record_count=0",
+        "correction": "Require a non-empty dispatch Decision Record before route-policy calibration.",
+        "rule_delta": {
+          "before": "A successful trace is usable for calibration even when its decision list is empty.",
+          "after": "An empty decision list makes decision-dependent calibration insufficient_data."
+        },
+        "evidence_refs": [
+          "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json#t13_4.parallel_read_analysis.trace.trace"
+        ],
+        "status": "CORRECTED",
+        "created_at": "2026-09-16T00:00:00.000Z",
+        "replay": {
+          "input": {
+            "decision_record_count": 0,
+            "outcome": "DONE"
+          },
+          "expected_before": "usable_for_calibration",
+          "expected_after": "insufficient_data",
+          "correction_id": "decision-record-admission-v1"
+        }
+      }
+    ],
+    "replay": {
+      "case_id": "phase13-empty-decision-record-001",
+      "correction_id": "decision-record-admission-v1",
+      "before": "usable_for_calibration",
+      "after": "insufficient_data",
+      "expected_before": "usable_for_calibration",
+      "expected_after": "insufficient_data",
+      "changed_behavior": true,
+      "passed": true
+    },
+    "preclassifier_false_negative_subclass": {
+      "status": "insufficient_data",
+      "count": 0,
+      "correction": "Ingest only evidence-backed T2.0-A false negatives; do not infer them from route failures."
+    }
+  },
+  "gate_checks": {
+    "t15_1_executable_calibration_report": true,
+    "t15_1_measured_recommendation_support": true,
+    "t15_2_recommendation_plus_rule_guard": true,
+    "t15_2_hard_rule_violation_interception_100_percent": true,
+    "t15_3_versioned_schema_and_ingestion": true,
+    "t15_3_real_historical_case_replay": true,
+    "phase12_phase13_phase14_status_unchanged": true,
+    "p0_invariants_preserved": true,
+    "validation_suite_passed": true
+  },
+  "known_gaps_separate_from_plan_regressions": true,
+  "data_quality": {
+    "insufficient_data_is_non_blocking_observation": true,
+    "insufficient_data_categories": [
+      "over_decomposition: explicit over_decomposed labels require at least 3 cases",
+      "preclassifier_false_negative: explicit preclassifier_false_negative labels require at least 3 cases",
+      "retry_replan_overuse: explicit retry_replan_overuse labels require at least 3 cases",
+      "unnecessary_handoff: explicit unnecessary_handoff labels require at least 3 cases",
+      "wrong_worker: explicit wrong_worker labels require at least 3 cases"
+    ],
+    "provider_or_model_identity_is_not_inferred_by_this_phase": true
+  },
+  "boundary": {
+    "new_architecture_module": false,
+    "pipeline_controller_dag_verification_persistent_state_modified": false,
+    "llm_required": false,
+    "secrets_read_or_recorded": false,
+    "recommendations_applied_automatically": false
+  },
+  "validation": {
+    "phase15_focused_tests": {
+      "command": "npm exec --workspace=@personal-pi/core vitest -- run test/adaptive-policy.test.ts test/plan-regression-dataset.test.ts",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 1002,
+      "test_files": 2,
+      "tests": 10
+    },
+    "personal_pi_full": {
+      "command": "npm run test --workspace=@personal-pi/core",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 2508,
+      "test_files": 39,
+      "tests": 209
+    },
+    "personal_pi_regression": {
+      "command": "npm run test:personal-pi-regression",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 6558,
+      "test_files": 3,
+      "tests": 23
+    },
+    "build": {
+      "command": "npm run build --workspace=@personal-pi/core",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 262
+    },
+    "protocol_isolation": {
+      "command": "npm run check:protocol-isolation --workspace=@personal-pi/core",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 183
+    },
+    "dependency_and_entry_checks": {
+      "command": [
+        "npm run check:pinned-deps",
+        "npm run check:runtime-deps",
+        "npm run check:ts-imports",
+        "npm run check:entry-graphs"
+      ],
+      "status": "PASS",
+      "checks": {
+        "pinned_deps": {
+          "command": "npm run check:pinned-deps",
+          "status": "PASS",
+          "exit_code": 0,
+          "duration_ms": 130
+        },
+        "runtime_deps": {
+          "command": "npm run check:runtime-deps",
+          "status": "PASS",
+          "exit_code": 0,
+          "duration_ms": 3173
+        },
+        "ts_imports": {
+          "command": "npm run check:ts-imports",
+          "status": "PASS",
+          "exit_code": 0,
+          "duration_ms": 1150
+        },
+        "entry_graphs": {
+          "command": "npm run check:entry-graphs",
+          "status": "PASS",
+          "exit_code": 0,
+          "duration_ms": 130
+        }
+      }
+    }
+  }
+}

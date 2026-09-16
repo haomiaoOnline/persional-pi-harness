@@ -42,6 +42,11 @@ export interface WorkerSelectionCandidate {
 	registration: RegisteredWorker;
 }
 
+export interface WorkerCandidateValidation {
+	allowed: boolean;
+	reasons: string[];
+}
+
 export class WorkerRegistrationError extends Error {
 	constructor(message: string) {
 		super(message);
@@ -84,6 +89,33 @@ function registrationValidation(input: WorkerRegistrationInput): ValidationResul
 		errors.push("latency_ms must be non-negative");
 	}
 	return errors.length === 0 ? validation : { valid: false, errors };
+}
+
+/** Canonical Registry admission predicate shared by selection and advisory routing. */
+export function validateRegisteredWorkerForTask(
+	task: TaskContract,
+	registration: RegisteredWorker,
+	role?: RoleProfile,
+): WorkerCandidateValidation {
+	const reasons: string[] = [];
+	const plugin = registration.manifest.worker_plugin;
+	if (!registration.available) reasons.push(`worker is unavailable: ${registration.worker_id}`);
+	if (task.execution.worker_type !== "cli" && registration.worker_type !== task.execution.worker_type)
+		reasons.push(`worker type violates Task Contract: ${registration.worker_type}`);
+	if (tierRank(plugin.cost_tier) < tierRank(task.execution.worker_tier))
+		reasons.push(`worker tier is below Task Contract requirement: ${task.execution.worker_tier}`);
+	if (plugin.context_limit < task.context.budget.max_input_tokens)
+		reasons.push(`worker context limit ${plugin.context_limit} is below ${task.context.budget.max_input_tokens}`);
+	if (!plugin.models_supported.some((model) => model.reasoning_levels.includes(task.execution.reasoning_depth)))
+		reasons.push(`manifest does not support reasoning depth: ${task.execution.reasoning_depth}`);
+	const missingCapabilities = task.execution.capability_tags.filter((tag) => !plugin.capability_tags.includes(tag));
+	if (missingCapabilities.length > 0)
+		reasons.push(`worker capability tags missing: ${missingCapabilities.sort().join(", ")}`);
+	if (role) {
+		const boundary = checkRoleBoundary(role, task);
+		if (!boundary.allowed) reasons.push(...boundary.reasons);
+	}
+	return { allowed: reasons.length === 0, reasons };
 }
 
 export class WorkerRegistry {
@@ -145,15 +177,8 @@ export class WorkerRegistry {
 		const requestedTier = tierRank(task.execution.worker_tier);
 		const candidates: WorkerSelectionCandidate[] = [];
 		for (const registration of this.workers.values()) {
-			if (!registration.available) continue;
-			if (task.execution.worker_type !== "cli" && registration.worker_type !== task.execution.worker_type) continue;
+			if (!validateRegisteredWorkerForTask(task, registration, role).allowed) continue;
 			const plugin = registration.manifest.worker_plugin;
-			if (tierRank(plugin.cost_tier) < requestedTier) continue;
-			if (plugin.context_limit < task.context.budget.max_input_tokens) continue;
-			if (!plugin.models_supported.some((model) => model.reasoning_levels.includes(task.execution.reasoning_depth)))
-				continue;
-			if (![...requiredTags].every((tag) => plugin.capability_tags.includes(tag))) continue;
-			if (role && !checkRoleBoundary(role, task).allowed) continue;
 
 			const tierDifference = tierRank(plugin.cost_tier) - requestedTier;
 			const matchingTags = [...requiredTags].filter((tag) => plugin.capability_tags.includes(tag)).length;
