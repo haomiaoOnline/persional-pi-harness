@@ -1,0 +1,55 @@
+version: 1
+known_gaps:
+  - id: GAP-01
+    symptoms: >-
+      The Codex CLI can execute, but the CLI output does not echo a trustworthy
+      accepted model and runtime model identity for Personal PI telemetry.
+    evidence: >-
+      docs/stage-gates/evidence/type-b-identity-surface-compatibility-2026-09-15.json,
+      docs/stage-gates/evidence/type-b-identity-attestation-2026-09-15.json, and
+      docs/stage-gates/evidence/phase-14-multi-cri-2026-09-15.json record
+      platform_accepted_model=unknown and observed_runtime_model=unknown for
+      the current Codex CLI probe; the adapter remains fail-closed.
+    root_cause: >-
+      The current Codex CLI event surface does not provide a verifiable runtime
+      identity field that Personal PI is authorized to treat as ground truth.
+    decision: >-
+      Do not derive runtime identity from requested or configured model values;
+      keep identity unknown and do not weaken Result, Evidence, or Verification
+      requirements.
+    resolution: Phase 14 Multi-CRI
+    current_consequence: >-
+      Codex runtime identity telemetry cannot close the heterogeneous Multi-CRI
+      evidence gap on its own; Hermes now supplies a separate attested
+      heterogeneous route for the Phase 14 Level-C gate, but GAP-01 remains
+      open for Codex and does not block the already-passed Level B or Phase 14
+      aggregate gate.
+    mvp_impact: NON_BLOCKING
+  - id: GAP-03
+    symptoms: >-
+      The locally installed Agy CLI executes a real bounded Worker run and
+      emits conversation/session correlation plus usage, but its stream-json
+      response does not expose a trustworthy response-side runtime model or
+      provider/backend identity.
+    evidence: >-
+      docs/stage-gates/evidence/agy-cli-candidate-e2e-2026-09-16.json and
+      packages/personal-pi/test/agy-cli-candidate.test.ts record a real
+      Agy stream with conversation_id and configured init.model, while
+      observed_runtime_model and provider_backend remain null; the adapter
+      fails closed and persists Result, Work Receipt, Evidence, and Verification.
+    root_cause: >-
+      Agy's available stream-json event surface exposes init.model as a
+      configured/requested value but does not provide response-side runtime
+      identity fields for the actual model and backend used by the run.
+    decision: >-
+      Do not derive observed runtime identity from init.model, command-line
+      arguments, local configuration, or conversation logs; keep the candidate
+      blocked on telemetry until the same run emits response-side identity.
+    resolution: Phase 14 Multi-CRI candidate verification
+    current_consequence: >-
+      Agy is feasible as an isolated CLI Worker execution path and is
+      heterogeneous with the existing pi-agent backend, but it cannot serve as
+      the selected Level-C CRI evidence source while response-side identity is
+      unavailable. Hermes supplies the selected attested route, so this gap
+      does not block the Phase 14 aggregate gate.
+    mvp_impact: NON_BLOCKING

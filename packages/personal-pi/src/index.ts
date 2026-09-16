@@ -7,6 +7,7 @@ export * from "./command-risk.ts";
 export * from "./context.ts";
 export * from "./effects.ts";
 export * from "./evidence.ts";
+export * from "./external-gaps.ts";
 export * from "./graph.ts";
 export * from "./graph-intelligence.ts";
 export * from "./lease.ts";
