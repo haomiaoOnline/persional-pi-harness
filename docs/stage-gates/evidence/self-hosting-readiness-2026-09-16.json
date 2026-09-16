@@ -1,0 +1,622 @@
+{
+  "schema_version": "self-hosting-readiness-2026-09-16.v1",
+  "generated_at": "2026-09-16T09:30:10.479Z",
+  "decision": "SELF_HOSTING_READY",
+  "decision_scope": "Self-Hosting Readiness Checkpoint only; no Product Shell, Multi-CLI, or new Multi-CRI",
+  "data_class": "synthetic_public_conformance_only",
+  "provider_allowlist": [
+    "local-only"
+  ],
+  "provider_route": "local-process-worker",
+  "requested_model": null,
+  "platform_accepted_model": null,
+  "observed_runtime_model": "not_applicable_local_worker",
+  "baseline_attestation": {
+    "start": {
+      "branch": "feature/t1-task-contract",
+      "head": "4553b93981004b2683ff58ca2088910e0e1cd4f4",
+      "tree": "f85676dc8a88d757c3534f3ec0fd8f46fb284b36",
+      "status_porcelain": "",
+      "clean": true,
+      "stash": "",
+      "baseline_tag": "personal-pi-v3.2-phase15-baseline",
+      "tag_object": "b0596147e59e9284d05857bdc8935cffe7a005bf",
+      "tag_commit": "4553b93981004b2683ff58ca2088910e0e1cd4f4",
+      "tag_tree": "f85676dc8a88d757c3534f3ec0fd8f46fb284b36",
+      "origin_feature": "71b3e44297d20b43faf31a677c2f5224a9e57481",
+      "origin_main": "71b3e44297d20b43faf31a677c2f5224a9e57481",
+      "origin_feature_divergence": "35\t0",
+      "origin_main_divergence": "35\t0",
+      "upstream_tracking": {
+        "ok": false,
+        "stdout": "",
+        "stderr": "fatal: no upstream configured for branch 'feature/t1-task-contract'"
+      }
+    },
+    "baseline_match": true,
+    "gate_evidence_digests": {
+      "phase12_gate": {
+        "path": "docs/stage-gates/phase-12-v3.2-gate.md",
+        "sha256": "de091cac99e31a885e1c43de220cd517373e660b7ede6e2ebe58f3e3a76d91b2"
+      },
+      "phase12_evidence": {
+        "path": "docs/stage-gates/evidence/phase-12-level-b-2026-09-15.json",
+        "sha256": "0a80ce2e0a87e3eb1051cfc26e336477b3da04bfa7b8c8f3241d2ca9560600c1"
+      },
+      "phase13_gate": {
+        "path": "docs/stage-gates/phase-13-t13-4-gate.md",
+        "sha256": "1d7cc5655d89a0050c05659ea5f16c85ff97cf7e50a9272a97d0a25113422a38"
+      },
+      "phase13_evidence": {
+        "path": "docs/stage-gates/evidence/phase-13-t13-4-2026-09-15.json",
+        "sha256": "5808b5b96085536f34b7ce3ba3005d92478e97e18315c3f416d7a02fa15d2963"
+      },
+      "phase14_gate": {
+        "path": "docs/stage-gates/phase-14-t14-1-t14-2-gate.md",
+        "sha256": "a7a4e8f5e9be3be2eedfdc52e2f45f9ec95d8836a136cb80085dfa939a168ad0"
+      },
+      "phase14_evidence": {
+        "path": "docs/stage-gates/evidence/phase-14-multi-cri-2026-09-15.json",
+        "sha256": "a586a382932d0c80acc30e6aa992142db6d4a6f6cac930f26794b2dc85af398d"
+      },
+      "phase15_gate": {
+        "path": "docs/stage-gates/phase-15-adaptive-policy-gate.md",
+        "sha256": "aabde98aafba50a38cd0568f88050d9ad2fcfb54e4d816780a7815d4da32950a"
+      },
+      "phase15_evidence": {
+        "path": "docs/stage-gates/evidence/phase-15-adaptive-policy-2026-09-16.json",
+        "sha256": "a5fda361ee840edc6f35b2552d3597a6438749c005083c6b49e0150664f64892"
+      }
+    },
+    "existing_t54_snapshot": {
+      "path": "docs/stage-gates/evidence/post-gate-snapshot-2026-09-15.json",
+      "sha256": "39f1bb7084b25c231a3ad9a65ca9870a60a50bb458361442f3c4b6e307731214",
+      "snapshot": {
+        "implementation": "PersistentStateStore.createSnapshot + restoreSnapshotFromStore",
+        "snapshot_id": "a80e9faf-52e4-472c-82fd-b735accb2999",
+        "snapshot_digest": "6be73b4135f3e1b2b2051f5b8e61d880bc27bd2290e84229669cbcb4dd2ee9db",
+        "persisted_snapshot_loaded": true,
+        "pre_restore_state_digest": "6be73b4135f3e1b2b2051f5b8e61d880bc27bd2290e84229669cbcb4dd2ee9db",
+        "mutated_state_digest": "bbc297a413e41be54bd1999f370d10b70e9a98e7e3d81ab290c5dcc02263f352",
+        "restored_state_digest": "6be73b4135f3e1b2b2051f5b8e61d880bc27bd2290e84229669cbcb4dd2ee9db",
+        "restore_verified": true,
+        "digest_mismatch_rejected": true,
+        "post_restore_state_file_sha256": "1219fc8faefd14d0b7d7de01fcce533c94e722c31ca4bdb3e1f3473a874fe633",
+        "fixture_state_counts": {
+          "worker_instances": 1,
+          "decisions": 1,
+          "snapshots": 1
+        }
+      },
+      "corresponds_to_current_baseline": false,
+      "reason": "historical snapshot has no current baseline commit/tree binding"
+    }
+  },
+  "successful_self_development_drill": {
+    "status": "PASS",
+    "kind": "success",
+    "task": {
+      "id": "self-hosting-readiness-success-20260916",
+      "contract_digest": "944d0ff3c25781a75afa2407de473887f4d0ee317c27aca4c1c860af7baa80d2",
+      "state": "DONE",
+      "task_record_digest": "c64247c2fe877f79605e3b040d375322473eff99dfa476385f6842c34e0f5c0e"
+    },
+    "assessment_policy": {
+      "plan_gate": {
+        "passed": true,
+        "checklist": {
+          "technical_feasibility": true,
+          "scalability": true,
+          "commercial_reasonableness": true,
+          "testability": true
+        },
+        "approval": {
+          "approved_by": "owner",
+          "action_digest": "d96da8b37c3d2a9ce4f5b3ffd00fb94a7e72bb020454c9fa3da45dfa26032ffa",
+          "bound_revision": 1,
+          "expires_at": "2999-01-01T00:00:00.000Z"
+        },
+        "reasons": []
+      },
+      "preclassification": {
+        "path": "FAST",
+        "reasons": [
+          "small, bounded task with no high-risk signal"
+        ],
+        "matched_signals": [],
+        "confidence": 0.95
+      },
+      "assessment": {
+        "scope": [
+          "packages/personal-pi/test/self-hosting-readiness-success.test.ts"
+        ],
+        "workload": "small",
+        "risk": "low",
+        "uncertainty": "low",
+        "dependency": "simple",
+        "parallelism": "ineligible",
+        "verification": "strong",
+        "context_budget": 2528,
+        "confidence": 0.9,
+        "capability_tags": [
+          "coding"
+        ]
+      },
+      "dispatch": {
+        "mode": "SINGLE_WORKER",
+        "worker_tier": "cheap",
+        "reasoning_depth": "low",
+        "candidate_worker_types": [
+          "pi"
+        ],
+        "capability_tags": [
+          "coding"
+        ],
+        "reason": "assessment risk=low, workload=small, dependency=simple; no role boundary requested"
+      },
+      "decisions": [
+        {
+          "id": "333bbd64-bc98-48a6-80e8-65925c1c936d",
+          "decision_type": "preclassification",
+          "decision": "FAST",
+          "reason": "small, bounded task with no high-risk signal"
+        },
+        {
+          "id": "6cea49f8-0377-46d6-b751-f6760b08b459",
+          "decision_type": "assessment",
+          "decision": "low",
+          "reason": "confidence=0.9"
+        },
+        {
+          "id": "a63084cb-3f3f-4ea5-9832-4942dd079cfc",
+          "decision_type": "dispatch_policy",
+          "decision": "SINGLE_WORKER",
+          "reason": "assessment risk=low, workload=small, dependency=simple; no role boundary requested"
+        },
+        {
+          "id": "a0fc0f9b-6c09-4f1b-a9ab-164c21ee3d53",
+          "decision_type": "verification",
+          "decision": "PASS",
+          "reason": "checks passed"
+        }
+      ],
+      "digest": "e2880ad9803dae12d2e0eff83cd486fa83b5afe49bcd820203b8c1a9f7898f84"
+    },
+    "worker_instance": {
+      "worker_id": "self-hosting-success-worker",
+      "worker_instance_id": "self-hosting-success-worker-instance",
+      "adapter_id": "pph-local-process-worker",
+      "start": {
+        "adapter_id": "pph-local-process-worker",
+        "pid": 35413,
+        "session_id": "local-session:4e6167bbe79bb376",
+        "session_id_sha256": "4e6167bbe79bb376",
+        "workspace_path": "DISPOSABLE_WORKTREE",
+        "alive": true
+      },
+      "after_stop": {
+        "adapter_id": "pph-local-process-worker",
+        "pid": null,
+        "session_id": "local-session:4e6167bbe79bb376",
+        "session_id_sha256": "4e6167bbe79bb376",
+        "workspace_path": "DISPOSABLE_WORKTREE",
+        "alive": false
+      },
+      "digest": "d201ee625d54d3ec9fed6bcffa935b33b5b928f2b9948e5efd52b543af9ef8b2"
+    },
+    "lease": {
+      "epoch": 1,
+      "run_id": "29518e96-7ba6-4ad4-a690-fe8fd9403ed9"
+    },
+    "result": {
+      "status": "success",
+      "digest": "ebf8909cd99f26606d550c24799223b9833530e869ef64ed742262f5e04f7621",
+      "changed_files": [
+        "packages/personal-pi/test/self-hosting-readiness-success.test.ts"
+      ],
+      "artifacts": [],
+      "errors": [],
+      "work_receipt": {
+        "work_attempted": true,
+        "effects_count": 1,
+        "artifacts_created": [],
+        "state_changed": true,
+        "no_op": false,
+        "evidence_refs": [
+          "self-hosting-success-worker-instance:process_pid=35413",
+          "self-hosting-success-worker-instance:session_id_sha256=4e6167bbe79bb376",
+          "self-hosting-success-worker-instance:workspace=DISPOSABLE_WORKTREE"
+        ],
+        "digest": "c9c72713f35e755b15fffd71d7f4df665079e14079fa400d0d05578f8741a095"
+      }
+    },
+    "evidence": {
+      "id": "a3e59b5f-7690-4a8d-b22b-8299785c4ffb",
+      "digest": "8007e74fc2d1156dd3665cd3fce82f767c1e8e5665086941db26c518dd0a6699",
+      "evidence_types": [
+        "self-hosting-success-worker-instance:process_pid=35413",
+        "self-hosting-success-worker-instance:session_id_sha256=4e6167bbe79bb376",
+        "self-hosting-success-worker-instance:workspace=DISPOSABLE_WORKTREE",
+        "pph-local-process-worker:process_pid=35413",
+        "pph-local-process-worker:session_id_sha256=4e6167bbe79bb376",
+        "pph-local-process-worker:workspace=DISPOSABLE_WORKTREE",
+        "independent_command"
+      ],
+      "command": {
+        "command": "self-hosting:verify-success",
+        "exit_code": 0,
+        "stdout_sha256": "cefa2c91f0810654ce180dda5ccf63f882ce845daf1e1d1d695d712972507aed",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_excerpt": "\n RUN  v4.1.9 /privateDISPOSABLE_WORKTREE\n\n·\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  17:30:08\n   Duration  131ms (transform 23ms, setup 0ms, import 33ms, tests 2ms, environment 0ms)\n\n",
+        "stderr_excerpt": ""
+      }
+    },
+    "verification": {
+      "id": "e4e582ee-2ff2-4fa3-9c87-4644459895a6",
+      "digest": "05aa2acb8f6be49580fd3ce302f6af12f4474be7ceab04cd7bbd855e57cf7dec",
+      "status": "PASS",
+      "confidence": "strong",
+      "reasons": [],
+      "checks": [
+        "command:self-hosting:verify-success"
+      ]
+    },
+    "acceptance": {
+      "accepted": true,
+      "persisted_task_state": "DONE",
+      "reason": "independent Verification PASS"
+    },
+    "trace": {
+      "id": "9b294109-1192-4d8b-9155-4dbc6afcc912",
+      "digest": "0c91de7119afc707d95f0c1fff8943de0dcf5ad8c376539a3a3e997c6a4c866f",
+      "outcome": "DONE"
+    },
+    "worktree": {
+      "base_commit": "4553b93981004b2683ff58ca2088910e0e1cd4f4",
+      "base_tree": "f85676dc8a88d757c3534f3ec0fd8f46fb284b36",
+      "ref": "DISPOSABLE_WORKTREE",
+      "target": "packages/personal-pi/test/self-hosting-readiness-success.test.ts",
+      "status_before_cleanup": "?? node_modules\n?? packages/personal-pi/test/self-hosting-readiness-success.test.ts",
+      "worker_status_before_cleanup": "?? packages/personal-pi/test/self-hosting-readiness-success.test.ts",
+      "infrastructure_paths_ignored": [
+        "node_modules"
+      ],
+      "target_only": true,
+      "patch_sha256": "4b9086d6419cb6e5f5b267cacc8277cf9b3dda1b220e368d05ff20a8fd7c2fdc",
+      "patch_bytes": 532,
+      "patch_excerpt": "diff --git a/packages/personal-pi/test/self-hosting-readiness-success.test.ts b/packages/personal-pi/test/self-hosting-readiness-success.test.ts\nnew file mode 100644\nindex 000000000..c674fb6c7\n--- /dev/null\n+++ b/packages/personal-pi/test/self-hosting-readiness-success.test.ts\n@@ -0,0 +1,7 @@\n+import { describe, expect, it } from \"vitest\";\n+\n+describe(\"self-hosting readiness diagnostic\", () => {\n+\tit(\"SELF_HOSTING_SUCCESS_MARKER\", () => {\n+\t\texpect(\"SELF_HOSTING_SUCCESS_MARKER\").toBe(\"SELF_HOSTING_SUCCESS_MARKER\");\n+\t});\n+});\n"
+    },
+    "state": {
+      "file_sha256": "fbee52f01cb020aecc2f56188377e152d521d77ff03bcd3bfe0723bf11c81b52",
+      "counts": {
+        "tasks": 1,
+        "runs": 1,
+        "results": 1,
+        "evidence": 1,
+        "verifications": 1,
+        "traces": 1
+      }
+    },
+    "cleanup": {
+      "worktree_removed": true,
+      "worktree_list_contains_path": false,
+      "parent_removed": true
+    }
+  },
+  "failed_rollback_drill": {
+    "status": "PASS",
+    "kind": "failure",
+    "task": {
+      "id": "self-hosting-readiness-failure-20260916",
+      "contract_digest": "917e9d944d0a8d126e1895edef288691a7dce80b8564283c36bc32319729613d",
+      "state": "FAILED",
+      "task_record_digest": "47a1a2d129aa0918b4725a6c4fb22eab77868621c33c3912f36aaebfeca33d23"
+    },
+    "assessment_policy": {
+      "plan_gate": {
+        "passed": true,
+        "checklist": {
+          "technical_feasibility": true,
+          "scalability": true,
+          "commercial_reasonableness": true,
+          "testability": true
+        },
+        "approval": {
+          "approved_by": "owner",
+          "action_digest": "d96da8b37c3d2a9ce4f5b3ffd00fb94a7e72bb020454c9fa3da45dfa26032ffa",
+          "bound_revision": 1,
+          "expires_at": "2999-01-01T00:00:00.000Z"
+        },
+        "reasons": []
+      },
+      "preclassification": {
+        "path": "FAST",
+        "reasons": [
+          "small, bounded task with no high-risk signal"
+        ],
+        "matched_signals": [],
+        "confidence": 0.95
+      },
+      "assessment": {
+        "scope": [
+          "packages/personal-pi/test/self-hosting-readiness-failure.test.ts"
+        ],
+        "workload": "small",
+        "risk": "low",
+        "uncertainty": "low",
+        "dependency": "simple",
+        "parallelism": "ineligible",
+        "verification": "strong",
+        "context_budget": 2530,
+        "confidence": 0.9,
+        "capability_tags": [
+          "coding"
+        ]
+      },
+      "dispatch": {
+        "mode": "SINGLE_WORKER",
+        "worker_tier": "cheap",
+        "reasoning_depth": "low",
+        "candidate_worker_types": [
+          "pi"
+        ],
+        "capability_tags": [
+          "coding"
+        ],
+        "reason": "assessment risk=low, workload=small, dependency=simple; no role boundary requested"
+      },
+      "decisions": [
+        {
+          "id": "524176d7-0821-48c6-85f9-f5effb4ce408",
+          "decision_type": "preclassification",
+          "decision": "FAST",
+          "reason": "small, bounded task with no high-risk signal"
+        },
+        {
+          "id": "c6baf477-070e-4fd5-803d-f76e01cd7232",
+          "decision_type": "assessment",
+          "decision": "low",
+          "reason": "confidence=0.9"
+        },
+        {
+          "id": "bcbb8c9f-8fe2-476d-b65f-4d5ef118a108",
+          "decision_type": "dispatch_policy",
+          "decision": "SINGLE_WORKER",
+          "reason": "assessment risk=low, workload=small, dependency=simple; no role boundary requested"
+        },
+        {
+          "id": "a4c74981-f048-427a-858d-e9dc8765e4a1",
+          "decision_type": "verification",
+          "decision": "FAIL",
+          "reason": "missing evidence: independent_command; command failed: self-hosting:verify-failure"
+        }
+      ],
+      "digest": "b173d40306feef821713dca536bf62e93d4230a692639a79f758502bd8867194"
+    },
+    "worker_instance": {
+      "worker_id": "self-hosting-failure-worker",
+      "worker_instance_id": "self-hosting-failure-worker-instance",
+      "adapter_id": "pph-local-process-worker",
+      "start": {
+        "adapter_id": "pph-local-process-worker",
+        "pid": 35440,
+        "session_id": "local-session:60362753c2a6929c",
+        "session_id_sha256": "60362753c2a6929c",
+        "workspace_path": "DISPOSABLE_WORKTREE",
+        "alive": true
+      },
+      "after_stop": {
+        "adapter_id": "pph-local-process-worker",
+        "pid": null,
+        "session_id": "local-session:60362753c2a6929c",
+        "session_id_sha256": "60362753c2a6929c",
+        "workspace_path": "DISPOSABLE_WORKTREE",
+        "alive": false
+      },
+      "digest": "539b44eb584618bfe74871fa874b23295e34c3fcf8cdaed2bfce3233d51e6c7f"
+    },
+    "lease": {
+      "epoch": 1,
+      "run_id": "4c46d04b-a807-48a1-bf07-a636cbca8650"
+    },
+    "result": {
+      "status": "success",
+      "digest": "61230696f86b20a64584667bbe12bfe0d94c2040fedd9a38cad46fa0fba7019e",
+      "changed_files": [
+        "packages/personal-pi/test/self-hosting-readiness-failure.test.ts"
+      ],
+      "artifacts": [],
+      "errors": [],
+      "work_receipt": {
+        "work_attempted": true,
+        "effects_count": 1,
+        "artifacts_created": [],
+        "state_changed": true,
+        "no_op": false,
+        "evidence_refs": [
+          "self-hosting-failure-worker-instance:process_pid=35440",
+          "self-hosting-failure-worker-instance:session_id_sha256=60362753c2a6929c",
+          "self-hosting-failure-worker-instance:workspace=DISPOSABLE_WORKTREE"
+        ],
+        "digest": "8c54c3050b5500933dcaa2fc813cdac0d16ae480b09bf8088000f47e3580f717"
+      }
+    },
+    "evidence": {
+      "id": "d91ccc47-5cad-4330-ae70-3f9c4af3abbf",
+      "digest": "bfb535f93b1bf796c48bffadcada85bb066c9ec328b45f13ee7c657fc709e478",
+      "evidence_types": [
+        "self-hosting-failure-worker-instance:process_pid=35440",
+        "self-hosting-failure-worker-instance:session_id_sha256=60362753c2a6929c",
+        "self-hosting-failure-worker-instance:workspace=DISPOSABLE_WORKTREE",
+        "pph-local-process-worker:process_pid=35440",
+        "pph-local-process-worker:session_id_sha256=60362753c2a6929c",
+        "pph-local-process-worker:workspace=DISPOSABLE_WORKTREE"
+      ],
+      "command": {
+        "command": "self-hosting:verify-failure",
+        "exit_code": 1,
+        "stdout_sha256": "5ac614b63e885e49b339e767cb3dacf191bec846cfb552c591c94959a7adf99a",
+        "stderr_sha256": "9068b4a1b43b735396aaf2f586c4b47ec763d4a58096b337795c44a101f30d2a",
+        "stdout_excerpt": "\n RUN  v4.1.9 /privateDISPOSABLE_WORKTREE\n\nx\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  17:30:09\n   Duration  90ms (transform 9ms, setup 0ms, import 15ms, tests 4ms, environment 0ms)\n\n",
+        "stderr_excerpt": "\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  packages/personal-pi/test/self-hosting-readiness-failure.test.ts > self-hosting rollback diagnostic > SELF_HOSTING_FAILURE_MARKER\nAssertionError: expected 'observed-controlled-failure' to be 'expected-success' // Object.is equality\n\nExpected: \"expected-success\"\nReceived: \"observed-controlled-failure\"\n\n ❯ packages/personal-pi/test/self-hosting-readiness-failure.test.ts:5:41\n      3| describe(\"self-hosting rollback diagnostic\", () => {\n      4|  it(\"SELF_HOSTING_FAILURE_MARKER\", () => {\n      5|   expect(\"observed-controlled-failure\").toBe(\"expected-success\");\n       |                                         ^\n      6|  });\n      7| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n"
+      }
+    },
+    "verification": {
+      "id": "1ed4e076-f303-4b17-9b7a-2d264af8893b",
+      "digest": "7faad5002ceeeb01ecf32fdd6fb29e99062805dd4fe85f79517f0d5e41eb87bf",
+      "status": "FAIL",
+      "confidence": "none",
+      "reasons": [
+        "missing evidence: independent_command",
+        "command failed: self-hosting:verify-failure"
+      ],
+      "checks": [
+        "command:self-hosting:verify-failure"
+      ]
+    },
+    "acceptance": {
+      "accepted": false,
+      "reject_reason": "verification is FAIL, not PASS",
+      "persisted_task_state": "FAILED",
+      "pipeline_acceptance_state": "FAILED"
+    },
+    "trace": {
+      "id": "1a375303-3e13-442c-8a54-dd37408dea24",
+      "digest": "1396406ce3942a30b062240643e61e7c385ea31f7aa5c72a23e6e0c4cd3e512b",
+      "outcome": "FAILED"
+    },
+    "worktree": {
+      "base_commit": "4553b93981004b2683ff58ca2088910e0e1cd4f4",
+      "base_tree": "f85676dc8a88d757c3534f3ec0fd8f46fb284b36",
+      "ref": "DISPOSABLE_WORKTREE",
+      "target": "packages/personal-pi/test/self-hosting-readiness-failure.test.ts",
+      "status_before_cleanup": "?? node_modules\n?? packages/personal-pi/test/self-hosting-readiness-failure.test.ts",
+      "worker_status_before_cleanup": "?? packages/personal-pi/test/self-hosting-readiness-failure.test.ts",
+      "infrastructure_paths_ignored": [
+        "node_modules"
+      ],
+      "target_only": true,
+      "patch_sha256": "98b1214fdae1021ef70d3f815b5b4941404f46f78b7a4816c1527f880f549e8a",
+      "patch_bytes": 520,
+      "patch_excerpt": "diff --git a/packages/personal-pi/test/self-hosting-readiness-failure.test.ts b/packages/personal-pi/test/self-hosting-readiness-failure.test.ts\nnew file mode 100644\nindex 000000000..59dc755d7\n--- /dev/null\n+++ b/packages/personal-pi/test/self-hosting-readiness-failure.test.ts\n@@ -0,0 +1,7 @@\n+import { describe, expect, it } from \"vitest\";\n+\n+describe(\"self-hosting rollback diagnostic\", () => {\n+\tit(\"SELF_HOSTING_FAILURE_MARKER\", () => {\n+\t\texpect(\"observed-controlled-failure\").toBe(\"expected-success\");\n+\t});\n+});\n"
+    },
+    "state": {
+      "file_sha256": "6569099d13097e6044a122c397d1c4ec0aa383ec857d328efdfcbfc174d11e47",
+      "counts": {
+        "tasks": 1,
+        "runs": 1,
+        "results": 1,
+        "evidence": 1,
+        "verifications": 1,
+        "traces": 1
+      }
+    },
+    "cleanup": {
+      "worktree_removed": true,
+      "worktree_list_contains_path": false,
+      "parent_removed": true
+    }
+  },
+  "snapshot_restore": {
+    "status": "PASS",
+    "implementation": "PersistentStateStore.createSnapshot + restoreSnapshotFromStore",
+    "baseline_commit": "4553b93981004b2683ff58ca2088910e0e1cd4f4",
+    "baseline_tree": "f85676dc8a88d757c3534f3ec0fd8f46fb284b36",
+    "checkpoint_created": true,
+    "snapshot_id": "670ce751-e5c0-4566-80c2-736d99cfc3ae",
+    "snapshot_digest": "f34a9002b94d2095811f056e3d6955ec02857fb77634fbc9576c87295a231d36",
+    "pre_restore_state_digest": "f34a9002b94d2095811f056e3d6955ec02857fb77634fbc9576c87295a231d36",
+    "readback_state_digest": "f34a9002b94d2095811f056e3d6955ec02857fb77634fbc9576c87295a231d36",
+    "readback_matches": true,
+    "mutated_state_digest": "9e65b9a8f454a177d5b62286dc8079f41e1f65dd1b23a88c8a9cf5b8240e27ca",
+    "restored_state_digest": "f34a9002b94d2095811f056e3d6955ec02857fb77634fbc9576c87295a231d36",
+    "restore_verified": true,
+    "digest_mismatch_rejected": true,
+    "digest_mismatch_reason": "snapshot digest mismatch",
+    "post_reject_state_digest": "f34a9002b94d2095811f056e3d6955ec02857fb77634fbc9576c87295a231d36",
+    "post_restore_state_file_sha256": "0e7cea61b7de2f974e044b3bdb8a8c2d46a38e7c5b89936b1cc60b7c17bcbad5",
+    "state_binding": {
+      "baseline_commit": "4553b93981004b2683ff58ca2088910e0e1cd4f4",
+      "baseline_tree": "f85676dc8a88d757c3534f3ec0fd8f46fb284b36",
+      "state_digest": "f34a9002b94d2095811f056e3d6955ec02857fb77634fbc9576c87295a231d36"
+    }
+  },
+  "final_baseline_readback": {
+    "branch": "feature/t1-task-contract",
+    "head": "4553b93981004b2683ff58ca2088910e0e1cd4f4",
+    "tree": "f85676dc8a88d757c3534f3ec0fd8f46fb284b36",
+    "status_porcelain": "",
+    "clean": true,
+    "baseline_unchanged": true
+  },
+  "validation": {
+    "self_development_focused": {
+      "status": "PASS",
+      "tests": 35
+    },
+    "personal_pi_core_full": {
+      "status": "PASS",
+      "tests": 209
+    },
+    "personal_pi_regression": {
+      "status": "PASS",
+      "tests": 23
+    },
+    "repository_scripts": {
+      "status": "PASS",
+      "tests": 29
+    },
+    "build": {
+      "status": "PASS"
+    },
+    "protocol_isolation": {
+      "status": "PASS"
+    },
+    "dependency_entry_boundary": {
+      "status": "PASS",
+      "pinned_dependencies": "PASS",
+      "runtime_dependencies": "PASS",
+      "ts_relative_imports": "PASS",
+      "entry_graphs": "PASS",
+      "coding_agent_install_lock": "PASS",
+      "browser_smoke": "PASS"
+    },
+    "git_diff_check_before_artifacts": {
+      "status": "PASS"
+    },
+    "known_upstream_failure": {
+      "status": "KNOWN_UPSTREAM_FAILURE_NOT_TOUCHED",
+      "fingerprint": "packages/ai/src/api/google-shared.ts(402,10): error TS2322: Type 'FinishReason.TOO_MANY_TOOL_CALLS' is not assignable to type 'never'."
+    },
+    "known_process_worker_warnings": {
+      "status": "KNOWN_EXISTING_WARNINGS_NOT_TOUCHED",
+      "warning_count": 2,
+      "fixes_applied": false
+    },
+    "full_root_check": {
+      "status": "NOT_RUN_BY_DESIGN",
+      "reason": "root check invokes biome --write"
+    }
+  },
+  "artifact_delivery": {
+    "requested_files": [
+      "docs/stage-gates/self-hosting-readiness-gate.md",
+      "docs/stage-gates/self-hosting-readiness-engineering-log.md",
+      "docs/stage-gates/evidence/self-hosting-readiness-2026-09-16.json"
+    ],
+    "optional_patch": "docs/stage-gates/evidence/self-hosting-readiness-success-2026-09-16.patch",
+    "source_files_changed": [],
+    "baseline_tag_modified": false,
+    "commit_push_merge_performed": false,
+    "note": "Requested evidence remains uncommitted by instruction; only declared artifacts may make the checkout dirty after delivery."
+  },
+  "aggregate": {
+    "successful_self_development": true,
+    "failed_self_development_fail_closed": true,
+    "snapshot_readback_and_digest_mismatch": true,
+    "regression_and_build": true,
+    "baseline_unchanged_after_drills": true,
+    "known_debt_not_suppressed": true,
+    "final_decision": "SELF_HOSTING_READY"
+  }
+}
