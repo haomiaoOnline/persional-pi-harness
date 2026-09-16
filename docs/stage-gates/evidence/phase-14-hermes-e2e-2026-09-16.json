@@ -1,0 +1,150 @@
+{
+  "schema_version": "1.0",
+  "phase": "Phase 14",
+  "stage": "T14.2",
+  "captured_at": "2026-09-16T01:35:35.934Z",
+  "evidence_base_sha": "a84dd4c1fc77096b064d5038e5d8e69f6ac04f51",
+  "baseline": {
+    "architecture_sha256": "31386a4490498665fbea0d580826acf11f767699a4b991ab03b49b930dc06480",
+    "task_list_sha256": "a48607de82aca989df6279c3b80d6ca27d58032558dcf3c75092eb3b8c24e99b"
+  },
+  "safety_boundary": {
+    "data_class": "synthetic_public_conformance_only",
+    "provider_allowlist": [
+      "custom"
+    ],
+    "repository_data_sent": false,
+    "resolved_context_sent": false,
+    "credentials_read_or_recorded": false,
+    "worker_tools_allowed": [],
+    "actions_requested": [],
+    "external_side_effects": false,
+    "auth_action": "none; existing Hermes runtime authentication was used without inspecting credentials"
+  },
+  "run": {
+    "task_id": "phase14-hermes-synthetic-e2e",
+    "pph_run_id": "pph-t14.2-hermes-e2e-20260916-01",
+    "worker_id": "phase14-hermes-cli",
+    "adapter_backend": "hermes-cli",
+    "provider_route": "custom@127.0.0.1",
+    "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+    "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+    "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+    "cli_version": "Hermes Agent v0.18.2 (2026.7.7.2) · upstream d59b79fa · local 43e566f7 (+1 carried commit)",
+    "hermes_session_id": "20260916_093528_3383fb",
+    "hermes_task_id": "1069a6df-9544-4929-b164-73d68d6c2406",
+    "request_id": null,
+    "response_id": null,
+    "identity_source": "post_api_request.response_model",
+    "source_event": "post_api_request",
+    "api_call_count": 1,
+    "started_at": "2026-09-16T01:35:24.293652+00:00",
+    "ended_at": "2026-09-16T01:35:35.564134+00:00",
+    "finish_reason": "stop",
+    "api_mode": "chat_completions",
+    "base_url_host": "127.0.0.1",
+    "usage": {
+      "input_tokens": 14896,
+      "output_tokens": 460,
+      "total_tokens": 19452
+    },
+    "prompt_response_captured": false,
+    "result_status": "success",
+    "result_contract_digest": "94e31d732d9e808ea0359f21c6cee858d674bfc7866ae4e385e0bf85ba88b44b",
+    "result_digest": "cb03afb9e0abcee958d156cc5d2f700bfb24000ba128bd4dfac26ce6107f4ed7",
+    "work_receipt_digest": "9402d6a4c2f96ac954f342243cb9b17e7111f85728978521dc7b2e1cad4eb485",
+    "evidence_digest": "ceed40ed8eea90f6b44f1de3417e95ff84df7e454f421a3a1d4ee296b2e20c1a",
+    "evidence_record_digest": "9950a47388d4fae86793ccbb3dc3d3f787e5c61eff96dbe22053d92442de9334",
+    "verification_id": "8374474b-6bb8-4472-8256-cbc2688cc51b",
+    "verification_digest": "28dd4b1efde58b09717d4570b4870828a87a1f9feddcd01c9a8a4b30070b3e6c"
+  },
+  "result_receipt_evidence_verification": {
+    "result_status": "success",
+    "changed_files": [],
+    "artifacts": [],
+    "work_receipt": {
+      "work_attempted": true,
+      "effects_count": 0,
+      "state_changed": false,
+      "no_op": true,
+      "no_op_reason_present": true,
+      "evidence_ref_count": 19
+    },
+    "evidence_id": "b73d6d77-9f39-4324-b389-6c71b97575e7",
+    "evidence_types": [
+      "worker_result",
+      "hermes_identity",
+      "hermes_receipt",
+      "heterogeneous_backend"
+    ],
+    "verification_status": "PASS",
+    "verification_confidence": "strong",
+    "verification_checks": [
+      "command:phase14-hermes-identity-shape"
+    ]
+  },
+  "identity_attestation": {
+    "pph_run_id_equals_hermes_event_run_id": true,
+    "hermes_session_id_present": true,
+    "hermes_task_id_present": true,
+    "response_side_model_equals_requested": true,
+    "configured_model_not_used_as_observed_identity": true,
+    "provider_backend_observed_in_same_event": true,
+    "api_request_event_count_positive": true
+  },
+  "heterogeneous_backend_comparison": {
+    "current": {
+      "adapter_backend": "hermes-cli",
+      "provider": "custom",
+      "base_url_host": "127.0.0.1",
+      "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731"
+    },
+    "phase12_pi_baseline_evidence": "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json",
+    "baseline": {
+      "backend": "pi-agent",
+      "provider": "opencodex",
+      "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731"
+    },
+    "different_adapter_backend": true,
+    "different_provider_route": true
+  },
+  "boundary_attestation": {
+    "phase12_phase13_retested_or_redefined": false,
+    "controller_dag_verification_persistent_state_files_touched": [],
+    "phase14_code_scope": [
+      "packages/personal-pi/src/adapters/hermes-cli.ts",
+      "packages/personal-pi/adapters/hermes-cli.ts",
+      "packages/personal-pi/examples/worker-plugins/hermes-cli-custom.plugin_manifest.yaml",
+      "packages/personal-pi/src/index.ts (Hermes export glue)",
+      "packages/personal-pi/package.json (E2E script entry)",
+      "packages/personal-pi/scripts/hermes-worker-bridge.py",
+      "packages/personal-pi/test/hermes-cli-adapter.test.ts",
+      "packages/personal-pi/scripts/phase-14-hermes-e2e.mjs"
+    ],
+    "core_boundaries_untouched": [
+      "Controller",
+      "DAG",
+      "Verification implementation",
+      "Persistent State implementation"
+    ]
+  },
+  "gate_checks": {
+    "real_hermes_cli_execution": true,
+    "same_run_pph_hermes_binding": true,
+    "response_side_runtime_model": true,
+    "provider_backend_identity": true,
+    "result_receipt_evidence_verification": true,
+    "heterogeneous_backend": true,
+    "no_tool_or_action_escalation": true,
+    "no_workspace_effect": true
+  },
+  "phase14_t14_2": "PASS",
+  "phase14_overall": "PASS",
+  "phase12": "PASS_UNCHANGED",
+  "phase13_t13_4": "PASS_UNCHANGED",
+  "p0_multi_worker_mvp": "PASS_UNCHANGED",
+  "known_external_gaps": {
+    "GAP_01_codex_runtime_identity": "OPEN_NON_BLOCKING",
+    "GAP_03_agy_runtime_identity": "OPEN_NON_BLOCKING"
+  }
+}

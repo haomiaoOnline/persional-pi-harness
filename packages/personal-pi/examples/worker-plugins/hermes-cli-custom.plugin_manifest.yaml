@@ -1,0 +1,15 @@
+worker_plugin:
+  id: hermes-cli-custom
+  adapter_entry: adapters/hermes-cli.ts
+  models_supported:
+    - model: ArkCoding/deepseek-v4-flash-ga-260731
+      reasoning_levels:
+        - high
+  capability_tags:
+    - coding
+  context_limit: 1048576
+  cost_tier: standard
+  auth:
+    type: none
+  discovery:
+    type: static_config

@@ -1,0 +1,325 @@
+{
+  "phase": "Phase 14",
+  "baseline": "v3.2",
+  "generated_at": "2026-09-16T01:35:35.934Z",
+  "authority": {
+    "architecture_document_sha256": "31386a4490498665fbea0d580826acf11f767699a4b991ab03b49b930dc06480",
+    "task_list_document_sha256": "a48607de82aca989df6279c3b80d6ca27d58032558dcf3c75092eb3b8c24e99b",
+    "mounted_data_directory": "/mnt/data",
+    "mounted_data_directory_available": false,
+    "authority_source": "user-supplied v3.2 attachments resolved from the referenced conversation",
+    "older_documents_used_as_standard": false
+  },
+  "repository_boundary": {
+    "branch": "feature/t1-task-contract",
+    "head": "a84dd4c1fc77096b064d5038e5d8e69f6ac04f51",
+    "worktree_dirty": true,
+    "origin_main_ahead": 29,
+    "origin_main_behind": 0,
+    "upstream": null,
+    "preexisting_phase12_phase13_source_changes": [
+      "packages/personal-pi/src/adapters/cli-runtime.ts",
+      "packages/personal-pi/src/bound-coverage.ts",
+      "packages/personal-pi/src/graph-intelligence.ts",
+      "packages/personal-pi/src/index.ts",
+      "packages/personal-pi/src/persistence.ts",
+      "packages/personal-pi/src/provider-resilience.ts",
+      "packages/personal-pi/src/types.ts",
+      "packages/personal-pi/src/worker-pool.ts"
+    ],
+    "phase14_source_delta": [
+      "packages/personal-pi/src/adapters/hermes-cli.ts",
+      "packages/personal-pi/adapters/hermes-cli.ts",
+      "packages/personal-pi/examples/worker-plugins/hermes-cli-custom.plugin_manifest.yaml",
+      "packages/personal-pi/src/index.ts (Hermes export glue)",
+      "packages/personal-pi/package.json (E2E script entry)",
+      "packages/personal-pi/scripts/hermes-worker-bridge.py",
+      "packages/personal-pi/scripts/phase-14-hermes-e2e.mjs",
+      "packages/personal-pi/test/hermes-cli-adapter.test.ts"
+    ],
+    "phase14_core_layer_delta": [],
+    "push_merge_tag_performed": false,
+    "upstream_known_failure_file_modified": false
+  },
+  "t14_1_adapter_manifest_registry": {
+    "status": "PASS",
+    "interpretation": "T14.1 retains the existing Codex registration and adds the Hermes Adapter/manifest registration; no new controller or orchestration branch was added.",
+    "adapter_id": "codex-cli",
+    "adapter_source": "packages/personal-pi/src/adapters/codex-cli.ts",
+    "adapter_entry": "packages/personal-pi/adapters/codex-cli.ts",
+    "manifest": "packages/personal-pi/examples/worker-plugins/codex-cli-existing-session.plugin_manifest.yaml",
+    "manifest_id": "codex-cli-existing-session",
+    "manifest_auth_type": "none",
+    "manifest_models": [
+      {
+        "model": "gpt-5.6-sol",
+        "reasoning_levels": [
+          "medium",
+          "high"
+        ]
+      }
+    ],
+    "registry_path": "packages/personal-pi/src/registry.ts",
+    "adapter_source_sha256_head_and_current": "17bed39e1ea3f0a81c0664f988a4112ef028b2e5e3c6e700f30575b769ecbb7c",
+    "adapter_entry_sha256_head_and_current": "900b9f115332f22d4dceaaea0d130a82246e23ca4b2e55a659cf5cd29a813e63",
+    "manifest_sha256_head_and_current": "65b6ed67f4e47f94ad3537e23111c27ca2cb882170567c5777c2d34901cd8b6c",
+    "registry_sha256_head_and_current": "359163966a703ac41f7b9c3b09e15fd8a0ba65af6c57798506037f6ed8df40be",
+    "plugin_schema_sha256_head_and_current": "39fe98ad42a23f5c3e769486925d9ca88a745d76254ec630ac5fec992dbba43d",
+    "controller_dag_verification_persistent_state_phase14_files_touched": [],
+    "task_contract_result_receipt_evidence_verification_path_preserved": true,
+    "tool_and_action_bridge": "fail-closed; Codex allowed_tools and requested_actions must be empty",
+    "hermes_route": {
+      "status": "PASS",
+      "adapter_source": "packages/personal-pi/src/adapters/hermes-cli.ts",
+      "adapter_entry": "packages/personal-pi/adapters/hermes-cli.ts",
+      "manifest": "packages/personal-pi/examples/worker-plugins/hermes-cli-custom.plugin_manifest.yaml",
+      "manifest_id": "hermes-cli-custom",
+      "backend": "hermes-cli",
+      "model": "ArkCoding/deepseek-v4-flash-ga-260731",
+      "reasoning_levels": ["high"],
+      "auth_type": "none",
+      "registry": "existing generic WorkerRegistry; no registry core change",
+      "bridge_boundary": "fixed synthetic probe; no arbitrary stdin, no configured toolsets, tool calls blocked"
+    }
+  },
+  "t14_2_codex_identity_probe": {
+    "status": "NOT_READY",
+    "requested_model": "gpt-5.6-sol",
+    "codex_version": "codex-cli 0.154.0",
+    "backend_command": "codex",
+    "probe_data_class": "public synthetic",
+    "isolated_workspace": true,
+    "repository_source_files_read": false,
+    "credentials_read": false,
+    "attempts": [
+      {
+        "attempt": 1,
+        "loop_budget_max_input_tokens": 12000,
+        "process_pid": 26426,
+        "session_id_sha256": "e04da5bca74c6c2d",
+        "parsed_events": 5,
+        "event_types": [
+          "item.completed",
+          "thread.started",
+          "turn.completed",
+          "turn.started"
+        ],
+        "item_types": [
+          "agent_message",
+          "error"
+        ],
+        "top_level_keys": [
+          "item",
+          "thread_id",
+          "type",
+          "usage"
+        ],
+        "identity_fields_seen": [],
+        "identity_event_types": [],
+        "observed_runtime_model": "unknown",
+        "provider": "unknown",
+        "result_status": "failure",
+        "verification_status": "FAIL",
+        "failure_class": "loop_budget_exhausted"
+      },
+      {
+        "attempt": 2,
+        "loop_budget_max_input_tokens": 50000,
+        "process_pid": 27085,
+        "session_id_sha256": "a02175e1516df38e",
+        "parsed_events": 5,
+        "event_types": [
+          "item.completed",
+          "thread.started",
+          "turn.completed",
+          "turn.started"
+        ],
+        "item_types": [
+          "agent_message",
+          "error"
+        ],
+        "top_level_keys": [
+          "item",
+          "thread_id",
+          "type",
+          "usage"
+        ],
+        "identity_fields_seen": [],
+        "identity_event_types": [],
+        "observed_runtime_model": "unknown",
+        "provider": "unknown",
+        "platform_accepted_model": "unknown",
+        "result_status": "success",
+        "work_receipt": {
+          "no_op": true,
+          "effects_count": 0
+        },
+        "evidence_types_include": [
+          "codex-cli:process",
+          "codex-cli:events=5",
+          "codex-cli:process_pid=27085",
+          "codex-cli:session_id_sha256=a02175e1516df38e",
+          "independent_command"
+        ],
+        "verification_status": "PASS",
+        "verification_confidence": "strong",
+        "task_state": "DONE",
+        "run_status": "SUCCEEDED",
+        "trace_outcome": "DONE"
+      }
+    ],
+    "same_run_binding": false,
+    "attestation_result": "NO_ATTESTATION",
+    "decision": "Do not substitute requested_model, configured model, UI metadata, or unbound logs for observed runtime identity. Keep GAP-01 fail-closed and non-blocking."
+  },
+  "t14_2_hermes_identity_probe": {
+    "status": "PASS",
+    "evidence_file": "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json",
+    "hermes_version": "Hermes Agent v0.18.2 (2026.7.7.2)",
+    "backend": "hermes-cli",
+    "provider_route": "custom@127.0.0.1",
+    "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+    "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+    "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+    "pph_run_id": "pph-t14.2-hermes-e2e-20260916-01",
+    "hermes_session_id": "20260916_093528_3383fb",
+    "hermes_task_id": "1069a6df-9544-4929-b164-73d68d6c2406",
+    "identity_source": "post_api_request.response_model",
+    "source_event": "post_api_request",
+    "api_call_count": 1,
+    "started_at": "2026-09-16T01:35:24.293652+00:00",
+    "ended_at": "2026-09-16T01:35:35.564134+00:00",
+    "finish_reason": "stop",
+    "api_mode": "chat_completions",
+    "base_url_host": "127.0.0.1",
+    "request_id": null,
+    "response_id": null,
+    "result_status": "success",
+    "work_receipt_no_op": true,
+    "verification_status": "PASS",
+    "verification_confidence": "strong",
+    "same_run_binding": true,
+    "repository_data_sent": false,
+    "resolved_context_sent": false,
+    "credentials_read": false,
+    "worker_tools_allowed": [],
+    "requested_actions": [],
+    "prompt_response_captured": false,
+    "heterogeneous_with": {
+      "backend": "pi-agent",
+      "provider": "opencodex",
+      "evidence": "docs/stage-gates/evidence/phase-12-real-heterogeneous-2026-09-15.json"
+    },
+    "decision": "PASS: Hermes response-side identity closes T14.2; Codex GAP-01 remains OPEN_NON_BLOCKING."
+  },
+  "alternative_second_cri_inventory": {
+    "claude": "absent",
+    "gemini": "absent",
+    "opencode": "absent",
+    "cursor": "GUI 3.18.9; not a headless Worker backend",
+    "pi": "present but is the already-used baseline PI CRI, not a new replacement second CRI",
+    "hermes": "present; real synthetic E2E PASS with machine-attested response-side identity",
+    "agy": "present; response-side identity unavailable; retained as GAP-03",
+    "usable_alternative_with_machine_attested_identity": true,
+    "selected_alternative": "hermes-cli/custom@127.0.0.1"
+  },
+  "known_external_gap": {
+    "id": "GAP-01",
+    "resolution": "Phase 14 Multi-CRI",
+    "mvp_impact": "NON_BLOCKING",
+    "status": "OPEN_NON_BLOCKING",
+    "observed_runtime_model": "unknown",
+    "provider": "unknown",
+    "evidence_basis": "Two current-version same-run Codex JSONL probes had session and PID evidence but no provider/model/runtime identity fields.",
+    "other_non_blocking_gaps": ["GAP-03"]
+  },
+  "known_upstream_failure": {
+    "file": "packages/ai/src/api/google-shared.ts",
+    "line": 402,
+    "diagnostic": "TS2322 FinishReason.TOO_MANY_TOOL_CALLS is not assignable to never",
+    "source_sha256": "fa9a45177b6c1e1636b8b1ef4c8b332e903e4b379039cb1bacbbc312a8e1662d",
+    "modified": false,
+    "broad_bypass_used": false
+  },
+  "validation": {
+    "core_build": {
+      "command": "npm run build --workspace=@personal-pi/core",
+      "status": "PASS"
+    },
+    "phase14_focused_tests": {
+      "command": "npm exec --workspace @personal-pi/core vitest -- run test/cli-adapters.test.ts test/plugin.test.ts test/registry.test.ts test/persistence.test.ts test/process-worker.test.ts test/external-gaps.test.ts test/hermes-cli-adapter.test.ts",
+      "test_files": 7,
+      "tests": 36,
+      "status": "PASS"
+    },
+    "hermes_real_worker_e2e": {
+      "command": "npm run phase-14-hermes-e2e --workspace=@personal-pi/core",
+      "evidence": "docs/stage-gates/evidence/phase-14-hermes-e2e-2026-09-16.json",
+      "result_status": "success",
+      "verification_status": "PASS",
+      "verification_confidence": "strong",
+      "status": "PASS"
+    },
+    "personal_pi_core_full_tests": {
+      "command": "npm run test --workspace=@personal-pi/core",
+      "test_files": 37,
+      "tests": 199,
+      "status": "PASS"
+    },
+    "protocol_isolation": {
+      "command": "npm run check:protocol-isolation --workspace=@personal-pi/core",
+      "status": "PASS"
+    },
+    "personal_pi_regression": {
+      "command": "npm run test:personal-pi-regression",
+      "test_files": 3,
+      "tests": 23,
+      "status": "PASS"
+    },
+    "repository_checks": {
+      "check:pinned-deps": "PASS",
+      "check:runtime-deps": "PASS",
+      "check:ts-imports": "PASS",
+      "check:entry-graphs": "PASS",
+      "check:shrinkwrap": "PASS",
+      "check:install-lock:coding-agent": "PASS",
+      "check:browser-smoke": "PASS",
+      "git_diff_check": "PASS"
+    },
+    "full_check": {
+      "command": "npm run check",
+      "status": "NOT_GREEN",
+      "reason": "Biome fixed 8 files, then reported two existing warnings in packages/personal-pi/src/process-worker.ts: unused asRecord and unused request parameter; the command stopped before later subchecks.",
+      "phase14_source_delta_after_check": []
+    },
+    "typescript": {
+      "command": "./node_modules/.bin/tsgo --noEmit",
+      "status": "KNOWN_UPSTREAM_FAILURE",
+      "exit_code": 2,
+      "diagnostics": [
+        "packages/ai/src/api/google-shared.ts:402 TS2322 FinishReason.TOO_MANY_TOOL_CALLS is not assignable to never"
+      ]
+    },
+    "upgrade_gate": {
+      "status": "NOT_RUN",
+      "reason": "The repository gate requires a clean checkout and a configured upstream; this user-scoped Phase 14 boundary intentionally retains uncommitted Phase 12/13 changes and has no upstream."
+    }
+  },
+  "stage_gate": {
+    "phase12_v3_2": "PASS_UNCHANGED",
+    "phase13_t13_4": "PASS_UNCHANGED",
+    "p0_multi_worker_mvp": "PASS_UNCHANGED",
+    "phase14": "PASS",
+    "blocking_exit": null,
+    "selected_heterogeneous_route": "hermes-cli/custom@127.0.0.1",
+    "t14_2_exit": "PASS: same-run Hermes post_api_request response-side identity is machine-verifiable",
+    "phase12_phase13_retested_or_redefined": false,
+    "follow_up_todos": [
+      {
+        "priority": "P2",
+        "item": "pph doctor --worker-clis (or equivalent) bounded local CLI discovery",
+        "blocking": false
+      }
+    ]
+  }
+}

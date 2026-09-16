@@ -1,5 +1,6 @@
 export * from "./adapters/cli-runtime.ts";
 export * from "./adapters/codex-cli.ts";
+export * from "./adapters/hermes-cli.ts";
 export * from "./adapters/pi-cli.ts";
 export * from "./artifacts.ts";
 export * from "./bound-coverage.ts";
