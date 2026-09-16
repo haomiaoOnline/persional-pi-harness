@@ -1,3 +1,4 @@
+export * from "./adapters/agy-cli.ts";
 export * from "./adapters/cli-runtime.ts";
 export * from "./adapters/codex-cli.ts";
 export * from "./adapters/hermes-cli.ts";

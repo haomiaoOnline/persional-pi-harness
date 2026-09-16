@@ -1,0 +1,15 @@
+worker_plugin:
+  id: agy-cli-existing-session
+  adapter_entry: adapters/agy-cli.ts
+  models_supported:
+    - model: gemini-3.8-flash-low
+      reasoning_levels:
+        - low
+  capability_tags:
+    - coding
+  context_limit: 24000
+  cost_tier: standard
+  auth:
+    type: none
+  discovery:
+    type: static_config

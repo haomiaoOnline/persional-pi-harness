@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-16T01:01:45.391Z",
+  "candidate": "Apy CLI (actual binary: agy)",
+  "actual_cli": {
+    "binary_name": "agy",
+    "path": "/Users/chenglong/.local/bin/agy",
+    "version": "1.2.3",
+    "architecture": "arm64",
+    "output_formats": ["text", "json", "stream-json"],
+    "input_formats": ["text", "stream-json"],
+    "supported_efforts": ["low", "medium", "high"],
+    "noninteractive": ["--print", "-p"],
+    "trace_or_telemetry_surface": ["stream-json event stream", "--log-file"],
+    "subcommands": [
+      "agent",
+      "agents",
+      "changelog",
+      "help",
+      "install",
+      "mcp",
+      "mic-serve",
+      "models",
+      "plugin",
+      "plugins",
+      "remote-control",
+      "update"
+    ]
+  },
+  "real_e2e": {
+    "status": "completed",
+    "task_id": "agy-candidate-real-20260916",
+    "pph_run_id": "a04644c6-7e8a-4146-968b-49973b0b665c",
+    "agy_run": {
+      "id_field": "conversation_id",
+      "conversation_id_sha256": "e5eae7f854c5ad95",
+      "request_id_sha256": null,
+      "requested_model": "gemini-3.8-flash-low",
+      "configured_model": "gemini-3.8-flash-low",
+      "observed_runtime_model": null,
+      "provider_backend": null,
+      "identity_source": "none",
+      "identity_fields_seen": [],
+      "started_at": "2026-09-16T01:01:36.042Z",
+      "ended_at": "2026-09-16T01:01:45.382Z",
+      "finish_reason": null
+    },
+    "request_prompt_id": null,
+    "stream": {
+      "parsed_events": 5,
+      "model_calls": 1,
+      "tool_calls": 0,
+      "input_tokens": 15117,
+      "output_tokens": 91,
+      "timed_out": false,
+      "event_types": ["init", "step_update", "result"]
+    },
+    "result": {
+      "status": "failure",
+      "worker_id": "agy-cli-existing-session",
+      "errors": [
+        "runtime_identity_unavailable",
+        "missing_response_model",
+        "missing_provider_backend"
+      ],
+      "changed_files": [],
+      "artifacts": []
+    },
+    "work_receipt": {
+      "work_attempted": true,
+      "effects_count": 0,
+      "artifacts_created": [],
+      "state_changed": false,
+      "no_op": true,
+      "no_op_reason": "No permitted Agy workspace effect was observed"
+    },
+    "evidence": {
+      "id": "dfe1363a-5667-42b5-90f7-e8b266a92a06",
+      "evidence_types": [
+        "agy-cli:process",
+        "agy-cli:events=5",
+        "agy-cli:process_pid=22060",
+        "agy-cli:session_id_sha256=e5eae7f854c5ad95",
+        "agy-cli:input_tokens=15117",
+        "agy-cli:input_accounting=provider_total_fail_closed",
+        "agy-cli:pph_projected_input_budget=30000",
+        "agy-cli:effective_provider_input_budget=30000",
+        "agy-cli:output_tokens=91",
+        "agy-cli:identity_fields=none",
+        "agy-cli:conversation_id_sha256=e5eae7f854c5ad95",
+        "agy-cli:runtime_identity_unavailable",
+        "runtime_identity_unavailable"
+      ],
+      "diff_files": [],
+      "command_count": 0,
+      "stdout_bytes": 71,
+      "stderr_bytes": 78
+    },
+    "verification": {
+      "id": "5d0175bb-8858-4974-b120-af48c8e31091",
+      "status": "FAIL",
+      "verification_confidence": "none",
+      "reasons": ["worker result reported failure"]
+    },
+    "persisted_counts": {
+      "tasks": 1,
+      "runs": 1,
+      "results": 1,
+      "evidence": 1,
+      "verifications": 1
+    }
+  },
+  "digests": {
+    "result": "5e4fdfbda6b1ffdc476147f8a81d0372af9b8c6f78cf115672b4968954c56f3a",
+    "work_receipt": "d67e32971f2ef856d467ba9ca8035e6d6a86bf1aec535994a7dfcfe7ef4e82d9",
+    "evidence": "d1b1eeb457d352c236c8f313333fe0ca97d37de901176fc6ea8a61a27cdea136",
+    "verification": "31857c39722c23411a6195ffff5799fe8e9c513e7ad747be985f855c75aa27e6"
+  },
+  "heterogeneity": {
+    "baseline_backend": "pi-agent",
+    "baseline_cli": "pi",
+    "candidate_backend": "agy-cli",
+    "candidate_cli": "agy",
+    "separate_executable": true,
+    "separate_adapter": true
+  },
+  "decision": {
+    "candidate_verdict": "BLOCKED_TELEMETRY",
+    "gap_id": "GAP-03",
+    "phase_14_overall": "NOT_READY_UNCHANGED",
+    "phase_12_13": "PASS_UNCHANGED",
+    "formal_line": "independent Agy candidate only; Hermes evidence untouched"
+  },
+  "privacy": {
+    "prompt_recorded": false,
+    "response_recorded": false,
+    "credential_content_recorded": false,
+    "conversation_ids_hashed": true,
+    "request_ids_hashed": true
+  }
+}
