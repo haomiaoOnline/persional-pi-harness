@@ -90,7 +90,7 @@ function terminateProcess(child: ChildProcessWithoutNullStreams): void {
 	}
 }
 
-function asRecord(value: JsonValue | undefined): Record<string, JsonValue> | undefined {
+function _asRecord(value: JsonValue | undefined): Record<string, JsonValue> | undefined {
 	return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 }
 
@@ -256,7 +256,7 @@ export class ProcessWorkerAdapter implements WorkerProcessLifecycle {
 	}
 
 	private async executeInProcess(
-		request: WorkerProtocolRequest,
+		_request: WorkerProtocolRequest,
 		input: WorkerExecutionInput,
 	): Promise<WorkerExecutionOutput> {
 		try {

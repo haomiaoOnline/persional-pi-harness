@@ -37,6 +37,7 @@ import {
 	type StreamOptions,
 } from "@earendil-works/pi-ai";
 import * as builtinProviderCatalog from "@earendil-works/pi-ai/providers/all";
+import { opencodexProvider } from "@earendil-works/pi-ai/providers/opencodex";
 import { getAgentDir } from "../config.ts";
 import { operationSignal, raceWithAbortSignal } from "../utils/abort.ts";
 import { AuthStorage as DefaultAuthStorage } from "./auth-storage.ts";
@@ -183,7 +184,7 @@ export class ModelRuntime implements Models {
 		const providers = builtinProviderCatalog
 			.builtinProviders()
 			.map((provider) =>
-				provider.id === "radius"
+				provider.id === "radius" || provider.id === "opencodex"
 					? provider
 					: withRemoteCatalog(provider, options.catalogBaseUrl, builtinModelDataGeneratedAt),
 			);
@@ -218,7 +219,13 @@ export class ModelRuntime implements Models {
 
 	private configureRadiusProviders(): void {
 		this.builtins.clear();
-		for (const [providerId, provider] of this.defaultBuiltins) this.builtins.set(providerId, provider);
+		for (const [providerId, provider] of this.defaultBuiltins) {
+			const config = this.config.getProvider(providerId);
+			this.builtins.set(
+				providerId,
+				providerId === "opencodex" && config?.baseUrl ? opencodexProvider({ baseUrl: config.baseUrl }) : provider,
+			);
+		}
 		for (const providerId of this.config.getProviderIds()) {
 			const config = this.config.getProvider(providerId);
 			if (config?.oauth !== "radius" || !config.baseUrl) continue;
