@@ -175,6 +175,23 @@ export class BudgetController {
 		this.persist();
 	}
 
+	releaseDispatch(taskId: string, activeWorkers: number, concurrentRoles: number): void {
+		if (activeWorkers < 0)
+			throw new BudgetExceededError("max_active_workers", "active worker count cannot be negative");
+		if (concurrentRoles < 0)
+			throw new BudgetExceededError("max_concurrent_roles", "concurrent role count cannot be negative");
+		this.usage.active_workers = activeWorkers;
+		this.usage.concurrent_roles = concurrentRoles;
+		this.decisions.push({
+			id: randomUUID(),
+			dimension: "coordination",
+			action: "ALLOW",
+			reason: `task=${taskId} released, workers=${activeWorkers}, roles=${concurrentRoles}`,
+			at: now(),
+		});
+		this.persist();
+	}
+
 	increase(
 		decomposition: Partial<DecompositionBudget>,
 		coordination: Partial<CoordinationBudget>,

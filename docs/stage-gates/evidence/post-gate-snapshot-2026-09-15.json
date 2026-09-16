@@ -1,0 +1,38 @@
+{
+  "artifact": "post-gate-persistent-state-snapshot",
+  "baseline": "v3.2",
+  "generated_at": "2026-09-15T22:03:02.000Z",
+  "purpose": "T5.4 post-gate close-out after Phase 12 and Phase 13 PASS",
+  "gate_inputs": {
+    "phase12_gate": "PASS",
+    "phase13_gate": "PASS",
+    "phase12_gate_document_sha256": "7672d4d397cce66c04c0b46a0e82b5df61f909a423ee3815369b4316789e1553",
+    "phase13_gate_document_sha256": "1d7cc5655d89a0050c05659ea5f16c85ff97cf7e50a9272a97d0a25113422a38",
+    "phase12_evidence_sha256": "0a80ce2e0a87e3eb1051cfc26e336477b3da04bfa7b8c8f3241d2ca9560600c1",
+    "phase13_evidence_sha256": "5808b5b96085536f34b7ce3ba3005d92478e97e18315c3f416d7a02fa15d2963"
+  },
+  "snapshot": {
+    "implementation": "PersistentStateStore.createSnapshot + restoreSnapshotFromStore",
+    "snapshot_id": "a80e9faf-52e4-472c-82fd-b735accb2999",
+    "snapshot_digest": "6be73b4135f3e1b2b2051f5b8e61d880bc27bd2290e84229669cbcb4dd2ee9db",
+    "persisted_snapshot_loaded": true,
+    "pre_restore_state_digest": "6be73b4135f3e1b2b2051f5b8e61d880bc27bd2290e84229669cbcb4dd2ee9db",
+    "mutated_state_digest": "bbc297a413e41be54bd1999f370d10b70e9a98e7e3d81ab290c5dcc02263f352",
+    "restored_state_digest": "6be73b4135f3e1b2b2051f5b8e61d880bc27bd2290e84229669cbcb4dd2ee9db",
+    "restore_verified": true,
+    "digest_mismatch_rejected": true,
+    "post_restore_state_file_sha256": "1219fc8faefd14d0b7d7de01fcce533c94e722c31ca4bdb3e1f3473a874fe633",
+    "fixture_state_counts": {
+      "worker_instances": 1,
+      "decisions": 1,
+      "snapshots": 1
+    }
+  },
+  "scope": {
+    "state_source": "synthetic non-secret PersistentState fixture",
+    "note": "This is a post-gate restore drill and evidence artifact; it does not replay or redefine the retired Phase 12/13 execution runs.",
+    "secrets_read": false,
+    "external_side_effects": false
+  },
+  "result": "PASS"
+}

@@ -65,6 +65,15 @@ export const V3_FEEDBACK_PATHS: readonly FeedbackPathCoverage[] = [
 			"loop-budget.integration.test.ts: reassign handoff exhaustion; controller-restart.integration.test.ts: epoch fencing",
 	},
 	{
+		path_id: "worker-process-crash-reassign",
+		feedback_path: "Worker process crash/timeout -> Pool reclaim -> reassign -> late Result",
+		deterministic_bound: "PersistentStateStore.lease_epochs plus coordination max_active_workers",
+		runtime_enforcement: "WorkerPool.reclaim removes the active lease; WorkerPool.execute rejects a stale epoch",
+		persistence: "PersistentStateStore.worker_instances, leases and lease_epochs",
+		exhaustion_behavior: "crashed instance becomes DEAD; late Result is REJECTED_STALE_EPOCH; no second active lease",
+		test_evidence: "process-worker.test.ts: crash, reclaim, reassignment and stale-result fencing",
+	},
+	{
 		path_id: "decomposer-replan",
 		feedback_path: "Decomposer -> replan -> Decomposer",
 		deterministic_bound: "DecompositionBudget.max_replan_count",

@@ -1,6 +1,9 @@
 export type ProviderCircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 export type ProviderAdmissionAction = "ALLOW" | "QUEUE" | "FALLBACK";
 
+import type { ResultContract, WorkerExecutionControls, WorkerProtocolRequest } from "./types.ts";
+import type { WorkerAdapter } from "./worker.ts";
+
 export interface ProviderResilienceConfig {
 	provider_id: string;
 	rate_limit: {
@@ -226,5 +229,86 @@ export class ProviderResilienceController {
 		const provider = this.providers.get(providerId);
 		if (!provider) throw new ProviderResilienceError(`unknown provider: ${providerId}`);
 		return provider;
+	}
+}
+
+export interface ProviderResilientWorkerAdapterOptions {
+	adapter: WorkerAdapter;
+	provider_id: string;
+	controller: ProviderResilienceController;
+	fallback_provider_id?: string;
+	response_status?: (result: ResultContract) => number;
+}
+
+function providerAdmissionFailure(
+	request: WorkerProtocolRequest,
+	workerId: string,
+	admission: ProviderAdmission,
+): ResultContract {
+	return {
+		task_id: request.task.id,
+		run_id: request.run_id ?? `provider-queue-${request.task.id}`,
+		worker_id: workerId,
+		lease_epoch: request.protocol.lease_epoch,
+		status: "failure",
+		summary: "provider admission blocked the Worker execution",
+		changed_files: [],
+		artifacts: [],
+		evidence: [
+			`${admission.provider_id}:admission=QUEUE`,
+			`${admission.provider_id}:queue_depth=${admission.queue_depth}`,
+		],
+		errors: [`provider backpressure: ${admission.reason}`],
+		work_receipt: {
+			work_attempted: false,
+			effects_count: 0,
+			artifacts_created: [],
+			state_changed: false,
+			no_op: true,
+			no_op_reason: "provider backpressure queue",
+			evidence_refs: [],
+		},
+	};
+}
+
+/** Applies one shared provider admission controller to every Worker instance. */
+export class ProviderResilientWorkerAdapter implements WorkerAdapter {
+	readonly worker_id: string;
+	readonly provider_id: string;
+	private readonly adapter: WorkerAdapter;
+	private readonly controller: ProviderResilienceController;
+	private readonly fallbackProviderId?: string;
+	private readonly responseStatus: (result: ResultContract) => number;
+
+	constructor(options: ProviderResilientWorkerAdapterOptions) {
+		if (!options.provider_id) throw new ProviderResilienceError("provider_id must not be empty");
+		this.worker_id = options.adapter.worker_id;
+		this.provider_id = options.provider_id;
+		this.adapter = options.adapter;
+		this.controller = options.controller;
+		this.fallbackProviderId = options.fallback_provider_id;
+		this.responseStatus = options.response_status ?? ((result) => (result.status === "success" ? 200 : 500));
+	}
+
+	async execute(request: WorkerProtocolRequest, controls?: WorkerExecutionControls): Promise<ResultContract> {
+		const admission = this.controller.admit(this.provider_id, {
+			fallback_provider_id: this.fallbackProviderId,
+		});
+		if (admission.action === "QUEUE") return providerAdmissionFailure(request, this.worker_id, admission);
+		try {
+			const result = await this.adapter.execute(request, controls);
+			this.controller.recordResponse(admission.provider_id, this.responseStatus(result));
+			return {
+				...result,
+				evidence: [
+					...result.evidence,
+					`${admission.provider_id}:admission=${admission.action}`,
+					`${admission.provider_id}:queue_depth=${admission.queue_depth}`,
+				],
+			};
+		} catch (error) {
+			this.controller.recordResponse(admission.provider_id, 500);
+			throw error;
+		}
 	}
 }

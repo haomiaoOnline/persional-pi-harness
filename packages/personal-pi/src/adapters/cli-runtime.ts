@@ -58,6 +58,7 @@ export interface CliObservation {
 	provider?: string;
 	model?: string;
 	session_id?: string;
+	process_pid?: number;
 	stop_reason?: string;
 	final_text?: string;
 	usage?: ExternalUsage;
@@ -100,6 +101,7 @@ export interface ExternalWorkerObservation {
 	observed_runtime_model: string | null;
 	provider: string | null;
 	session_id_sha256: string | null;
+	process_pid: number | null;
 	status: string;
 	elapsed_ms: number;
 	input_tokens: number | null;
@@ -302,6 +304,7 @@ export function runJsonlProcess(options: JsonlProcessOptions): Promise<JsonlProc
 				stdio: ["pipe", "pipe", "pipe"],
 				detached: true,
 			} satisfies SpawnOptions) as ChildProcessWithoutNullStreams;
+			observation.process_pid = child.pid ?? undefined;
 		} catch (error) {
 			observation.spawn_error = { message: errorMessage(error) };
 			finish(null, null);
@@ -513,6 +516,7 @@ export function externalObservation(
 		observed_runtime_model: observedModel,
 		provider: observation.provider ?? null,
 		session_id_sha256: sessionDigest(observation.session_id),
+		process_pid: observation.process_pid ?? null,
 		status,
 		elapsed_ms: elapsedMs,
 		input_tokens: observation.usage?.input_tokens ?? null,
@@ -534,6 +538,7 @@ export function safeEvidence(
 	inputAccounting?: InputTokenAccounting,
 ): string[] {
 	const evidence = [`${backend}:process`, `${backend}:events=${observation.parsed_events}`];
+	if (observation.process_pid !== undefined) evidence.push(`${backend}:process_pid=${observation.process_pid}`);
 	if (provider) evidence.push(`${backend}:provider=${provider}`);
 	if (model) evidence.push(`${backend}:model=${model}`);
 	const sessionId = sessionDigest(observation.session_id);

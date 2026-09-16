@@ -20,6 +20,7 @@ export * from "./persistence.ts";
 export * from "./pipeline.ts";
 export * from "./planning.ts";
 export * from "./plugin.ts";
+export * from "./process-worker.ts";
 export * from "./progressive-tools.ts";
 export * from "./prompt.ts";
 export * from "./protocol.ts";

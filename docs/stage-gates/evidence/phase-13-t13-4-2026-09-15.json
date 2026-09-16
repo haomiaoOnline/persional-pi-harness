@@ -1,0 +1,981 @@
+{
+  "phase": "Phase 13",
+  "baseline": "v3.2",
+  "t13_4": {
+    "parallel_read_analysis": {
+      "status": "PASS",
+      "worker_instances": [
+        {
+          "worker_id": "t13-read-architecture",
+          "worker_instance_id": "t13-instance-t13-read-architecture",
+          "adapter_id": "pi-read-analysis-adapter",
+          "pid": 8097,
+          "session_id_sha256": "0b67393ae9c39b4b",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-architecture"
+        },
+        {
+          "worker_id": "t13-read-code",
+          "worker_instance_id": "t13-instance-t13-read-code",
+          "adapter_id": "pi-read-analysis-adapter",
+          "pid": 8098,
+          "session_id_sha256": "50a364da8c5f68f0",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-code"
+        },
+        {
+          "worker_id": "t13-read-tests",
+          "worker_instance_id": "t13-instance-t13-read-tests",
+          "adapter_id": "pi-read-analysis-adapter",
+          "pid": 8099,
+          "session_id_sha256": "775f9f9d8a1cd360",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-tests"
+        },
+        {
+          "worker_id": "t13-read-synthesis",
+          "worker_instance_id": "t13-instance-t13-read-synthesis",
+          "adapter_id": "pi-read-analysis-adapter",
+          "pid": 8100,
+          "session_id_sha256": "cac7849696ae7fda",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-synthesis"
+        }
+      ],
+      "analysis_executions": [
+        {
+          "task_id": "t13-read-architecture",
+          "worker_id": "t13-read-architecture",
+          "worker_instance_id": "t13-instance-t13-read-architecture",
+          "adapter_id": "pi-read-analysis-adapter",
+          "pid": 8097,
+          "session_id_sha256": "0b67393ae9c39b4b",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-architecture",
+          "lease_epoch": 1,
+          "started_at": "2026-09-15T13:47:20.696Z",
+          "ended_at": "2026-09-15T13:47:21.061Z",
+          "status": "success",
+          "result_evidence": [
+            "t13-instance-t13-read-architecture:process_pid=8097",
+            "t13-instance-t13-read-architecture:session_id_sha256=0b67393ae9c39b4b",
+            "t13-instance-t13-read-architecture:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-architecture",
+            "t13-instance-t13-read-architecture:analysis_digest=b09548e32b62a04caee0895c1ab84c2f56117ab039aa2b2e10f37878c9f50846",
+            "pi-read-analysis-adapter:process_pid=8097",
+            "pi-read-analysis-adapter:session_id_sha256=0b67393ae9c39b4b",
+            "pi-read-analysis-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-architecture"
+          ],
+          "error": null
+        },
+        {
+          "task_id": "t13-read-code",
+          "worker_id": "t13-read-code",
+          "worker_instance_id": "t13-instance-t13-read-code",
+          "adapter_id": "pi-read-analysis-adapter",
+          "pid": 8098,
+          "session_id_sha256": "50a364da8c5f68f0",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-code",
+          "lease_epoch": 1,
+          "started_at": "2026-09-15T13:47:20.698Z",
+          "ended_at": "2026-09-15T13:47:21.069Z",
+          "status": "success",
+          "result_evidence": [
+            "t13-instance-t13-read-code:process_pid=8098",
+            "t13-instance-t13-read-code:session_id_sha256=50a364da8c5f68f0",
+            "t13-instance-t13-read-code:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-code",
+            "t13-instance-t13-read-code:analysis_digest=cdb5b528c753e9028b37e46344776d434a231fb731d2d5133c2d676988e91063",
+            "pi-read-analysis-adapter:process_pid=8098",
+            "pi-read-analysis-adapter:session_id_sha256=50a364da8c5f68f0",
+            "pi-read-analysis-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-code"
+          ],
+          "error": null
+        },
+        {
+          "task_id": "t13-read-tests",
+          "worker_id": "t13-read-tests",
+          "worker_instance_id": "t13-instance-t13-read-tests",
+          "adapter_id": "pi-read-analysis-adapter",
+          "pid": 8099,
+          "session_id_sha256": "775f9f9d8a1cd360",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-tests",
+          "lease_epoch": 1,
+          "started_at": "2026-09-15T13:47:20.699Z",
+          "ended_at": "2026-09-15T13:47:21.067Z",
+          "status": "success",
+          "result_evidence": [
+            "t13-instance-t13-read-tests:process_pid=8099",
+            "t13-instance-t13-read-tests:session_id_sha256=775f9f9d8a1cd360",
+            "t13-instance-t13-read-tests:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-tests",
+            "t13-instance-t13-read-tests:analysis_digest=faf3c7d09b55ccecbc3b147f0adbe5ecede5722033c5b0852ac4937646f2deff",
+            "pi-read-analysis-adapter:process_pid=8099",
+            "pi-read-analysis-adapter:session_id_sha256=775f9f9d8a1cd360",
+            "pi-read-analysis-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-tests"
+          ],
+          "error": null
+        }
+      ],
+      "synthesis_execution": {
+        "task_id": "t13-read-synthesis",
+        "worker_id": "t13-read-synthesis",
+        "worker_instance_id": "t13-instance-t13-read-synthesis",
+        "adapter_id": "pi-read-analysis-adapter",
+        "pid": 8100,
+        "session_id_sha256": "cac7849696ae7fda",
+        "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-synthesis",
+        "lease_epoch": 1,
+        "started_at": "2026-09-15T13:47:21.071Z",
+        "ended_at": "2026-09-15T13:47:21.180Z",
+        "status": "success",
+        "result_evidence": [
+          "t13-instance-t13-read-synthesis:process_pid=8100",
+          "t13-instance-t13-read-synthesis:session_id_sha256=cac7849696ae7fda",
+          "t13-instance-t13-read-synthesis:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-synthesis",
+          "t13-instance-t13-read-synthesis:fan_in_count=3",
+          "t13-instance-t13-read-synthesis:synthesis_digest=2a9a5c164a0a76630fec7d157516bdaf9ae3ebf13ace7966135c4a29d8d365c6",
+          "pi-read-analysis-adapter:process_pid=8100",
+          "pi-read-analysis-adapter:session_id_sha256=cac7849696ae7fda",
+          "pi-read-analysis-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-read-fwbqQE/t13-read-synthesis"
+        ],
+        "error": null
+      },
+      "fan_in": {
+        "input_task_ids": [
+          "t13-read-architecture",
+          "t13-read-code",
+          "t13-read-tests"
+        ],
+        "input_digests": [
+          "b09548e32b62a04caee0895c1ab84c2f56117ab039aa2b2e10f37878c9f50846",
+          "cdb5b528c753e9028b37e46344776d434a231fb731d2d5133c2d676988e91063",
+          "faf3c7d09b55ccecbc3b147f0adbe5ecede5722033c5b0852ac4937646f2deff"
+        ],
+        "context_digests": [
+          "b09548e32b62a04caee0895c1ab84c2f56117ab039aa2b2e10f37878c9f50846",
+          "cdb5b528c753e9028b37e46344776d434a231fb731d2d5133c2d676988e91063",
+          "faf3c7d09b55ccecbc3b147f0adbe5ecede5722033c5b0852ac4937646f2deff"
+        ],
+        "synthesis_path": "synthesis/architecture-code-tests.json"
+      },
+      "dag": {
+        "topological_order": [
+          "t13-read-architecture",
+          "t13-read-code",
+          "t13-read-tests",
+          "t13-read-synthesis"
+        ]
+      },
+      "trace": {
+        "trace": {
+          "trace_id": "c44fc7fd-669b-40eb-9f2b-9dee02fc8970",
+          "task_id": "t13-read-synthesis",
+          "started_at": "2026-09-15T13:47:20.696Z",
+          "events": [
+            {
+              "stage": "REQUIREMENT",
+              "detail": "T13.4 real acceptance requirement",
+              "at": "2026-09-15T13:47:20.696Z"
+            },
+            {
+              "stage": "PLAN_GATE",
+              "detail": "Phase 12 gate PASS; T13.4 is now in scope",
+              "at": "2026-09-15T13:47:20.696Z"
+            },
+            {
+              "stage": "PRECLASSIFY",
+              "detail": "local process Worker resources with bounded public conformance data",
+              "at": "2026-09-15T13:47:20.696Z"
+            },
+            {
+              "stage": "ASSESSMENT",
+              "detail": "independent files, leases, timestamps and final Verification required",
+              "at": "2026-09-15T13:47:20.696Z"
+            },
+            {
+              "stage": "DISPATCH",
+              "detail": "three analysis Workers dispatched independently; synthesis waits on all three DAG predecessors",
+              "at": "2026-09-15T13:47:20.696Z",
+              "fields": {
+                "graph_width": 3,
+                "graph_depth": 2,
+                "active_workers": 3,
+                "handoff_count": 0
+              }
+            },
+            {
+              "stage": "TASK",
+              "detail": "architecture/code/tests → fan-in synthesis",
+              "at": "2026-09-15T13:47:20.696Z"
+            },
+            {
+              "stage": "DOR",
+              "detail": "context, workspace and Worker capacity ready",
+              "at": "2026-09-15T13:47:20.696Z"
+            },
+            {
+              "stage": "WORKER",
+              "detail": "three same-adapter process Workers",
+              "at": "2026-09-15T13:47:20.696Z",
+              "fields": {
+                "active_workers": 3,
+                "model_calls": 0
+              }
+            },
+            {
+              "stage": "RUN",
+              "detail": "analysis executions overlap=true",
+              "at": "2026-09-15T13:47:20.696Z",
+              "fields": {
+                "overlap": true,
+                "retry_depth": 0,
+                "elapsed_ms": 484
+              }
+            },
+            {
+              "stage": "RESULT",
+              "detail": "three analysis Work Receipts followed by synthesis Work Receipt",
+              "at": "2026-09-15T13:47:21.180Z",
+              "fields": {
+                "useful_work": 1,
+                "no_op": false
+              }
+            },
+            {
+              "stage": "EVIDENCE",
+              "detail": "distinct PIDs, context digests, analysis digests and topological order",
+              "at": "2026-09-15T13:47:21.180Z"
+            },
+            {
+              "stage": "VERIFICATION",
+              "detail": "PASS",
+              "at": "2026-09-15T13:47:21.180Z",
+              "fields": {
+                "status": "PASS"
+              }
+            },
+            {
+              "stage": "ACCEPTANCE",
+              "detail": "DONE",
+              "at": "2026-09-15T13:47:21.180Z"
+            }
+          ],
+          "decisions": [],
+          "metrics": {
+            "token_per_task": 0,
+            "cache_hit_rate": 0,
+            "worker_tier_distribution": {
+              "cheap": 0,
+              "standard": 1,
+              "frontier": 0
+            },
+            "graph_efficiency": {
+              "graph_width": 3,
+              "graph_depth": 2,
+              "handoff_count": 0,
+              "peak_active_workers": 3,
+              "retry_depth": 0,
+              "replan_count": 0,
+              "useful_work_ratio": 1,
+              "verification_first_pass_rate": 1,
+              "cost_per_verified_task": 0,
+              "time_per_verified_task": 484,
+              "agent_calls": 1,
+              "coordination_efficiency": 1
+            }
+          },
+          "replayable": true,
+          "outcome": "DONE",
+          "ended_at": "2026-09-15T13:47:21.180Z"
+        },
+        "replay": {
+          "complete": true,
+          "order_valid": true,
+          "ordered_stages": [
+            "REQUIREMENT",
+            "PLAN_GATE",
+            "PRECLASSIFY",
+            "ASSESSMENT",
+            "DISPATCH",
+            "TASK",
+            "DOR",
+            "WORKER",
+            "RUN",
+            "RESULT",
+            "EVIDENCE",
+            "VERIFICATION",
+            "ACCEPTANCE"
+          ],
+          "missing_stages": [],
+          "decision_reasons": [],
+          "outcome": "DONE"
+        }
+      },
+      "worker_count": 4,
+      "real_overlap": true
+    },
+    "parallel_coding": {
+      "status": "PASS",
+      "worker_instances": [
+        {
+          "worker_id": "t13-code-a",
+          "worker_instance_id": "t13-instance-t13-code-a",
+          "adapter_id": "pi-coding-adapter",
+          "pid": 8230,
+          "session_id_sha256": "f3a9c6f9fd7d334a",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/a"
+        },
+        {
+          "worker_id": "t13-code-b",
+          "worker_instance_id": "t13-instance-t13-code-b",
+          "adapter_id": "pi-coding-adapter",
+          "pid": 8231,
+          "session_id_sha256": "2673bd066b63f2de",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/b"
+        },
+        {
+          "worker_id": "t13-code-c",
+          "worker_instance_id": "t13-instance-t13-code-c",
+          "adapter_id": "pi-coding-adapter",
+          "pid": 8232,
+          "session_id_sha256": "504b2fe5575a9a08",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/c"
+        },
+        {
+          "worker_id": "t13-code-integration",
+          "worker_instance_id": "t13-instance-t13-code-integration",
+          "adapter_id": "pi-coding-integration-adapter",
+          "pid": 8233,
+          "session_id_sha256": "5b84970d46e9c2b3",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/integration"
+        }
+      ],
+      "branch_executions": [
+        {
+          "task_id": "t13-code-a",
+          "worker_id": "t13-code-a",
+          "worker_instance_id": "t13-instance-t13-code-a",
+          "adapter_id": "pi-coding-adapter",
+          "pid": 8230,
+          "session_id_sha256": "f3a9c6f9fd7d334a",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/a",
+          "lease_epoch": 1,
+          "started_at": "2026-09-15T13:47:22.217Z",
+          "ended_at": "2026-09-15T13:47:22.865Z",
+          "status": "success",
+          "result_evidence": [
+            "t13-instance-t13-code-a:process_pid=8230",
+            "t13-instance-t13-code-a:session_id_sha256=f3a9c6f9fd7d334a",
+            "t13-instance-t13-code-a:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/a",
+            "t13-instance-t13-code-a:commit=72fc2f512316f5d04ec2cb0b90bbe63d6ce175d2",
+            "pi-coding-adapter:process_pid=8230",
+            "pi-coding-adapter:session_id_sha256=f3a9c6f9fd7d334a",
+            "pi-coding-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/a"
+          ],
+          "error": null
+        },
+        {
+          "task_id": "t13-code-b",
+          "worker_id": "t13-code-b",
+          "worker_instance_id": "t13-instance-t13-code-b",
+          "adapter_id": "pi-coding-adapter",
+          "pid": 8231,
+          "session_id_sha256": "2673bd066b63f2de",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/b",
+          "lease_epoch": 1,
+          "started_at": "2026-09-15T13:47:22.218Z",
+          "ended_at": "2026-09-15T13:47:22.864Z",
+          "status": "success",
+          "result_evidence": [
+            "t13-instance-t13-code-b:process_pid=8231",
+            "t13-instance-t13-code-b:session_id_sha256=2673bd066b63f2de",
+            "t13-instance-t13-code-b:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/b",
+            "t13-instance-t13-code-b:commit=d7352f4346e25c63e9ed7b9118fc843ac1dbce40",
+            "pi-coding-adapter:process_pid=8231",
+            "pi-coding-adapter:session_id_sha256=2673bd066b63f2de",
+            "pi-coding-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/b"
+          ],
+          "error": null
+        },
+        {
+          "task_id": "t13-code-c",
+          "worker_id": "t13-code-c",
+          "worker_instance_id": "t13-instance-t13-code-c",
+          "adapter_id": "pi-coding-adapter",
+          "pid": 8232,
+          "session_id_sha256": "504b2fe5575a9a08",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/c",
+          "lease_epoch": 1,
+          "started_at": "2026-09-15T13:47:22.218Z",
+          "ended_at": "2026-09-15T13:47:22.957Z",
+          "status": "success",
+          "result_evidence": [
+            "t13-instance-t13-code-c:process_pid=8232",
+            "t13-instance-t13-code-c:session_id_sha256=504b2fe5575a9a08",
+            "t13-instance-t13-code-c:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/c",
+            "t13-instance-t13-code-c:commit=aa4291ccc0cf37205e9821a2d82f44ed361b012b",
+            "pi-coding-adapter:process_pid=8232",
+            "pi-coding-adapter:session_id_sha256=504b2fe5575a9a08",
+            "pi-coding-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/c"
+          ],
+          "error": null
+        }
+      ],
+      "branch_commits": [
+        "72fc2f512316f5d04ec2cb0b90bbe63d6ce175d2",
+        "d7352f4346e25c63e9ed7b9118fc843ac1dbce40",
+        "aa4291ccc0cf37205e9821a2d82f44ed361b012b"
+      ],
+      "branch_worktrees": [
+        {
+          "worker_id": "t13-code-a",
+          "path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/a",
+          "target": "packages/personal-pi/t13-fixture/module-a.mjs",
+          "clean_after_commit": true
+        },
+        {
+          "worker_id": "t13-code-b",
+          "path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/b",
+          "target": "packages/personal-pi/t13-fixture/module-b.mjs",
+          "clean_after_commit": true
+        },
+        {
+          "worker_id": "t13-code-c",
+          "path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/c",
+          "target": "packages/personal-pi/t13-fixture/module-c.test.mjs",
+          "clean_after_commit": true
+        }
+      ],
+      "integration_execution": {
+        "task_id": "t13-code-integration",
+        "worker_id": "t13-code-integration",
+        "worker_instance_id": "t13-instance-t13-code-integration",
+        "adapter_id": "pi-coding-integration-adapter",
+        "pid": 8233,
+        "session_id_sha256": "5b84970d46e9c2b3",
+        "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/integration",
+        "lease_epoch": 1,
+        "started_at": "2026-09-15T13:47:23.139Z",
+        "ended_at": "2026-09-15T13:47:23.619Z",
+        "status": "success",
+        "result_evidence": [
+          "t13-instance-t13-code-integration:process_pid=8233",
+          "t13-instance-t13-code-integration:session_id_sha256=5b84970d46e9c2b3",
+          "t13-instance-t13-code-integration:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/integration",
+          "t13-instance-t13-code-integration:merge_commit=05ac99596a6a39f8d278f6705535a1b8a6c8c71f",
+          "t13-instance-t13-code-integration:merged_commits=72fc2f512316f5d04ec2cb0b90bbe63d6ce175d2,d7352f4346e25c63e9ed7b9118fc843ac1dbce40,aa4291ccc0cf37205e9821a2d82f44ed361b012b",
+          "pi-coding-integration-adapter:process_pid=8233",
+          "pi-coding-integration-adapter:session_id_sha256=5b84970d46e9c2b3",
+          "pi-coding-integration-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/integration"
+        ],
+        "error": null
+      },
+      "integration_worktree": {
+        "path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-coding-yDIOxi/worktrees/integration",
+        "merge_commit": "05ac99596a6a39f8d278f6705535a1b8a6c8c71f",
+        "merged_ancestors": true
+      },
+      "final_state": {
+        "merge_commit": "05ac99596a6a39f8d278f6705535a1b8a6c8c71f",
+        "merged_ancestors": true,
+        "files": [
+          {
+            "path": "packages/personal-pi/t13-fixture/module-a.mjs",
+            "content_digest": "371dbc51e320657d29c1adc4605ba2a1b28ca994b5645cad55a6151323077a4c"
+          },
+          {
+            "path": "packages/personal-pi/t13-fixture/module-b.mjs",
+            "content_digest": "be3d445dde07934f518be8a38e39c3ba4a996180a912d05c3e5b5daddf1d1ceb"
+          },
+          {
+            "path": "packages/personal-pi/t13-fixture/module-c.test.mjs",
+            "content_digest": "7d139c786379f774d1d5d5ddf0cc360de015d9eb4e82c754fc267a28854916d2"
+          }
+        ],
+        "command_results": [
+          {
+            "command": "node --test packages/personal-pi/t13-fixture/module-c.test.mjs",
+            "exit_code": 0,
+            "stdout": "exit=0",
+            "stderr": ""
+          },
+          {
+            "command": "git diff --check HEAD~1",
+            "exit_code": 0,
+            "stdout": "exit=0",
+            "stderr": ""
+          },
+          {
+            "command": "git status --porcelain",
+            "exit_code": 0,
+            "stdout": "exit=0",
+            "stderr": ""
+          }
+        ]
+      },
+      "final_verification": {
+        "status": "PASS",
+        "checks": [
+          "command:node --test packages/personal-pi/t13-fixture/module-c.test.mjs",
+          "command:git diff --check HEAD~1",
+          "command:git status --porcelain"
+        ],
+        "reasons": [],
+        "accepted_task_state": "DONE",
+        "branch_pass_not_reused": true
+      },
+      "trace": {
+        "trace": {
+          "trace_id": "84d5c5f3-cc04-4fe9-ab76-44b46311b231",
+          "task_id": "t13-code-integration",
+          "started_at": "2026-09-15T13:47:22.217Z",
+          "events": [
+            {
+              "stage": "REQUIREMENT",
+              "detail": "T13.4 real acceptance requirement",
+              "at": "2026-09-15T13:47:22.217Z"
+            },
+            {
+              "stage": "PLAN_GATE",
+              "detail": "Phase 12 gate PASS; T13.4 is now in scope",
+              "at": "2026-09-15T13:47:22.217Z"
+            },
+            {
+              "stage": "PRECLASSIFY",
+              "detail": "local process Worker resources with bounded public conformance data",
+              "at": "2026-09-15T13:47:22.217Z"
+            },
+            {
+              "stage": "ASSESSMENT",
+              "detail": "independent files, leases, timestamps and final Verification required",
+              "at": "2026-09-15T13:47:22.217Z"
+            },
+            {
+              "stage": "DISPATCH",
+              "detail": "Workers A/B/C received disjoint files and an Integration Worker waited for their commits",
+              "at": "2026-09-15T13:47:22.217Z",
+              "fields": {
+                "graph_width": 3,
+                "graph_depth": 2,
+                "active_workers": 3,
+                "handoff_count": 0
+              }
+            },
+            {
+              "stage": "TASK",
+              "detail": "module A + module B + test C → integration merge → final Verification",
+              "at": "2026-09-15T13:47:22.217Z"
+            },
+            {
+              "stage": "DOR",
+              "detail": "context, workspace and Worker capacity ready",
+              "at": "2026-09-15T13:47:22.217Z"
+            },
+            {
+              "stage": "WORKER",
+              "detail": "three independent worktrees plus one Integration Worker worktree",
+              "at": "2026-09-15T13:47:22.217Z",
+              "fields": {
+                "active_workers": 3,
+                "model_calls": 0
+              }
+            },
+            {
+              "stage": "RUN",
+              "detail": "A/B/C coding executions overlap=true",
+              "at": "2026-09-15T13:47:22.217Z",
+              "fields": {
+                "overlap": true,
+                "retry_depth": 0,
+                "elapsed_ms": 1512
+              }
+            },
+            {
+              "stage": "RESULT",
+              "detail": "three branch commits and one real merge commit",
+              "at": "2026-09-15T13:47:23.729Z",
+              "fields": {
+                "useful_work": 1,
+                "no_op": false
+              }
+            },
+            {
+              "stage": "EVIDENCE",
+              "detail": "commit ancestry, worktree paths, final test, diff check and clean status",
+              "at": "2026-09-15T13:47:23.729Z"
+            },
+            {
+              "stage": "VERIFICATION",
+              "detail": "PASS",
+              "at": "2026-09-15T13:47:23.729Z",
+              "fields": {
+                "status": "PASS"
+              }
+            },
+            {
+              "stage": "ACCEPTANCE",
+              "detail": "DONE",
+              "at": "2026-09-15T13:47:23.729Z"
+            }
+          ],
+          "decisions": [],
+          "metrics": {
+            "token_per_task": 0,
+            "cache_hit_rate": 0,
+            "worker_tier_distribution": {
+              "cheap": 0,
+              "standard": 1,
+              "frontier": 0
+            },
+            "graph_efficiency": {
+              "graph_width": 3,
+              "graph_depth": 2,
+              "handoff_count": 0,
+              "peak_active_workers": 3,
+              "retry_depth": 0,
+              "replan_count": 0,
+              "useful_work_ratio": 1,
+              "verification_first_pass_rate": 1,
+              "cost_per_verified_task": 0,
+              "time_per_verified_task": 1512,
+              "agent_calls": 1,
+              "coordination_efficiency": 1
+            }
+          },
+          "replayable": true,
+          "outcome": "DONE",
+          "ended_at": "2026-09-15T13:47:23.729Z"
+        },
+        "replay": {
+          "complete": true,
+          "order_valid": true,
+          "ordered_stages": [
+            "REQUIREMENT",
+            "PLAN_GATE",
+            "PRECLASSIFY",
+            "ASSESSMENT",
+            "DISPATCH",
+            "TASK",
+            "DOR",
+            "WORKER",
+            "RUN",
+            "RESULT",
+            "EVIDENCE",
+            "VERIFICATION",
+            "ACCEPTANCE"
+          ],
+          "missing_stages": [],
+          "decision_reasons": [],
+          "outcome": "DONE"
+        }
+      },
+      "real_overlap": true
+    },
+    "failure_recovery": {
+      "status": "PASS",
+      "executions": {
+        "a": {
+          "task_id": "t13-recovery-a-task",
+          "worker_id": "t13-recovery-a",
+          "worker_instance_id": "t13-instance-t13-recovery-a",
+          "adapter_id": "pi-recovery-adapter",
+          "pid": 8569,
+          "session_id_sha256": "1cf7a88285cba88d",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/a",
+          "lease_epoch": 1,
+          "started_at": "2026-09-15T13:47:24.186Z",
+          "ended_at": "2026-09-15T13:47:24.548Z",
+          "status": "success",
+          "result_evidence": [
+            "t13-instance-t13-recovery-a:process_pid=8569",
+            "t13-instance-t13-recovery-a:session_id_sha256=1cf7a88285cba88d",
+            "t13-instance-t13-recovery-a:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/a",
+            "pi-recovery-adapter:process_pid=8569",
+            "pi-recovery-adapter:session_id_sha256=1cf7a88285cba88d",
+            "pi-recovery-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/a"
+          ],
+          "error": null
+        },
+        "b_old": {
+          "task_id": "t13-recovery-b-task",
+          "worker_id": "t13-recovery-b",
+          "worker_instance_id": "t13-instance-t13-recovery-b",
+          "adapter_id": "pi-recovery-adapter",
+          "pid": null,
+          "session_id_sha256": "d3bc863d77b79975",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/b",
+          "lease_epoch": 1,
+          "started_at": "2026-09-15T13:47:24.186Z",
+          "ended_at": "2026-09-15T13:47:24.266Z",
+          "status": "error",
+          "result_evidence": [],
+          "error": {
+            "name": "WorkerPoolStaleResultError",
+            "message": "REJECTED_STALE_EPOCH"
+          }
+        },
+        "c": {
+          "task_id": "t13-recovery-c-task",
+          "worker_id": "t13-recovery-c",
+          "worker_instance_id": "t13-instance-t13-recovery-c",
+          "adapter_id": "pi-recovery-adapter",
+          "pid": 8571,
+          "session_id_sha256": "cc41904753fb64b2",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/c",
+          "lease_epoch": 1,
+          "started_at": "2026-09-15T13:47:24.187Z",
+          "ended_at": "2026-09-15T13:47:24.544Z",
+          "status": "success",
+          "result_evidence": [
+            "t13-instance-t13-recovery-c:process_pid=8571",
+            "t13-instance-t13-recovery-c:session_id_sha256=cc41904753fb64b2",
+            "t13-instance-t13-recovery-c:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/c",
+            "pi-recovery-adapter:process_pid=8571",
+            "pi-recovery-adapter:session_id_sha256=cc41904753fb64b2",
+            "pi-recovery-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/c"
+          ],
+          "error": null
+        },
+        "d_reassigned": {
+          "task_id": "t13-recovery-b-task",
+          "worker_id": "t13-recovery-d",
+          "worker_instance_id": "t13-instance-t13-recovery-d",
+          "adapter_id": "pi-recovery-adapter",
+          "pid": 8572,
+          "session_id_sha256": "d02484d1eaf2ede1",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/d",
+          "lease_epoch": 2,
+          "started_at": "2026-09-15T13:47:24.267Z",
+          "ended_at": "2026-09-15T13:47:24.371Z",
+          "status": "success",
+          "result_evidence": [
+            "t13-instance-t13-recovery-d:process_pid=8572",
+            "t13-instance-t13-recovery-d:session_id_sha256=d02484d1eaf2ede1",
+            "t13-instance-t13-recovery-d:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/d",
+            "pi-recovery-adapter:process_pid=8572",
+            "pi-recovery-adapter:session_id_sha256=d02484d1eaf2ede1",
+            "pi-recovery-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/d"
+          ],
+          "error": null
+        },
+        "dag_join": {
+          "task_id": "t13-recovery-dag-join",
+          "worker_id": "t13-recovery-d",
+          "worker_instance_id": "t13-instance-t13-recovery-d",
+          "adapter_id": "pi-recovery-adapter",
+          "pid": 8572,
+          "session_id_sha256": "d02484d1eaf2ede1",
+          "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/d",
+          "lease_epoch": 1,
+          "started_at": "2026-09-15T13:47:24.558Z",
+          "ended_at": "2026-09-15T13:47:24.666Z",
+          "status": "success",
+          "result_evidence": [
+            "t13-instance-t13-recovery-d:process_pid=8572",
+            "t13-instance-t13-recovery-d:session_id_sha256=d02484d1eaf2ede1",
+            "t13-instance-t13-recovery-d:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/d",
+            "pi-recovery-adapter:process_pid=8572",
+            "pi-recovery-adapter:session_id_sha256=d02484d1eaf2ede1",
+            "pi-recovery-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase13-recovery-zZ5fBQ/d"
+          ],
+          "error": null
+        }
+      },
+      "crash_recovery": {
+        "crash_at": "2026-09-15T13:47:24.264Z",
+        "reclaimed": true,
+        "old_lease": {
+          "task_id": "t13-recovery-b-task",
+          "worker_id": "t13-recovery-b",
+          "lease_epoch": 1,
+          "issued_at": "2026-09-15T13:47:24.185Z"
+        },
+        "reassigned_lease": {
+          "task_id": "t13-recovery-b-task",
+          "worker_id": "t13-recovery-d",
+          "lease_epoch": 2,
+          "issued_at": "2026-09-15T13:47:24.266Z"
+        },
+        "stale_result_rejected": true,
+        "b_state_after_reclaim": "DEAD",
+        "a_c_unaffected": true,
+        "a_c_overlap_crash": true
+      },
+      "dag": {
+        "topological_order": [
+          "t13-recovery-a-task",
+          "t13-recovery-b-task",
+          "t13-recovery-c-task",
+          "t13-recovery-dag-join"
+        ],
+        "final_command": {
+          "command": "node --input-type=module -e dag-final-check",
+          "exit_code": 0,
+          "stdout": "exit=0",
+          "stderr": ""
+        }
+      },
+      "final_verification": {
+        "status": "PASS",
+        "checks": [
+          "command:node --input-type=module -e dag-final-check"
+        ],
+        "reasons": [],
+        "accepted_task_state": "DONE"
+      },
+      "trace": {
+        "trace": {
+          "trace_id": "4e932509-fbe0-46a4-8c41-c228cc22a4b0",
+          "task_id": "t13-recovery-dag-join",
+          "started_at": "2026-09-15T13:47:24.186Z",
+          "events": [
+            {
+              "stage": "REQUIREMENT",
+              "detail": "B crash must not affect A/C; stale B result must be fenced and the DAG must complete",
+              "at": "2026-09-15T13:47:24.186Z"
+            },
+            {
+              "stage": "PLAN_GATE",
+              "detail": "Phase 12 gate PASS; T13.4 is now in scope",
+              "at": "2026-09-15T13:47:24.186Z"
+            },
+            {
+              "stage": "PRECLASSIFY",
+              "detail": "local process Worker resources with bounded public conformance data",
+              "at": "2026-09-15T13:47:24.186Z"
+            },
+            {
+              "stage": "ASSESSMENT",
+              "detail": "independent files, leases, timestamps and final Verification required",
+              "at": "2026-09-15T13:47:24.186Z"
+            },
+            {
+              "stage": "DISPATCH",
+              "detail": "A/B/C leased concurrently; B is intentionally crashed and reassigned to D",
+              "at": "2026-09-15T13:47:24.186Z",
+              "fields": {
+                "graph_width": 3,
+                "graph_depth": 2,
+                "active_workers": 3,
+                "handoff_count": 1
+              }
+            },
+            {
+              "stage": "TASK",
+              "detail": "A + B + C → crash/reclaim/reassign B → DAG join",
+              "at": "2026-09-15T13:47:24.186Z"
+            },
+            {
+              "stage": "DOR",
+              "detail": "context, workspace and Worker capacity ready",
+              "at": "2026-09-15T13:47:24.186Z"
+            },
+            {
+              "stage": "WORKER",
+              "detail": "A/C remained active while B process was killed; D received epoch N+1",
+              "at": "2026-09-15T13:47:24.186Z",
+              "fields": {
+                "active_workers": 3,
+                "model_calls": 0
+              }
+            },
+            {
+              "stage": "RUN",
+              "detail": "A/C overlap crash=true, stale old lease=true",
+              "at": "2026-09-15T13:47:24.186Z",
+              "fields": {
+                "overlap": true,
+                "retry_depth": 1,
+                "elapsed_ms": 522
+              }
+            },
+            {
+              "stage": "RESULT",
+              "detail": "A/C success, B stale result rejected, D reassigned result success",
+              "at": "2026-09-15T13:47:24.708Z",
+              "fields": {
+                "useful_work": 1,
+                "no_op": false
+              }
+            },
+            {
+              "stage": "EVIDENCE",
+              "detail": "crash timestamp, old/new epochs, DEAD B, stale rejection and final DAG command",
+              "at": "2026-09-15T13:47:24.708Z"
+            },
+            {
+              "stage": "VERIFICATION",
+              "detail": "PASS",
+              "at": "2026-09-15T13:47:24.708Z",
+              "fields": {
+                "status": "PASS"
+              }
+            },
+            {
+              "stage": "ACCEPTANCE",
+              "detail": "DONE",
+              "at": "2026-09-15T13:47:24.708Z"
+            }
+          ],
+          "decisions": [],
+          "metrics": {
+            "token_per_task": 0,
+            "cache_hit_rate": 0,
+            "worker_tier_distribution": {
+              "cheap": 0,
+              "standard": 1,
+              "frontier": 0
+            },
+            "graph_efficiency": {
+              "graph_width": 3,
+              "graph_depth": 2,
+              "handoff_count": 1,
+              "peak_active_workers": 3,
+              "retry_depth": 1,
+              "replan_count": 0,
+              "useful_work_ratio": 1,
+              "verification_first_pass_rate": 0,
+              "cost_per_verified_task": 0,
+              "time_per_verified_task": 522,
+              "agent_calls": 1,
+              "coordination_efficiency": 0.3333333333333333
+            }
+          },
+          "replayable": true,
+          "outcome": "DONE",
+          "ended_at": "2026-09-15T13:47:24.708Z"
+        },
+        "replay": {
+          "complete": true,
+          "order_valid": true,
+          "ordered_stages": [
+            "REQUIREMENT",
+            "PLAN_GATE",
+            "PRECLASSIFY",
+            "ASSESSMENT",
+            "DISPATCH",
+            "TASK",
+            "DOR",
+            "WORKER",
+            "RUN",
+            "RESULT",
+            "EVIDENCE",
+            "VERIFICATION",
+            "ACCEPTANCE"
+          ],
+          "missing_stages": [],
+          "decision_reasons": [],
+          "outcome": "DONE"
+        }
+      }
+    }
+  },
+  "gate_checks": {
+    "phase12_prerequisite": true,
+    "parallel_read_analysis": true,
+    "parallel_coding": true,
+    "failure_recovery": true
+  },
+  "aggregate_gate": "PASS",
+  "p0_multi_worker_mvp": "PASS",
+  "phase14_gap_01": "NON_BLOCKING; resolution Phase 14 Multi-CRI",
+  "known_upstream_failure": {
+    "file": "packages/ai/src/api/google-shared.ts",
+    "line": 402,
+    "fingerprint": "TS2322 FinishReason.TOO_MANY_TOOL_CALLS is not assignable to never",
+    "status": "unchanged-known-upstream-failure"
+  }
+}

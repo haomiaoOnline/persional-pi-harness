@@ -12,6 +12,7 @@ export type WorkerType = "pi" | "codex" | "claude" | "local_model" | "cli";
 export type WorkerTier = "cheap" | "standard" | "frontier";
 export type ReasoningDepth = "low" | "medium" | "high" | "extended";
 export type WorkerPluginAuthType = "none" | "api_key";
+export type WorkerInstanceState = "COLD" | "WARMING" | "IDLE" | "LEASED" | "BUSY" | "DEAD";
 
 export interface WorkerPluginModel {
 	model: string;
@@ -643,6 +644,22 @@ export interface RunRecord {
 	failure_reason?: string;
 }
 
+export interface WorkerInstanceRecord {
+	worker_instance_id: string;
+	adapter_id: string;
+	pid: number | null;
+	session_id: string;
+	session_id_sha256: string;
+	lease_epoch: number;
+	workspace_path: string;
+	context_projection_digest: string;
+	loop_usage: LoopUsage;
+	state: WorkerInstanceState;
+	execution_started_at?: string;
+	execution_ended_at?: string;
+	updated_at: string;
+}
+
 export interface StateSnapshot {
 	id: string;
 	created_at: string;
@@ -688,6 +705,8 @@ export interface PersistentState {
 	leases: Record<string, Lease>;
 	/** 每个 Task 最近分配过的 epoch，防止 Controller 重启后 epoch 回退。 */
 	lease_epochs: Record<string, number>;
+	/** Level-B Worker Instance 的非机密运行时身份与生命周期快照。 */
+	worker_instances: Record<string, WorkerInstanceRecord>;
 	loop_usage: Record<string, LoopUsage>;
 	traces: ExecutionTrace[];
 	regressions: RegressionCase[];

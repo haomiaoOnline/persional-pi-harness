@@ -1,0 +1,462 @@
+{
+  "phase": "Phase 12",
+  "baseline": "v3.2",
+  "generated_at": "2026-09-15T11:55:31.365Z",
+  "evidence_base_sha": "a84dd4c1fc77096b064d5038e5d8e69f6ac04f51",
+  "known_external_gap_registry": {
+    "version": 1,
+    "known_gaps": [
+      {
+        "id": "GAP-01",
+        "symptoms": "The Codex CLI can execute, but the CLI output does not echo a trustworthy accepted model and runtime model identity for Personal PI telemetry.",
+        "evidence": "docs/stage-gates/evidence/type-b-identity-surface-2026-09-15.json and docs/stage-gates/evidence/type-b-identity-attestation-2026-09-15.json record platform_accepted_model=unknown and observed_runtime_model=unknown; the adapter remains fail-closed.",
+        "root_cause": "The current Codex CLI event surface does not provide a verifiable runtime identity field that Personal PI is authorized to treat as ground truth.",
+        "decision": "Do not derive runtime identity from requested or configured model values; keep identity unknown and do not weaken Result, Evidence, or Verification requirements.",
+        "resolution": "Phase 14 Multi-CRI",
+        "current_consequence": "Codex runtime identity telemetry cannot close the heterogeneous Multi-CRI evidence gap, but this does not block the Level B same-Adapter Worker Instance gate.",
+        "mvp_impact": "NON_BLOCKING"
+      }
+    ]
+  },
+  "worker_instances": [
+    {
+      "worker_instance_id": "level-b-instance-level-b-a",
+      "adapter_id": "pi-same-adapter",
+      "pid": null,
+      "session_id": "local-session:ff3b4735023cef28",
+      "session_id_sha256": "ff3b4735023cef28",
+      "lease_epoch": 2,
+      "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-a",
+      "context_projection_digest": "84fdffa2e3651b9f2a53910e28ac8e790b1f01a253bd5ba77dd52d56ba6a442c",
+      "loop_usage": {
+        "attempts": 0,
+        "model_calls": 0,
+        "tool_calls": 0,
+        "handoffs": 0,
+        "elapsed_ms": 258,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cost_usd": 0,
+        "state_growth_bytes": 0
+      },
+      "state": "DEAD",
+      "execution_started_at": "2026-09-15T11:55:17.506Z",
+      "execution_ended_at": "2026-09-15T11:55:17.507Z",
+      "updated_at": "2026-09-15T11:55:31.364Z"
+    },
+    {
+      "worker_instance_id": "level-b-instance-level-b-b",
+      "adapter_id": "pi-same-adapter",
+      "pid": null,
+      "session_id": "local-session:bd414281be112e97",
+      "session_id_sha256": "bd414281be112e97",
+      "lease_epoch": 1,
+      "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-b",
+      "context_projection_digest": "3bd9bfce6aeec8802cfdb36559cc7bf24116750e34c37e146681f7ec793c25e6",
+      "loop_usage": {
+        "attempts": 0,
+        "model_calls": 0,
+        "tool_calls": 0,
+        "handoffs": 0,
+        "elapsed_ms": 309,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cost_usd": 0,
+        "state_growth_bytes": 0
+      },
+      "state": "DEAD",
+      "execution_started_at": "2026-09-15T11:55:17.450Z",
+      "execution_ended_at": "2026-09-15T11:55:17.504Z",
+      "updated_at": "2026-09-15T11:55:17.505Z"
+    }
+  ],
+  "process_pool": {
+    "warmed": [
+      {
+        "worker_id": "level-b-a",
+        "worker_instance_id": "level-b-instance-level-b-a",
+        "adapter_id": "pi-same-adapter",
+        "kind": "local_process_worker",
+        "state": "IDLE",
+        "pid": 79083,
+        "session_id": "local-session:ff3b4735023cef28",
+        "session_id_sha256": "ff3b4735023cef28",
+        "lease_epoch": 0,
+        "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-a",
+        "context_projection_digest": "b5d8efd0611a9663debb766bbab44943fcf24f85c5743e65eed7624a1d12926d",
+        "loop_usage": {
+          "attempts": 0,
+          "model_calls": 0,
+          "tool_calls": 0,
+          "handoffs": 0,
+          "elapsed_ms": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cost_usd": 0,
+          "state_growth_bytes": 0
+        },
+        "last_activity_at": 1789473317148,
+        "session_context": {}
+      },
+      {
+        "worker_id": "level-b-b",
+        "worker_instance_id": "level-b-instance-level-b-b",
+        "adapter_id": "pi-same-adapter",
+        "kind": "local_process_worker",
+        "state": "IDLE",
+        "pid": 79084,
+        "session_id": "local-session:bd414281be112e97",
+        "session_id_sha256": "bd414281be112e97",
+        "lease_epoch": 0,
+        "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-b",
+        "context_projection_digest": "09175385703d2ec07ee586f5659dbe72d5abfa3294dd691d3653def8a460f00c",
+        "loop_usage": {
+          "attempts": 0,
+          "model_calls": 0,
+          "tool_calls": 0,
+          "handoffs": 0,
+          "elapsed_ms": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cost_usd": 0,
+          "state_growth_bytes": 0
+        },
+        "last_activity_at": 1789473317178,
+        "session_context": {}
+      }
+    ],
+    "first_results": [
+      {
+        "task_id": "level-b-task-a",
+        "run_id": "run-level-b-task-a-1",
+        "worker_id": "level-b-a",
+        "lease_epoch": 1,
+        "status": "success",
+        "summary": "process Worker level-b-instance-level-b-a wrote tmp/a.txt",
+        "changed_files": [
+          "tmp/a.txt"
+        ],
+        "artifacts": [],
+        "evidence": [
+          "level-b-instance-level-b-a:process_pid=79083",
+          "level-b-instance-level-b-a:session_id_sha256=ff3b4735023cef28",
+          "level-b-instance-level-b-a:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-a",
+          "pi-same-adapter:process_pid=79083",
+          "pi-same-adapter:session_id_sha256=ff3b4735023cef28",
+          "pi-same-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-a"
+        ],
+        "errors": [],
+        "work_receipt": {
+          "work_attempted": true,
+          "effects_count": 1,
+          "artifacts_created": [],
+          "state_changed": true,
+          "no_op": false,
+          "evidence_refs": [
+            "level-b-instance-level-b-a:process_pid=79083",
+            "level-b-instance-level-b-a:session_id_sha256=ff3b4735023cef28",
+            "level-b-instance-level-b-a:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-a"
+          ]
+        }
+      },
+      {
+        "task_id": "level-b-task-b",
+        "run_id": "run-level-b-task-b-1",
+        "worker_id": "level-b-b",
+        "lease_epoch": 1,
+        "status": "success",
+        "summary": "process Worker level-b-instance-level-b-b wrote tmp/b.txt",
+        "changed_files": [
+          "tmp/b.txt"
+        ],
+        "artifacts": [],
+        "evidence": [
+          "level-b-instance-level-b-b:process_pid=79084",
+          "level-b-instance-level-b-b:session_id_sha256=bd414281be112e97",
+          "level-b-instance-level-b-b:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-b",
+          "pi-same-adapter:process_pid=79084",
+          "pi-same-adapter:session_id_sha256=bd414281be112e97",
+          "pi-same-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-b"
+        ],
+        "errors": [],
+        "work_receipt": {
+          "work_attempted": true,
+          "effects_count": 1,
+          "artifacts_created": [],
+          "state_changed": true,
+          "no_op": false,
+          "evidence_refs": [
+            "level-b-instance-level-b-b:process_pid=79084",
+            "level-b-instance-level-b-b:session_id_sha256=bd414281be112e97",
+            "level-b-instance-level-b-b:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-b"
+          ]
+        }
+      }
+    ],
+    "execution_snapshots": [
+      {
+        "worker_id": "level-b-a",
+        "worker_instance_id": "level-b-instance-level-b-a",
+        "adapter_id": "pi-same-adapter",
+        "kind": "local_process_worker",
+        "state": "BUSY",
+        "pid": 79083,
+        "session_id": "local-session:ff3b4735023cef28",
+        "session_id_sha256": "ff3b4735023cef28",
+        "lease_epoch": 1,
+        "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-a",
+        "context_projection_digest": "84fdffa2e3651b9f2a53910e28ac8e790b1f01a253bd5ba77dd52d56ba6a442c",
+        "loop_usage": {
+          "attempts": 0,
+          "model_calls": 0,
+          "tool_calls": 0,
+          "handoffs": 0,
+          "elapsed_ms": 257,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cost_usd": 0,
+          "state_growth_bytes": 0
+        },
+        "execution_started_at": "2026-09-15T11:55:17.190Z",
+        "execution_ended_at": "2026-09-15T11:55:17.447Z",
+        "last_activity_at": 1789473317447,
+        "session_context": {}
+      },
+      {
+        "worker_id": "level-b-b",
+        "worker_instance_id": "level-b-instance-level-b-b",
+        "adapter_id": "pi-same-adapter",
+        "kind": "local_process_worker",
+        "state": "BUSY",
+        "pid": 79084,
+        "session_id": "local-session:bd414281be112e97",
+        "session_id_sha256": "bd414281be112e97",
+        "lease_epoch": 1,
+        "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-b",
+        "context_projection_digest": "3bd9bfce6aeec8802cfdb36559cc7bf24116750e34c37e146681f7ec793c25e6",
+        "loop_usage": {
+          "attempts": 0,
+          "model_calls": 0,
+          "tool_calls": 0,
+          "handoffs": 0,
+          "elapsed_ms": 255,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cost_usd": 0,
+          "state_growth_bytes": 0
+        },
+        "execution_started_at": "2026-09-15T11:55:17.191Z",
+        "execution_ended_at": "2026-09-15T11:55:17.446Z",
+        "last_activity_at": 1789473317446,
+        "session_context": {}
+      }
+    ],
+    "duplicate_claims": [
+      "fulfilled",
+      "rejected"
+    ],
+    "workspaces": [
+      "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-a",
+      "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-b"
+    ]
+  },
+  "lease_recovery": {
+    "old_lease": {
+      "task_id": "recovery-task",
+      "worker_id": "level-b-b",
+      "lease_epoch": 1,
+      "issued_at": "2026-09-15T11:55:17.449Z"
+    },
+    "reassigned_lease": {
+      "task_id": "recovery-task",
+      "worker_id": "level-b-a",
+      "lease_epoch": 2,
+      "issued_at": "2026-09-15T11:55:17.506Z"
+    },
+    "reclaimed": true,
+    "stale_rejection": true,
+    "recovery_result_status": "success"
+  },
+  "result_receipt_verification": {
+    "result_status": "success",
+    "work_receipt": {
+      "work_attempted": true,
+      "effects_count": 1,
+      "artifacts_created": [],
+      "state_changed": true,
+      "no_op": false,
+      "evidence_refs": [
+        "level-b-instance-level-b-a:process_pid=79083",
+        "level-b-instance-level-b-a:session_id_sha256=ff3b4735023cef28",
+        "level-b-instance-level-b-a:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-a"
+      ]
+    },
+    "evidence_types": [
+      "level-b-instance-level-b-a:process_pid=79083",
+      "level-b-instance-level-b-a:session_id_sha256=ff3b4735023cef28",
+      "level-b-instance-level-b-a:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-a",
+      "pi-same-adapter:process_pid=79083",
+      "pi-same-adapter:session_id_sha256=ff3b4735023cef28",
+      "pi-same-adapter:workspace=/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/level-b-a",
+      "independent_command"
+    ],
+    "verification_status": "PASS",
+    "task_state": "DONE"
+  },
+  "controlled_breaker": {
+    "opened": {
+      "provider_id": "controlled-provider",
+      "state": "OPEN",
+      "requests_used": 2,
+      "consecutive_failures": 2,
+      "opened_until": 1789473317572,
+      "probe_in_flight": false
+    },
+    "blocked_status": "failure",
+    "blocked_evidence": [
+      "controlled-provider:admission=QUEUE",
+      "controlled-provider:queue_depth=0"
+    ],
+    "final_status": {
+      "provider_id": "controlled-provider",
+      "state": "CLOSED",
+      "requests_used": 3,
+      "consecutive_failures": 0,
+      "probe_in_flight": false
+    }
+  },
+  "real_provider_concurrency": {
+    "status": "PASS",
+    "provider_id": "opencodex",
+    "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+    "instances": [
+      {
+        "worker_instance_id": "pi-provider-instance-a",
+        "adapter_id": "pi-agent",
+        "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/pi-provider-a-UXlev7",
+        "backend": "pi-agent",
+        "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+        "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+        "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+        "provider": "opencodex",
+        "session_id_sha256": null,
+        "process_pid": 79110,
+        "status": "success",
+        "elapsed_ms": 13836,
+        "input_tokens": 1104,
+        "output_tokens": 564,
+        "model_calls": 1,
+        "tool_calls": 0,
+        "timed_out": false
+      },
+      {
+        "worker_instance_id": "pi-provider-instance-b",
+        "adapter_id": "pi-agent",
+        "workspace_path": "/var/folders/pt/6nsbgd1d1ljdj7djgqdh9xmr0000gn/T/pph-phase12-level-b-CGQhsG/pi-provider-b-D8wI7E",
+        "backend": "pi-agent",
+        "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+        "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+        "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+        "provider": "opencodex",
+        "session_id_sha256": null,
+        "process_pid": 79136,
+        "status": "success",
+        "elapsed_ms": 5766,
+        "input_tokens": 1106,
+        "output_tokens": 491,
+        "model_calls": 1,
+        "tool_calls": 0,
+        "timed_out": false
+      }
+    ],
+    "executions": [
+      {
+        "started_at": "2026-09-15T11:55:17.522Z",
+        "ended_at": "2026-09-15T11:55:31.360Z",
+        "status": "success",
+        "admission_evidence": [
+          "opencodex:admission=ALLOW",
+          "opencodex:queue_depth=0"
+        ],
+        "observation": {
+          "backend": "pi-agent",
+          "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+          "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+          "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+          "provider": "opencodex",
+          "session_id_sha256": null,
+          "process_pid": 79110,
+          "status": "success",
+          "elapsed_ms": 13836,
+          "input_tokens": 1104,
+          "output_tokens": 564,
+          "model_calls": 1,
+          "tool_calls": 0,
+          "timed_out": false
+        }
+      },
+      {
+        "started_at": "2026-09-15T11:55:17.526Z",
+        "ended_at": "2026-09-15T11:55:23.292Z",
+        "status": "success",
+        "admission_evidence": [
+          "opencodex:admission=ALLOW",
+          "opencodex:queue_depth=0"
+        ],
+        "observation": {
+          "backend": "pi-agent",
+          "requested_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+          "platform_accepted_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+          "observed_runtime_model": "ArkCoding/deepseek-v4-flash-ga-260731",
+          "provider": "opencodex",
+          "session_id_sha256": null,
+          "process_pid": 79136,
+          "status": "success",
+          "elapsed_ms": 5766,
+          "input_tokens": 1106,
+          "output_tokens": 491,
+          "model_calls": 1,
+          "tool_calls": 0,
+          "timed_out": false
+        }
+      }
+    ],
+    "quota": {
+      "provider_id": "opencodex",
+      "state": "CLOSED",
+      "requests_used": 2,
+      "quota_remaining": 0,
+      "consecutive_failures": 0,
+      "probe_in_flight": false
+    },
+    "session_isolation": "Pi adapter uses --no-session for each bounded execution; raw session identifiers are not recorded"
+  },
+  "bound_coverage": {
+    "passed": true,
+    "uncovered_paths": [],
+    "reasons": []
+  },
+  "gate_checks": {
+    "t0_3_known_external_gap_registry": true,
+    "registry_capability_selection": true,
+    "real_independent_worker_instances": true,
+    "atomic_lease_no_double_dispatch": true,
+    "persistent_lease_epoch_and_fencing": true,
+    "lifecycle": true,
+    "crash_recovery_reassign_stale_result": true,
+    "workspace_session_context_isolation": true,
+    "coordination_budget": true,
+    "t12_6_controlled_quota_backpressure_breaker": true,
+    "t12_6_real_same_provider_multi_instance": true,
+    "result_receipt_verification_regression": true,
+    "bound_coverage": true
+  },
+  "phase12_gate": "PASS",
+  "phase13": "NOT_ENTERED",
+  "known_upstream_failure": {
+    "file": "packages/ai/src/api/google-shared.ts",
+    "line": 402,
+    "fingerprint": "TS2322 FinishReason.TOO_MANY_TOOL_CALLS is not assignable to never",
+    "status": "unchanged-known-upstream-failure"
+  }
+}

@@ -16,6 +16,8 @@
 		"clean": "shx rm -rf dist",
 		"build": "tsgo -p tsconfig.build.json",
 		"check:protocol-isolation": "node scripts/check-protocol-isolation.mjs",
+		"phase-12-level-b": "node scripts/phase-12-level-b.mjs",
+		"phase-13-t13-4": "node scripts/phase-13-t13-4.mjs",
 		"test": "vitest --run"
 	},
   "engines": {

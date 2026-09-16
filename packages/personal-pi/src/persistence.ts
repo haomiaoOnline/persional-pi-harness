@@ -23,6 +23,7 @@ import type {
 	TaskGraph,
 	TaskRecord,
 	VerificationRecord,
+	WorkerInstanceRecord,
 } from "./types.ts";
 
 function emptyState(): PersistentState {
@@ -43,6 +44,7 @@ function emptyState(): PersistentState {
 		budget_decisions: {},
 		leases: {},
 		lease_epochs: {},
+		worker_instances: {},
 		loop_usage: {},
 		traces: [],
 		regressions: [],
@@ -62,6 +64,7 @@ function normalizeState(state: Partial<PersistentState>): PersistentState {
 		budget_decisions: state.budget_decisions ?? {},
 		leases: state.leases ?? {},
 		lease_epochs: state.lease_epochs ?? {},
+		worker_instances: state.worker_instances ?? {},
 		loop_usage: state.loop_usage ?? {},
 		snapshot_payloads: state.snapshot_payloads ?? {},
 	};
@@ -119,6 +122,21 @@ export class PersistentStateStore {
 		if (this.filePath) writeAtomically(this.filePath, candidate);
 		this.state = candidate;
 		return this.read();
+	}
+
+	upsertWorkerInstance(instance: WorkerInstanceRecord): void {
+		this.transact((state) => {
+			state.worker_instances[instance.worker_instance_id] = structuredClone(instance);
+		});
+	}
+
+	getWorkerInstance(workerInstanceId: string): WorkerInstanceRecord | undefined {
+		const instance = this.state.worker_instances[workerInstanceId];
+		return instance ? structuredClone(instance) : undefined;
+	}
+
+	listWorkerInstances(): WorkerInstanceRecord[] {
+		return Object.values(this.state.worker_instances).map((instance) => structuredClone(instance));
 	}
 
 	createTask(contract: TaskContract): TaskRecord {
