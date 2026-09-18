@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 
 interface CodingAgentPackageJson {
 	bin: Record<string, string>;
+	dependencies?: Record<string, string>;
 	piConfig: { name: string; configDir: string };
 	main: string;
 	exports: {
@@ -24,6 +25,7 @@ describe("package distribution entrypoints", () => {
 		expect(packageJson.main).toBe("./dist/index.js");
 		expect(packageJson.exports["."].import).toBe("./dist/index.js");
 		expect(packageJson.exports["./rpc-entry"].import).toBe("./dist/bundle/rpc-entry.js");
+		expect(packageJson.dependencies?.["@personal-pi/core"]).toBeUndefined();
 	});
 
 	// Regression for #9132: internal experimental entrypoints must not be published runtime exports.

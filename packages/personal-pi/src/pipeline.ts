@@ -104,6 +104,7 @@ export interface PipelineRequest {
 	recipe_registry?: VerificationRecipeRegistry;
 	snapshot: WorkspaceSnapshot;
 	current_snapshot?: WorkspaceSnapshot;
+	workspace_snapshot_provider?: (artifacts: readonly string[]) => WorkspaceSnapshot;
 	existing_task?: TaskRecord;
 	definition_of_ready?: DefinitionOfReadyInput;
 	at?: string;
@@ -606,11 +607,12 @@ export class PersonalPiPipeline {
 			new TaskStateMachine().transition(task, "VERIFYING", "Result and Evidence recorded", at),
 		);
 
+		const verificationSnapshot = request.workspace_snapshot_provider?.(result.artifacts) ?? request.snapshot;
 		const verificationRequest: VerificationRequest = {
 			task,
 			evidence,
-			snapshot: request.snapshot,
-			currentSnapshot: request.current_snapshot ?? request.snapshot,
+			snapshot: verificationSnapshot,
+			currentSnapshot: request.current_snapshot ?? verificationSnapshot,
 			commandRunner: undefined,
 			recipeRegistry: request.recipe_registry,
 			workerStatus: result.status,
@@ -632,12 +634,11 @@ export class PersonalPiPipeline {
 
 		if (verification.status === "PASS" && result.status === "success") {
 			try {
-				task = this.acceptanceGate.markDone(
-					task,
-					verification,
-					request.current_snapshot ?? request.snapshot,
-					result,
-				);
+				const acceptanceSnapshot =
+					request.workspace_snapshot_provider?.(result.artifacts) ??
+					request.current_snapshot ??
+					verificationSnapshot;
+				task = this.acceptanceGate.markDone(task, verification, acceptanceSnapshot, result);
 			} catch (error) {
 				if (!(error instanceof Error) || !error.message.startsWith("work_receipt_anomaly:")) throw error;
 				const reason = error.message;

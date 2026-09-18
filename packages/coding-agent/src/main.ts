@@ -64,6 +64,10 @@ import { hasTrustRequiringProjectResources, ProjectTrustStore } from "./core/tru
 import { builtInExtensions } from "./extensions/index.ts";
 import { runMigrations, showDeprecationWarnings } from "./migrations.ts";
 import { InteractiveMode, runPrintMode, runRpcMode } from "./modes/index.ts";
+import {
+	createInteractiveIngressForMode,
+	type InteractiveIngressFactory,
+} from "./modes/interactive/interactive-ingress.ts";
 import { initTheme, setThemeJsonValidator, stopThemeWatcher } from "./modes/interactive/theme/theme.ts";
 import { validateThemeJson } from "./modes/interactive/theme/theme-json.ts";
 import { cleanupManagedInstall, handleConfigCommand, handlePackageCommand } from "./package-manager-cli.ts";
@@ -557,6 +561,7 @@ async function promptForMissingSessionCwd(
 
 export interface MainOptions {
 	extensionFactories?: InlineExtension[];
+	interactiveIngressFactory?: InteractiveIngressFactory;
 }
 
 export async function main(args: string[], options?: MainOptions) {
@@ -926,6 +931,20 @@ export async function main(args: string[], options?: MainOptions) {
 			.catch(() => {})
 			.finally(() => clearTimeout(timeout));
 	}
+	const interactiveIngress = await createInteractiveIngressForMode(appMode, options?.interactiveIngressFactory, {
+		getWorkerRoute: () => {
+			const currentSession = runtime.session;
+			return {
+				cwd: runtime.cwd,
+				command: process.execPath,
+				command_args_prefix: [process.argv[1]],
+				provider: currentSession.model?.provider,
+				model: currentSession.model?.id,
+				thinking: currentSession.thinkingLevel,
+				active_tools: currentSession.getActiveToolNames(),
+			};
+		},
+	});
 
 	if (appMode === "rpc") {
 		printTimings();
@@ -939,6 +958,7 @@ export async function main(args: string[], options?: MainOptions) {
 			initialMessage,
 			initialImages,
 			initialMessages: parsed.messages,
+			interactiveIngress,
 			verbose: parsed.verbose,
 			tuiMode: parsed.tuiMode,
 			initialThemeSetting: parsed.useTheme,

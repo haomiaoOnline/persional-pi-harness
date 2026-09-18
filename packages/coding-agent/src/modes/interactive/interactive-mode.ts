@@ -154,6 +154,11 @@ import { TrustSelectorComponent } from "./components/trust-selector.ts";
 import { UserMessageComponent } from "./components/user-message.ts";
 import { UserMessageSelectorComponent } from "./components/user-message-selector.ts";
 import { editInExternalEditor } from "./external-editor.ts";
+import {
+	governedInteractiveBusyReason,
+	type InteractiveIngressHandler,
+	routeInteractiveSubmission,
+} from "./interactive-ingress.ts";
 import { refreshModelCatalogs } from "./model-catalog-refresh.ts";
 import { getModelSearchText } from "./model-search.ts";
 import { shareSession } from "./session-share.ts";
@@ -364,6 +369,8 @@ export interface InteractiveModeOptions {
 	initialImages?: ImageContent[];
 	/** Additional messages to send after the initial message */
 	initialMessages?: string[];
+	/** Optional governing ingress for top-level interactive work submissions. */
+	interactiveIngress?: InteractiveIngressHandler;
 	/** Force verbose startup (overrides quietStartup setting) */
 	verbose?: boolean;
 	/** TUI layout mode. */
@@ -1110,7 +1117,7 @@ export class InteractiveMode {
 		// Process initial messages
 		if (initialMessage) {
 			try {
-				await this.session.prompt(initialMessage, { images: initialImages });
+				await this.submitTopLevelWork(initialMessage, initialImages);
 			} catch (error: unknown) {
 				const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 				this.showError(errorMessage);
@@ -1120,7 +1127,7 @@ export class InteractiveMode {
 		if (initialMessages) {
 			for (const message of initialMessages) {
 				try {
-					await this.session.prompt(message);
+					await this.submitTopLevelWork(message);
 				} catch (error: unknown) {
 					const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 					this.showError(errorMessage);
@@ -1132,12 +1139,24 @@ export class InteractiveMode {
 		while (true) {
 			const userInput = await this.getUserInput();
 			try {
-				await this.session.prompt(userInput);
+				await this.submitTopLevelWork(userInput);
 			} catch (error: unknown) {
 				const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 				this.showError(errorMessage);
 			}
 		}
+	}
+
+	private async submitTopLevelWork(text: string, images?: ImageContent[]): Promise<void> {
+		const result = await routeInteractiveSubmission(
+			this.options.interactiveIngress,
+			{ text, images },
+			async (submission) => {
+				await this.session.prompt(submission.text, { images: submission.images });
+				return { summary: this.session.getLastAssistantText() ?? undefined };
+			},
+		);
+		if (this.options.interactiveIngress && result.summary) this.showStatus(result.summary);
 	}
 
 	private async checkForPackageUpdates(): Promise<string[]> {
@@ -3103,7 +3122,7 @@ export class InteractiveMode {
 			}
 
 			// Handle bash command (! for normal, !! for excluded from context)
-			if (text.startsWith("!")) {
+			if (text.startsWith("!") && !this.options.interactiveIngress) {
 				const isExcluded = text.startsWith("!!");
 				const command = isExcluded ? text.slice(2).trim() : text.slice(1).trim();
 				if (command) {
@@ -3118,6 +3137,16 @@ export class InteractiveMode {
 					this.updateEditorBorderColor();
 					return;
 				}
+			}
+
+			const governedBusyReason = governedInteractiveBusyReason(this.options.interactiveIngress, {
+				isCompacting: this.session.isCompacting,
+				isStreaming: this.session.isStreaming,
+			});
+			if (governedBusyReason) {
+				this.showWarning(governedBusyReason);
+				this.editor.setText(text);
+				return;
 			}
 
 			// Queue input during compaction (extension commands execute immediately)
@@ -4126,6 +4155,16 @@ export class InteractiveMode {
 		const text = (this.editor.getExpandedText?.() ?? this.editor.getText()).trim();
 		if (!text) return;
 
+		const governedBusyReason = governedInteractiveBusyReason(this.options.interactiveIngress, {
+			isCompacting: this.session.isCompacting,
+			isStreaming: this.session.isStreaming,
+		});
+		if (governedBusyReason) {
+			this.showWarning(governedBusyReason);
+			this.editor.setText(text);
+			return;
+		}
+
 		// Queue input during compaction (extension commands execute immediately)
 		if (this.session.isCompacting) {
 			if (this.isExtensionCommand(text)) {
@@ -4431,6 +4470,13 @@ export class InteractiveMode {
 		const queuedMessages = [...this.compactionQueuedMessages];
 		this.compactionQueuedMessages = [];
 		this.updatePendingMessagesDisplay();
+		if (this.options.interactiveIngress) {
+			const existing = (this.editor.getExpandedText?.() ?? this.editor.getText()).trim();
+			const restored = queuedMessages.map((message) => message.text).join("\n\n");
+			this.editor.setText([existing, restored].filter(Boolean).join("\n\n"));
+			this.showWarning("Governed interactive queued work was restored instead of bypassing ingress");
+			return;
+		}
 
 		const restoreQueue = (error: unknown) => {
 			this.session.clearQueue();

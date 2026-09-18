@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import { chmodSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { isBuiltin } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { validateBundleExternalImports, validateBundleRequiredOutputs } from "./coding-agent-bundle-policy.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, "..");
@@ -12,6 +12,9 @@ const codingAgentDir = join(repoRoot, "packages", "coding-agent");
 const aiDistDir = join(repoRoot, "packages", "ai", "dist");
 const codingAgentDistDir = join(codingAgentDir, "dist");
 const bundleDir = join(codingAgentDistDir, "bundle");
+const pphCliBootstrap = join(scriptDir, "pph-cli-bootstrap.mjs");
+const pphPermissionGate = join(repoRoot, "packages", "personal-pi", "src", "adapters", "pi-permission-gate.ts");
+const pphPermissionGateOutput = join(bundleDir, "pi-permission-gate.js");
 const banner = {
 	js: 'import { createRequire as __piCreateRequire } from "node:module"; const require = __piCreateRequire(import.meta.url);',
 };
@@ -108,23 +111,6 @@ function commonBuildOptions() {
 	};
 }
 
-function validateExternalImports(metafiles) {
-	const unexpected = new Set();
-	for (const metafile of metafiles) {
-		for (const input of Object.values(metafile.inputs)) {
-			for (const imported of input.imports) {
-				if (!imported.external || isBuiltin(imported.path) || allowedExternalPackages.has(imported.path)) {
-					continue;
-				}
-				unexpected.add(imported.path);
-			}
-		}
-	}
-	if (unexpected.size > 0) {
-		throw new Error(`Bundle left unexpected external imports: ${Array.from(unexpected).sort().join(", ")}`);
-	}
-}
-
 function findContainingOutput(metafile, inputSuffix) {
 	const normalizedSuffix = inputSuffix.replaceAll("\\", "/");
 	for (const [outputPath, output] of Object.entries(metafile.outputs)) {
@@ -149,6 +135,8 @@ for (const entry of [
 	join(codingAgentDistDir, "utils", "image-resize-worker.js"),
 	join(aiDistDir, "api", "bedrock-converse-stream.js"),
 	join(aiDistDir, "auth", "oauth", "anthropic.js"),
+	pphCliBootstrap,
+	pphPermissionGate,
 ]) {
 	if (!existsSync(entry)) {
 		throw new Error(`Bundle input is missing: ${relative(repoRoot, entry)}. Build the workspace packages first.`);
@@ -162,7 +150,7 @@ const mainResult = await build({
 	...commonBuildOptions(),
 	entryNames: "[name]",
 	entryPoints: {
-		cli: join(codingAgentDistDir, "cli.js"),
+		cli: pphCliBootstrap,
 		index: join(codingAgentDistDir, "index.js"),
 		"rpc-entry": join(codingAgentDistDir, "rpc-entry.js"),
 	},
@@ -199,15 +187,25 @@ const lazyResult = await build({
 	splitting: false,
 });
 
+const permissionGateResult = await build({
+	...commonBuildOptions(),
+	entryNames: "[name]",
+	entryPoints: { "pi-permission-gate": pphPermissionGate },
+	outdir: bundleDir,
+	splitting: false,
+});
+
 const imageResizeWorkerOutput = resolve(dirname(bedrockLoaderOutput), "image-resize-worker.js");
 if (dirname(imageResizeOutput) !== dirname(imageResizeWorkerOutput)) {
 	throw new Error("Image resize implementation and worker were emitted into different directories");
 }
 
-validateExternalImports([mainResult.metafile, lazyResult.metafile]);
+const metafiles = [mainResult.metafile, lazyResult.metafile, permissionGateResult.metafile];
+validateBundleExternalImports(metafiles, allowedExternalPackages);
+validateBundleRequiredOutputs(metafiles, [relative(repoRoot, pphPermissionGateOutput)]);
 chmodSync(join(bundleDir, "cli.js"), 0o755);
 chmodSync(join(bundleDir, "rpc-entry.js"), 0o755);
 
-const files = new Set([...Object.keys(mainResult.metafile.outputs), ...Object.keys(lazyResult.metafile.outputs)]).size;
-const mib = outputBytes([mainResult.metafile, lazyResult.metafile]) / (1024 * 1024);
+const files = new Set(metafiles.flatMap((metafile) => Object.keys(metafile.outputs))).size;
+const mib = outputBytes(metafiles) / (1024 * 1024);
 console.log(`Built ${relative(repoRoot, bundleDir)} (${files} files, ${mib.toFixed(1)} MiB)`);

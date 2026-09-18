@@ -29,6 +29,8 @@ const WRITE_TOOLS = new Set(["write", "edit"]);
 export interface PiAgentWorkerAdapterOptions {
 	worker_id?: string;
 	command?: string;
+	command_args_prefix?: string[];
+	permission_gate_path?: string | URL;
 	provider?: string;
 	model?: string;
 	thinking?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
@@ -96,7 +98,11 @@ function absoluteWorkingDirectory(task: TaskContract): string {
 		: resolve(process.cwd(), task.execution.working_directory);
 }
 
-function extensionPath(): string | undefined {
+function extensionPath(explicitPath?: string | URL): string | undefined {
+	if (explicitPath !== undefined) {
+		const injected = explicitPath instanceof URL ? fileURLToPath(explicitPath) : explicitPath;
+		return existsSync(injected) ? injected : undefined;
+	}
 	const compiled = fileURLToPath(new URL("./pi-permission-gate.js", import.meta.url));
 	if (existsSync(compiled)) return compiled;
 	const source = fileURLToPath(new URL("./pi-permission-gate.ts", import.meta.url));
@@ -234,6 +240,8 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 	readonly backend = "pi-agent";
 	readonly requested_model: string;
 	private readonly command: string;
+	private readonly command_args_prefix: string[];
+	private readonly permission_gate_path?: string | URL;
 	private readonly provider: string;
 	private readonly thinking: NonNullable<PiAgentWorkerAdapterOptions["thinking"]>;
 	private readonly timeout_ms: number;
@@ -245,6 +253,8 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 	constructor(options: PiAgentWorkerAdapterOptions = {}) {
 		this.worker_id = options.worker_id ?? "pi-agent-deepseek-v4-flash";
 		this.command = options.command ?? "pi";
+		this.command_args_prefix = [...(options.command_args_prefix ?? [])];
+		this.permission_gate_path = options.permission_gate_path;
 		this.provider = options.provider ?? "opencodex";
 		this.requested_model = options.model ?? "ArkCoding/deepseek-v4-flash-ga-260731";
 		this.thinking = options.thinking ?? "high";
@@ -276,7 +286,7 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 		const prompt = buildExternalPrompt(input, request.task, this.backend, tools, denial);
 		const maxElapsed = request.task.loop_budget?.max_elapsed_ms ?? this.timeout_ms;
 		const timeout = Math.max(1, Math.min(this.timeout_ms, request.task.timeout, maxElapsed));
-		const extension = tools.length > 0 ? extensionPath() : undefined;
+		const extension = tools.length > 0 ? extensionPath(this.permission_gate_path) : undefined;
 		if (tools.length > 0 && !extension) {
 			const observation = createCliObservation();
 			observation.protocol_error = "permission gate unavailable";
@@ -289,6 +299,7 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 			);
 		}
 		const args = [
+			...this.command_args_prefix,
 			"-p",
 			"--mode",
 			"json",
