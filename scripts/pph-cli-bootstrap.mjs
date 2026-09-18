@@ -6,6 +6,10 @@ import { createPersonalPiInteractiveIngressFactory } from "../packages/personal-
 import { runPersonalPiStableCli } from "../packages/personal-pi/src/stable-cli.ts";
 
 const permissionGatePath = fileURLToPath(new URL("./pi-permission-gate.js", import.meta.url));
+const providerMode = process.env.PPH_PROVIDER_MODE;
+if (providerMode !== undefined && !["mock", "local", "real"].includes(providerMode)) {
+	throw new Error("PPH_PROVIDER_MODE must be one of: mock, local, real");
+}
 const argv = process.argv.slice(2);
 const stable = await runPersonalPiStableCli(argv, { permission_gate_path: permissionGatePath });
 if (stable.handled) {
@@ -15,6 +19,9 @@ if (stable.handled) {
 } else {
 	setupCli();
 	await main(argv, {
-		interactiveIngressFactory: createPersonalPiInteractiveIngressFactory({ permission_gate_path: permissionGatePath }),
+		interactiveIngressFactory: createPersonalPiInteractiveIngressFactory({
+			permission_gate_path: permissionGatePath,
+			provider_mode: providerMode,
+		}),
 	});
 }

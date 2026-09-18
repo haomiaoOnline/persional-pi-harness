@@ -116,6 +116,8 @@ function planFor(task: TaskContract) {
 		playbook_refs: ["trace-cli"],
 	};
 	return {
+		provider_mode: "mock" as const,
+		baseline_commit: "trace-test-baseline",
 		plan_assessment,
 		plan_checklist: {
 			technical_feasibility: true,

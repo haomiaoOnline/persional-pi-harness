@@ -637,6 +637,27 @@ export interface CommandEvidence {
 	stderr: string;
 }
 
+export type ProviderMode = "mock" | "local" | "real";
+
+export interface DeliveryEvidencePackage {
+	baseline_commit: string;
+	actual_diff: {
+		files: string[];
+		digest: string;
+	};
+	task_revision: number;
+	workspace_snapshot_ref: string;
+	commands_and_exit_codes: Array<{
+		command: string;
+		exit_code: number;
+	}>;
+	test_output_summary: string;
+	artifact_digest: string;
+	browser_or_container_verification: string[];
+	unfinished_items: string[];
+	provider_mode: ProviderMode;
+}
+
 export interface EvidenceRecord {
 	id: string;
 	task_id: string;
@@ -653,6 +674,8 @@ export interface EvidenceRecord {
 	build_result?: string;
 	artifacts: string[];
 	evidence_types: string[];
+	/** Optional only for loading/replaying pre-v3.4 legacy Evidence. New verification requires it. */
+	delivery_evidence_package?: DeliveryEvidencePackage;
 }
 
 export interface WorkspaceSnapshot {
@@ -664,6 +687,10 @@ export interface WorkspaceSnapshot {
 export interface VerificationRecord {
 	id: string;
 	task_id: string;
+	/** Required on all newly-produced verification records; optional only for legacy persisted records. */
+	evidence_id?: string;
+	/** Content binding for the exact standardized package used by this verification. */
+	delivery_evidence_package_digest?: string;
 	status: VerificationStatus;
 	verification_confidence: VerificationStrength;
 	task_revision: number;
@@ -680,6 +707,7 @@ export interface VerificationRecipe {
 	task_type: string;
 	required: string[];
 	evidence: string[];
+	required_provider_mode?: ProviderMode;
 }
 
 export type RunStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "TIMEOUT" | "CRASHED";
@@ -877,6 +905,10 @@ export interface AcceptanceRecord {
 	task_revision: number;
 	verification_id: string;
 	run_id: string;
+	/** Required for new acceptances; optional only for pre-v3.4 legacy state. */
+	evidence_id?: string;
+	/** Required for new acceptances; never inferred for legacy state. */
+	provider_mode?: ProviderMode;
 	accepted_at: string;
 }
 

@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import {
+	captureWorkspaceSnapshot,
+	createDeliveryEvidencePackage,
 	PersistentStateStore,
 	probeLocalStableCliWorkerStatus,
 	runPersonalPiStableCli,
@@ -140,7 +142,18 @@ describe("T2.7-C stable CLI", () => {
 
 		const run = parsed(
 			await runPersonalPiStableCli(
-				["task", "run", "--task", "pph-stable-1", "--provider", "test", "--model", "test-model"],
+				[
+					"task",
+					"run",
+					"--task",
+					"pph-stable-1",
+					"--provider",
+					"test",
+					"--model",
+					"test-model",
+					"--provider-mode",
+					"mock",
+				],
 				options,
 			),
 		);
@@ -150,6 +163,9 @@ describe("T2.7-C stable CLI", () => {
 		expect(persisted.runs).toHaveLength(1);
 		expect(persisted.loop_usage["pph-stable-1"]?.attempts).toBe(1);
 		expect(persisted.acceptances).toHaveLength(1);
+		expect(persisted.evidence).toHaveLength(1);
+		expect(persisted.evidence[0]?.delivery_evidence_package?.provider_mode).toBe("mock");
+		expect(persisted.evidence[0]?.delivery_evidence_package?.baseline_commit).toBe(repository.baseline);
 
 		const verified = parsed(await runPersonalPiStableCli(["task", "verify", "--task", "pph-stable-1"], options));
 		expect((verified.verification as Record<string, unknown>).status).toBe("PASS");
@@ -199,7 +215,18 @@ describe("T2.7-C stable CLI", () => {
 		);
 
 		const run = await runPersonalPiStableCli(
-			["task", "run", "--task", "pph-stable-untrusted", "--provider", "test", "--model", "test-model"],
+			[
+				"task",
+				"run",
+				"--task",
+				"pph-stable-untrusted",
+				"--provider",
+				"test",
+				"--model",
+				"test-model",
+				"--provider-mode",
+				"mock",
+			],
 			options,
 		);
 		expect(run.exit_code).toBe(2);
@@ -213,6 +240,77 @@ describe("T2.7-C stable CLI", () => {
 			execution_mode: "root_only",
 			delivery_status: "degraded",
 		});
+	});
+
+	test("requires an explicit valid provider mode and never infers it from the provider name", async () => {
+		const root = temporaryDirectory();
+		const repository = gitRepository(root);
+		const statePath = join(root, "state.json");
+		const specPath = join(root, "task.json");
+		taskSpec(specPath);
+		const options = {
+			cwd: root,
+			state_path: statePath,
+			task_id_factory: () => "pph-stable-provider-mode",
+			worker_factory: () => noOpWorker(),
+			worker_status_factory: () => AVAILABLE_WORKER_STATUS,
+		};
+		const registered = parsed(
+			await runPersonalPiStableCli(
+				[
+					"project",
+					"register",
+					"--repo",
+					repository.path,
+					"--baseline",
+					repository.baseline,
+					"--architecture",
+					"ARCHITECTURE.md",
+					"--ledger",
+					"TASKS.md",
+				],
+				options,
+			),
+		);
+		const projectId = registered.project_id as string;
+		parsed(
+			await runPersonalPiStableCli(
+				["task", "create", "--project", projectId, "--project-task", "T1.05", "--phase", "P0", "--spec", specPath],
+				options,
+			),
+		);
+
+		const missingMode = await runPersonalPiStableCli(
+			["task", "run", "--task", "pph-stable-provider-mode", "--provider", "mock", "--model", "test-model"],
+			options,
+		);
+		expect(missingMode.exit_code).toBe(2);
+		expect(missingMode.stderr).toContain("--provider-mode is required exactly once");
+
+		const invalidMode = await runPersonalPiStableCli(
+			[
+				"task",
+				"run",
+				"--task",
+				"pph-stable-provider-mode",
+				"--provider",
+				"mock",
+				"--model",
+				"test-model",
+				"--provider-mode",
+				"inferred",
+			],
+			options,
+		);
+		expect(invalidMode.exit_code).toBe(2);
+		expect(invalidMode.stderr).toContain("invalid --provider-mode value: inferred");
+
+		const persisted = new PersistentStateStore(statePath).read();
+		expect(persisted.tasks.find((task) => task.id === "pph-stable-provider-mode")?.state).toBe("DRAFT");
+		expect(persisted.dispatches).toEqual([]);
+		expect(persisted.runs).toEqual([]);
+		expect(persisted.evidence).toEqual([]);
+		expect(persisted.loop_usage["pph-stable-provider-mode"]).toBeUndefined();
 	});
 
 	test("inspect and gate status are physically read-only and stable across repeated calls", async () => {
@@ -328,17 +426,27 @@ describe("T2.7-C stable CLI", () => {
 				evidence_refs: [],
 			},
 		});
+		const evidenceSnapshot = captureWorkspaceSnapshot(repository.baseline, [], []);
 		store.saveEvidence({
 			id: "evidence-verify-accept",
 			task_id: task.id,
 			run_id: run.id,
 			captured_at: new Date().toISOString(),
-			diff: { files: [], digest: "ignored-by-verifier" },
+			diff: { files: [], digest: evidenceSnapshot.diff_digest },
 			commands: [],
 			stdout: "",
 			stderr: "",
 			artifacts: [],
 			evidence_types: [],
+			delivery_evidence_package: createDeliveryEvidencePackage({
+				baseline_commit: repository.baseline,
+				task_revision: task.task_revision,
+				snapshot: evidenceSnapshot,
+				changed_files: [],
+				commands: [],
+				test_output_summary: "verified no-op",
+				provider_mode: "mock",
+			}),
 		});
 		store.updateTask(machine.transition(task, "VERIFYING"));
 

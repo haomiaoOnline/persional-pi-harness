@@ -5,7 +5,7 @@ import { PiAgentWorkerAdapter } from "./adapters/pi-cli.ts";
 import { IngressGate } from "./ingress.ts";
 import { PersistentStateStore } from "./persistence.ts";
 import { createPlanApproval, PersonalPiPipeline } from "./pipeline.ts";
-import type { WorkerStatus, WorkspaceSnapshot } from "./types.ts";
+import type { ProviderMode, WorkerStatus, WorkspaceSnapshot } from "./types.ts";
 import { captureWorkspaceSnapshot } from "./verification.ts";
 
 const PI_TOOLS = new Set(["read", "write", "edit", "grep", "find", "ls", "bash"]);
@@ -38,6 +38,7 @@ export interface PersonalPiInteractiveIngressOptions {
 	state_path?: string;
 	task_id_factory?: () => string;
 	permission_gate_path?: string | URL;
+	provider_mode?: ProviderMode;
 }
 
 const PLAN_ASSESSMENT = {
@@ -74,6 +75,8 @@ function gitSnapshot(cwd: string, artifacts: readonly string[]): WorkspaceSnapsh
 export function createPersonalPiInteractiveIngressFactory(options: PersonalPiInteractiveIngressOptions = {}) {
 	return (context: PersonalPiInteractiveContext) => {
 		return async (submission: PersonalPiInteractiveSubmission): Promise<PersonalPiInteractiveResult> => {
+			if (!options.provider_mode)
+				throw new Error("interactive PPH requires an explicit provider_mode (mock|local|real)");
 			const objective = submission.text.trim();
 			if (!objective) throw new Error("interactive ingress requires a non-empty work submission");
 			if (submission.images && submission.images.length > 0)
@@ -170,6 +173,8 @@ export function createPersonalPiInteractiveIngressFactory(options: PersonalPiInt
 					non_functional: ["bounded execution"],
 					commercialization: ["local personal automation"],
 				},
+				provider_mode: options.provider_mode,
+				baseline_commit: initialSnapshot.commit_hash,
 				plan_assessment: PLAN_ASSESSMENT,
 				plan_checklist: {
 					technical_feasibility: true,

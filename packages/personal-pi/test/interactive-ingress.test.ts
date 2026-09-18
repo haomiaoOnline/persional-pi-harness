@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -78,14 +78,16 @@ describe("T7.0 bundled interactive Personal PI composition", () => {
 	test("uses a real non-interactive PiAgentWorkerAdapter child and persists the governed control-plane chain", async () => {
 		const cwd = temporaryDirectory();
 		initializeGitRepository(cwd);
-		const statePath = join(cwd, ".pph", "state.json");
-		const markerPath = join(cwd, "worker-argv.json");
-		const fakeCli = writeFakePiCli(cwd);
+		const workerFixtureDirectory = temporaryDirectory();
+		const statePath = join(workerFixtureDirectory, "state.json");
+		const markerPath = join(workerFixtureDirectory, "worker-argv.json");
+		const fakeCli = writeFakePiCli(workerFixtureDirectory);
 		const permissionGateUrl = new URL("../src/adapters/pi-permission-gate.ts", import.meta.url);
 		const handler = createPersonalPiInteractiveIngressFactory({
 			state_path: statePath,
 			task_id_factory: () => "interactive-task-1",
 			permission_gate_path: permissionGateUrl,
+			provider_mode: "mock",
 		})({
 			getWorkerRoute: () => ({
 				cwd,
@@ -135,6 +137,7 @@ describe("T7.0 bundled interactive Personal PI composition", () => {
 		const handler = createPersonalPiInteractiveIngressFactory({
 			state_path: statePath,
 			task_id_factory: () => "blocked-task",
+			provider_mode: "mock",
 		})({
 			getWorkerRoute: () => ({
 				cwd,
@@ -159,5 +162,25 @@ describe("T7.0 bundled interactive Personal PI composition", () => {
 		expect(state.dispatches[0]?.worker_status.worker_capability).toBe("unavailable");
 		expect(state.dispatches[0]?.lease_epoch).toBeUndefined();
 		expect(state.runs).toEqual([]);
+	});
+
+	test("fails closed before route or state execution when provider mode is omitted", async () => {
+		const cwd = temporaryDirectory();
+		const statePath = join(cwd, ".pph", "state.json");
+		const getWorkerRoute = vi.fn(() => {
+			throw new Error("worker route must not be resolved");
+		});
+		const handler = createPersonalPiInteractiveIngressFactory({
+			state_path: statePath,
+			task_id_factory: () => "missing-provider-mode",
+		})({ getWorkerRoute });
+		const rawFallback = vi.fn(async () => ({ summary: "must not run" }));
+
+		await expect(
+			routeInteractiveSubmission(handler, { text: "blocked before execution" }, rawFallback),
+		).rejects.toThrow("interactive PPH requires an explicit provider_mode (mock|local|real)");
+		expect(rawFallback).not.toHaveBeenCalled();
+		expect(getWorkerRoute).not.toHaveBeenCalled();
+		expect(existsSync(statePath)).toBe(false);
 	});
 });

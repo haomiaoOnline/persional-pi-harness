@@ -99,6 +99,8 @@ function pipelineOptions(task: TaskContract) {
 		playbook_refs: ["summary-cli"],
 	};
 	return {
+		provider_mode: "mock" as const,
+		baseline_commit: "routine-test-baseline",
 		plan_assessment: assessment,
 		plan_checklist: {
 			technical_feasibility: true,

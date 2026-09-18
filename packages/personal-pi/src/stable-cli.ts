@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { accessSync, constants, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { PiAgentWorkerAdapter } from "./adapters/pi-cli.ts";
+import { validateProviderMode } from "./evidence.ts";
 import { DeterministicTaskCompiler, IngressGate, type TaskIngressRequest } from "./ingress.ts";
 import { PersistentStateStore } from "./persistence.ts";
 import { createPlanApproval, PersonalPiPipeline } from "./pipeline.ts";
@@ -12,6 +13,7 @@ import { inspectStableCliTask, readStableCliGateStatus } from "./stable-cli-read
 import type {
 	ArchitectureCommercialAssessment,
 	PersistentState,
+	ProviderMode,
 	RoleProfile,
 	TaskContract,
 	TaskLedgerBinding,
@@ -282,7 +284,7 @@ async function taskCreate(
 }
 
 async function taskRun(flags: ParsedFlags, options: PersonalPiStableCliOptions, cwd: string): Promise<StableCliResult> {
-	assertKnownFlags(flags, ["state", "task", "provider", "model", "thinking"]);
+	assertKnownFlags(flags, ["state", "task", "provider", "model", "thinking", "provider-mode"]);
 	const store = new PersistentStateStore(statePath(flags, options, cwd));
 	const taskId = requiredFlag(flags, "task");
 	const task = store.getTask(taskId);
@@ -295,6 +297,9 @@ async function taskRun(flags: ParsedFlags, options: PersonalPiStableCliOptions, 
 		throw new Error("task working_directory no longer matches its registered project");
 	const provider = requiredFlag(flags, "provider");
 	const model = requiredFlag(flags, "model");
+	const providerModeValue = requiredFlag(flags, "provider-mode");
+	if (!validateProviderMode(providerModeValue)) throw new Error(`invalid --provider-mode value: ${providerModeValue}`);
+	const providerMode: ProviderMode = providerModeValue;
 	const thinking = (optionalFlag(flags, "thinking") ?? "medium") as StableCliWorkerRequest["thinking"];
 	if (!new Set(["off", "minimal", "low", "medium", "high", "xhigh", "max"]).has(thinking))
 		throw new Error(`invalid --thinking value: ${thinking}`);
@@ -327,6 +332,8 @@ async function taskRun(flags: ParsedFlags, options: PersonalPiStableCliOptions, 
 			non_functional: ["bounded governed execution"],
 			commercialization: ["reusable project delivery"],
 		},
+		provider_mode: providerMode,
+		baseline_commit: project.baseline_commit,
 		plan_assessment: PLAN_ASSESSMENT,
 		plan_checklist: {
 			technical_feasibility: true,

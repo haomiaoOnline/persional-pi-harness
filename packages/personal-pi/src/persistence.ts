@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { deliveryEvidencePackageDigest, validateDeliveryEvidencePackage } from "./evidence.ts";
 import { validateMasterHandoffReceipt } from "./handoff.ts";
 import { validateModelIdentity, validateResultContract, validateWorkerStatus } from "./result.ts";
 import { validateRoleProfile } from "./roles.ts";
@@ -56,6 +57,36 @@ function assertDoneAcceptanceInvariant(previous: PersistentState, candidate: Per
 		const result = candidate.results.find((entry) => entry.run_id === acceptance.run_id);
 		if (!result || result.task_id !== task.id || result.status !== "success")
 			throw new Error(`DONE task ${task.id} is not backed by a successful persisted Result`);
+		if (!acceptance.evidence_id || !acceptance.provider_mode)
+			throw new Error(`DONE task ${task.id} Acceptance is missing standardized Evidence binding`);
+		const evidence = candidate.evidence.find((entry) => entry.id === acceptance.evidence_id);
+		if (!evidence || evidence.task_id !== task.id || evidence.run_id !== acceptance.run_id)
+			throw new Error(`DONE task ${task.id} Acceptance Evidence does not match the accepted Run`);
+		const packageValidation = validateDeliveryEvidencePackage(evidence.delivery_evidence_package);
+		if (!packageValidation.valid || !packageValidation.value)
+			throw new Error(`DONE task ${task.id} is missing a valid delivery evidence package`);
+		if (
+			packageValidation.value.provider_mode !== acceptance.provider_mode ||
+			verification.evidence_id !== evidence.id
+		)
+			throw new Error(`DONE task ${task.id} Acceptance/Verification Evidence binding is inconsistent`);
+	}
+}
+
+function assertCanonicalEvidenceHistoryInvariant(previous: PersistentState, candidate: PersistentState): void {
+	for (const collection of ["evidence", "verifications", "acceptances"] as const) {
+		const candidateEntries = candidate[collection];
+		const ids = new Set<string>();
+		for (const entry of candidateEntries) {
+			if (ids.has(entry.id)) throw new Error(`duplicate canonical ${collection} id: ${entry.id}`);
+			ids.add(entry.id);
+		}
+		for (const existing of previous[collection]) {
+			const current = candidateEntries.find((entry) => entry.id === existing.id);
+			if (!current) throw new Error(`canonical ${collection} record cannot be deleted: ${existing.id}`);
+			if (JSON.stringify(current) !== JSON.stringify(existing))
+				throw new Error(`canonical ${collection} record is immutable: ${existing.id}`);
+		}
 	}
 }
 
@@ -90,6 +121,23 @@ function assertWorkerRuntimeInvariant(state: PersistentState): void {
 			run.model_identity.requested_model !== result.model_identity.requested_model
 		)
 			throw new Error(`Result ${result.run_id} identity does not match its persisted Run`);
+	}
+	for (const verification of state.verifications) {
+		if (!verification.evidence_id) continue;
+		const evidence = state.evidence.find((candidate) => candidate.id === verification.evidence_id);
+		if (!evidence || evidence.task_id !== verification.task_id)
+			throw new Error(`Verification ${verification.id} has invalid Evidence binding`);
+		const packageValidation = validateDeliveryEvidencePackage(evidence.delivery_evidence_package);
+		if (!packageValidation.valid || !packageValidation.value) {
+			if (verification.status === "PASS" || verification.delivery_evidence_package_digest)
+				throw new Error(`Verification ${verification.id} cannot PASS with incomplete delivery Evidence`);
+			continue;
+		}
+		if (
+			!verification.delivery_evidence_package_digest ||
+			verification.delivery_evidence_package_digest !== deliveryEvidencePackageDigest(packageValidation.value)
+		)
+			throw new Error(`Verification ${verification.id} delivery Evidence digest mismatch`);
 	}
 	for (const receipt of state.handoff_receipts) {
 		const validation = validateMasterHandoffReceipt(receipt);
@@ -216,6 +264,7 @@ export class PersistentStateStore {
 		mutation(candidate);
 		assertWorkerRuntimeInvariant(candidate);
 		assertDoneAcceptanceInvariant(this.state, candidate);
+		assertCanonicalEvidenceHistoryInvariant(this.state, candidate);
 		if (this.filePath) writeAtomically(this.filePath, candidate);
 		this.state = candidate;
 		return this.read();
@@ -329,13 +378,28 @@ export class PersistentStateStore {
 		const result = this.state.results.find((candidate) => candidate.run_id === resultRunId);
 		if (!result) throw new Error(`unknown persisted result: ${resultRunId}`);
 		if (result.task_id !== taskId) throw new Error(`result ${resultRunId} does not belong to task ${taskId}`);
-		const accepted = acceptanceGate.markDone(task, verification, currentSnapshot, result);
+		if (!verification.evidence_id) throw new Error(`verification ${verificationId} is not bound to Evidence`);
+		const evidence = this.state.evidence.find((candidate) => candidate.id === verification.evidence_id);
+		if (!evidence) throw new Error(`unknown verification Evidence: ${verification.evidence_id}`);
+		if (evidence.task_id !== taskId || evidence.run_id !== resultRunId)
+			throw new Error(`verification Evidence does not belong to accepted Task/Run: ${verification.evidence_id}`);
+		const packageValidation = validateDeliveryEvidencePackage(evidence.delivery_evidence_package);
+		if (!packageValidation.valid || !packageValidation.value)
+			throw new Error(`cannot accept without valid delivery evidence package: ${verification.evidence_id}`);
+		if (
+			!verification.delivery_evidence_package_digest ||
+			verification.delivery_evidence_package_digest !== deliveryEvidencePackageDigest(packageValidation.value)
+		)
+			throw new Error(`verification delivery Evidence digest is stale: ${verificationId}`);
+		const accepted = acceptanceGate.markDone(task, verification, currentSnapshot, result, evidence);
 		const acceptance: AcceptanceRecord = {
 			id: randomUUID(),
 			task_id: taskId,
 			task_revision: task.task_revision,
 			verification_id: verificationId,
 			run_id: resultRunId,
+			evidence_id: evidence.id,
+			provider_mode: packageValidation.value.provider_mode,
 			accepted_at: acceptedAt,
 		};
 		this.transact((state) => {
@@ -433,11 +497,27 @@ export class PersistentStateStore {
 	}
 
 	saveEvidence(evidence: EvidenceRecord): void {
-		this.transact((state) => state.evidence.push(structuredClone(evidence)));
+		if (evidence.delivery_evidence_package) {
+			const validation = validateDeliveryEvidencePackage(evidence.delivery_evidence_package);
+			if (!validation.valid)
+				throw new Error(`cannot persist invalid delivery Evidence: ${validation.errors.join("; ")}`);
+		}
+		this.transact((state) => {
+			if (state.evidence.some((candidate) => candidate.id === evidence.id))
+				throw new Error(`Evidence already exists: ${evidence.id}`);
+			state.evidence.push(structuredClone(evidence));
+		});
 	}
 
 	saveVerification(verification: VerificationRecord): void {
-		this.transact((state) => state.verifications.push(structuredClone(verification)));
+		this.transact((state) => {
+			if (verification.evidence_id) {
+				const evidence = state.evidence.find((candidate) => candidate.id === verification.evidence_id);
+				if (!evidence || evidence.task_id !== verification.task_id)
+					throw new Error(`Verification Evidence binding is invalid: ${verification.id}`);
+			}
+			state.verifications.push(structuredClone(verification));
+		});
 	}
 
 	saveHandoffReceipt(

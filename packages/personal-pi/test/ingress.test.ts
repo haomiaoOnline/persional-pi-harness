@@ -50,6 +50,8 @@ function makeRequest(
 ) {
 	return {
 		ingress,
+		provider_mode: "mock" as const,
+		baseline_commit: "ingress-test-baseline",
 		readiness: { dependencies_ready: true, artifact_edges: [] },
 		requirement: {
 			user: "Personal PI owner",

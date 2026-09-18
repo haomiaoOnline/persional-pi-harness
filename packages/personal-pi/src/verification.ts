@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { digestFor } from "./artifacts.ts";
-import { evidenceHasType } from "./evidence.ts";
+import {
+	deliveryEvidencePackageDigest,
+	evidenceHasType,
+	validateDeliveryEvidencePackage,
+	workspaceSnapshotRef,
+} from "./evidence.ts";
 import type { VerificationRecipeRegistry } from "./recipes.ts";
 import { TaskStateMachine } from "./state-machine.ts";
 import type {
@@ -58,6 +63,7 @@ export interface VerifierInput {
 		build_result?: string;
 		artifacts: string[];
 		evidence_types: string[];
+		delivery_evidence_package?: EvidenceRecord["delivery_evidence_package"];
 	};
 	recipe_ref?: string;
 }
@@ -78,6 +84,9 @@ export function buildVerifierInput(request: VerificationRequest): VerifierInput 
 			build_result: request.evidence.build_result,
 			artifacts: [...request.evidence.artifacts],
 			evidence_types: [...request.evidence.evidence_types],
+			delivery_evidence_package: request.evidence.delivery_evidence_package
+				? structuredClone(request.evidence.delivery_evidence_package)
+				: undefined,
 		},
 		recipe_ref: request.task.verification.recipe_ref,
 	};
@@ -119,6 +128,27 @@ export class VerificationEngine {
 		const checks: string[] = [];
 		const reasons: string[] = [];
 		let status: VerificationRecord["status"] = "PASS";
+		const deliveryPackage = request.evidence.delivery_evidence_package;
+		const packageValidation = validateDeliveryEvidencePackage(deliveryPackage);
+		if (!packageValidation.valid || !packageValidation.value) {
+			status = "UNKNOWN";
+			reasons.push(`delivery evidence package is incomplete: ${packageValidation.errors.join("; ")}`);
+		} else {
+			const packageValue = packageValidation.value;
+			if (packageValue.task_revision !== request.task.task_revision) {
+				status = "UNKNOWN";
+				reasons.push("delivery evidence package task revision is stale");
+			}
+			if (
+				packageValue.actual_diff.digest !== request.evidence.diff.digest ||
+				packageValue.actual_diff.digest !== request.snapshot.diff_digest ||
+				packageValue.artifact_digest !== request.snapshot.artifact_digest ||
+				packageValue.workspace_snapshot_ref !== workspaceSnapshotRef(request.snapshot)
+			) {
+				status = "UNKNOWN";
+				reasons.push("delivery evidence package does not match verification workspace snapshot");
+			}
+		}
 		const missing = missingEvidence(request.task, request.evidence);
 		if (missing.length > 0) {
 			status = "UNKNOWN";
@@ -130,6 +160,15 @@ export class VerificationEngine {
 				reasons.push(`missing verification recipe: ${request.task.verification.recipe_ref}`);
 				if (status === "PASS") status = "UNKNOWN";
 			} else {
+				if (
+					recipe.required_provider_mode &&
+					request.evidence.delivery_evidence_package?.provider_mode !== recipe.required_provider_mode
+				) {
+					status = "UNKNOWN";
+					reasons.push(
+						`provider mode ${request.evidence.delivery_evidence_package?.provider_mode ?? "missing"} does not satisfy recipe requirement ${recipe.required_provider_mode}`,
+					);
+				}
 				const missingChecks = recipe.required.filter((check) => !request.evidence.evidence_types.includes(check));
 				const missingRecipeEvidence = recipe.evidence.filter((type) => !evidenceHasType(request.evidence, type));
 				if (missingChecks.length > 0 || missingRecipeEvidence.length > 0) {
@@ -174,6 +213,10 @@ export class VerificationEngine {
 		return {
 			id: randomUUID(),
 			task_id: request.task.id,
+			evidence_id: request.evidence.id,
+			delivery_evidence_package_digest: packageValidation.value
+				? deliveryEvidencePackageDigest(packageValidation.value)
+				: undefined,
 			status,
 			verification_confidence: status === "PASS" ? request.task.verification.strength : "none",
 			task_revision: request.task.task_revision,
@@ -200,6 +243,7 @@ export class AcceptanceGate {
 		verification: VerificationRecord,
 		currentSnapshot: WorkspaceSnapshot,
 		result?: ResultContract,
+		evidence?: EvidenceRecord,
 	): TaskRecord {
 		if (task.state !== "VERIFYING") throw new AcceptanceGateError("task must be VERIFYING before acceptance");
 		if (verification.status !== "PASS")
@@ -213,6 +257,26 @@ export class AcceptanceGate {
 		};
 		if (!snapshotMatches(recordedSnapshot, currentSnapshot))
 			throw new AcceptanceGateError("verification PASS invalidated by workspace change");
+		if (!verification.evidence_id || !evidence || verification.evidence_id !== evidence.id)
+			throw new AcceptanceGateError("verification is not bound to the canonical Evidence record");
+		if (evidence.task_id !== task.id || evidence.run_id !== result?.run_id)
+			throw new AcceptanceGateError("Evidence does not belong to the accepted Task/Run");
+		const packageValidation = validateDeliveryEvidencePackage(evidence.delivery_evidence_package);
+		if (!packageValidation.valid || !packageValidation.value)
+			throw new AcceptanceGateError("delivery evidence package is incomplete");
+		const deliveryPackage = packageValidation.value;
+		if (
+			!verification.delivery_evidence_package_digest ||
+			verification.delivery_evidence_package_digest !== deliveryEvidencePackageDigest(deliveryPackage)
+		)
+			throw new AcceptanceGateError("verification delivery evidence package digest is stale");
+		if (
+			deliveryPackage.task_revision !== task.task_revision ||
+			deliveryPackage.actual_diff.digest !== currentSnapshot.diff_digest ||
+			deliveryPackage.artifact_digest !== currentSnapshot.artifact_digest ||
+			deliveryPackage.workspace_snapshot_ref !== workspaceSnapshotRef(currentSnapshot)
+		)
+			throw new AcceptanceGateError("delivery evidence package does not match accepted workspace snapshot");
 		if (
 			result?.status === "success" &&
 			(!result.work_receipt ||

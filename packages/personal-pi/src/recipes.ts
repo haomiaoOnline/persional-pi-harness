@@ -2,12 +2,15 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 import type { ValidationResult, VerificationRecipe } from "./types.ts";
 
+const ProviderModeSchema = Type.Union([Type.Literal("mock"), Type.Literal("local"), Type.Literal("real")]);
+
 const VerificationRecipeSchema = Type.Object(
 	{
 		id: Type.String({ minLength: 1 }),
 		task_type: Type.String({ minLength: 1 }),
 		required: Type.Array(Type.String({ minLength: 1 })),
 		evidence: Type.Array(Type.String({ minLength: 1 })),
+		required_provider_mode: Type.Optional(ProviderModeSchema),
 	},
 	{ additionalProperties: false },
 );

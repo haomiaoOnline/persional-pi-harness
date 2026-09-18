@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { ArtifactStore } from "./artifacts.ts";
 import { authorizeCommand, type CommandApproval, CommandRiskClassifier } from "./command-risk.ts";
 import { type ContextResolver, evaluateContextReadiness, FreshContextBuilder } from "./context.ts";
-import { EvidenceCollector } from "./evidence.ts";
+import { createDeliveryEvidencePackage, EvidenceCollector } from "./evidence.ts";
 import { buildMasterHandoffReceipt, createArchivedHandoffFailure } from "./handoff.ts";
 import { LeaseManager } from "./lease.ts";
 import type { LifecycleHookManager, LifecycleHookRunResult } from "./lifecycle-hooks.ts";
@@ -40,6 +40,7 @@ import type {
 	PlanQualityChecklist,
 	PlanQualityGateResult,
 	Preclassification,
+	ProviderMode,
 	RequirementContract,
 	ResolvedContext,
 	ResultContract,
@@ -92,6 +93,10 @@ export class PipelineStageError extends Error {
 export interface PipelineRequest {
 	requirement: RequirementContract;
 	task: TaskContract;
+	/** Explicit environment label; never inferred from provider/model/adapter identity. */
+	provider_mode: ProviderMode;
+	/** Explicit controller/project baseline; never synthesized from provider output. */
+	baseline_commit: string;
 	worker: WorkerAdapter;
 	worker_status: WorkerStatus;
 	plan_checklist: PlanQualityChecklist;
@@ -747,6 +752,41 @@ export class PersonalPiPipeline {
 			}
 		}
 
+		const verificationSnapshot = request.workspace_snapshot_provider?.(result.artifacts) ?? request.snapshot;
+		const evidenceTypes = [
+			...new Set([
+				...result.evidence,
+				...lifecycleEvidence,
+				...(verifierCommands.some((command) => command.exit_code === 0) ? ["independent_command"] : []),
+			]),
+		];
+		const hasBrowserOrContainerEvidence = evidenceTypes.some((type) =>
+			new Set([
+				"browser_e2e",
+				"network_trace",
+				"screenshot",
+				"video",
+				"console_log",
+				"request_trace",
+				"container_verification",
+			]).has(type),
+		);
+		const browserOrContainerEvidence = hasBrowserOrContainerEvidence ? [...result.artifacts] : [];
+		const deliveryEvidencePackage = createDeliveryEvidencePackage({
+			baseline_commit: request.baseline_commit,
+			task_revision: task.task_revision,
+			snapshot: verificationSnapshot,
+			changed_files: result.changed_files,
+			commands: verifierCommands,
+			test_output_summary: [
+				`worker_status=${result.status}`,
+				`verification_commands=${verifierCommands.length}`,
+				`failed_commands=${verifierCommands.filter((command) => command.exit_code !== 0).length}`,
+			].join("; "),
+			browser_or_container_verification: browserOrContainerEvidence,
+			unfinished_items: [...result.errors, ...(result.requested_context ?? [])],
+			provider_mode: request.provider_mode,
+		});
 		const evidence = this.evidenceCollector.collect({
 			task_id: task.id,
 			run_id: run.id,
@@ -755,14 +795,9 @@ export class PersonalPiPipeline {
 			stdout: result.summary,
 			stderr: result.errors.join("; "),
 			artifacts: result.artifacts,
-			evidence_types: [
-				...new Set([
-					...result.evidence,
-					...lifecycleEvidence,
-					...(verifierCommands.some((command) => command.exit_code === 0) ? ["independent_command"] : []),
-				]),
-			],
+			evidence_types: evidenceTypes,
 			captured_at: at,
+			delivery_evidence_package: deliveryEvidencePackage,
 		});
 		this.stateStore.saveEvidence(evidence);
 		tracer.record("EVIDENCE", "Evidence recorded", at);
@@ -770,7 +805,6 @@ export class PersonalPiPipeline {
 			new TaskStateMachine().transition(task, "VERIFYING", "Result and Evidence recorded", at),
 		);
 
-		const verificationSnapshot = request.workspace_snapshot_provider?.(result.artifacts) ?? request.snapshot;
 		const verificationRequest: VerificationRequest = {
 			task,
 			evidence,

@@ -2,7 +2,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
-import { captureWorkspaceSnapshot, PersistentStateStore, type TaskContract, TaskStateMachine } from "../src/index.ts";
+import {
+	captureWorkspaceSnapshot,
+	createDeliveryEvidencePackage,
+	deliveryEvidencePackageDigest,
+	PersistentStateStore,
+	type TaskContract,
+	TaskStateMachine,
+} from "../src/index.ts";
 import { TaskLedger } from "../src/task-ledger.ts";
 import { AVAILABLE_WORKER_STATUS, UNKNOWN_MODEL_IDENTITY } from "./v3-fixtures.ts";
 
@@ -288,9 +295,33 @@ describe("T2.7-B Task Ledger", () => {
 		});
 		record = store.updateTask(machine.transition(record, "VERIFYING"));
 		const snapshot = captureWorkspaceSnapshot("commit-1", [], []);
+		const deliveryPackage = createDeliveryEvidencePackage({
+			baseline_commit: "commit-1",
+			task_revision: record.task_revision,
+			snapshot,
+			changed_files: [],
+			commands: [],
+			test_output_summary: "verified no-op",
+			provider_mode: "mock",
+		});
+		store.saveEvidence({
+			id: "evidence-pass",
+			task_id: record.id,
+			run_id: run.id,
+			captured_at: "2026-09-18T00:00:30.000Z",
+			diff: structuredClone(deliveryPackage.actual_diff),
+			commands: [],
+			stdout: "",
+			stderr: "",
+			artifacts: [],
+			evidence_types: [],
+			delivery_evidence_package: deliveryPackage,
+		});
 		store.saveVerification({
 			id: "verification-pass",
 			task_id: record.id,
+			evidence_id: "evidence-pass",
+			delivery_evidence_package_digest: deliveryEvidencePackageDigest(deliveryPackage),
 			status: "PASS",
 			verification_confidence: "strong",
 			task_revision: record.task_revision,

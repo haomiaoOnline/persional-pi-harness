@@ -128,6 +128,8 @@ export function planFor(task: TaskContract) {
 		testability: true,
 	};
 	return {
+		provider_mode: "mock" as const,
+		baseline_commit: "fixture-baseline",
 		plan_assessment: assessment,
 		plan_checklist,
 		plan_approval: createPlanApproval(assessment, "owner"),
