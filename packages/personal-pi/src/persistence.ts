@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { validateResultContract } from "./result.ts";
 import { validateRoleProfile } from "./roles.ts";
 import { validateTaskContract } from "./schema.ts";
+import { clonePersistentState, createEmptyPersistentState, loadPersistentState } from "./state-file.ts";
 import { createTaskRecord, TaskStateMachine } from "./state-machine.ts";
 import type {
 	AcceptanceRecord,
@@ -31,54 +32,6 @@ import type {
 } from "./types.ts";
 import { AcceptanceGate } from "./verification.ts";
 
-function emptyState(): PersistentState {
-	return {
-		version: 1,
-		projects: [],
-		task_ledger: [],
-		acceptances: [],
-		tasks: [],
-		graphs: [],
-		dispatches: [],
-		runs: [],
-		results: [],
-		evidence: [],
-		verifications: [],
-		decisions: [],
-		role_profiles: [],
-		effects: [],
-		budget_usage: {},
-		budget_decisions: {},
-		leases: {},
-		lease_epochs: {},
-		worker_instances: {},
-		loop_usage: {},
-		traces: [],
-		regressions: [],
-		snapshots: [],
-		snapshot_payloads: {},
-	};
-}
-
-function normalizeState(state: Partial<PersistentState>): PersistentState {
-	const base = emptyState();
-	return {
-		...base,
-		...state,
-		task_ledger: state.task_ledger ?? [],
-		acceptances: state.acceptances ?? [],
-		traces: state.traces ?? [],
-		regressions: state.regressions ?? [],
-		budget_usage: state.budget_usage ?? {},
-		budget_decisions: state.budget_decisions ?? {},
-		leases: state.leases ?? {},
-		lease_epochs: state.lease_epochs ?? {},
-		worker_instances: state.worker_instances ?? {},
-		loop_usage: state.loop_usage ?? {},
-		snapshot_payloads: state.snapshot_payloads ?? {},
-	};
-}
-
 function assertDoneAcceptanceInvariant(previous: PersistentState, candidate: PersistentState): void {
 	for (const task of candidate.tasks) {
 		const previousTask = previous.tasks.find((entry) => entry.id === task.id);
@@ -101,10 +54,6 @@ function assertDoneAcceptanceInvariant(previous: PersistentState, candidate: Per
 	}
 }
 
-function cloneState(state: PersistentState): PersistentState {
-	return normalizeState(structuredClone(state));
-}
-
 function stateDigest(state: PersistentState): string {
 	const snapshotSafe = { ...state, snapshots: [], snapshot_payloads: {} };
 	return createHash("sha256").update(JSON.stringify(snapshotSafe)).digest("hex");
@@ -117,15 +66,6 @@ function writeAtomically(path: string, state: PersistentState): void {
 	renameSync(temporaryPath, path);
 }
 
-function loadState(path: string): PersistentState {
-	if (!existsSync(path)) return emptyState();
-	const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-	if (!parsed || typeof parsed !== "object" || (parsed as { version?: unknown }).version !== 1) {
-		throw new Error(`unsupported persistent state at ${path}`);
-	}
-	return normalizeState(parsed as Partial<PersistentState>);
-}
-
 export type PersistentStateMutation = (state: PersistentState) => void;
 
 export class PersistentStateStore {
@@ -135,20 +75,20 @@ export class PersistentStateStore {
 	constructor(options?: string | { filePath?: string; initialState?: PersistentState }) {
 		if (typeof options === "string") {
 			this.filePath = options;
-			this.state = loadState(options);
+			this.state = loadPersistentState(options);
 		} else {
 			this.filePath = options?.filePath;
-			this.state = cloneState(options?.initialState ?? emptyState());
-			if (this.filePath && existsSync(this.filePath)) this.state = loadState(this.filePath);
+			this.state = clonePersistentState(options?.initialState ?? createEmptyPersistentState());
+			if (this.filePath && existsSync(this.filePath)) this.state = loadPersistentState(this.filePath);
 		}
 	}
 
 	read(): PersistentState {
-		return cloneState(this.state);
+		return clonePersistentState(this.state);
 	}
 
 	transact(mutation: PersistentStateMutation): PersistentState {
-		const candidate = cloneState(this.state);
+		const candidate = clonePersistentState(this.state);
 		mutation(candidate);
 		assertDoneAcceptanceInvariant(this.state, candidate);
 		if (this.filePath) writeAtomically(this.filePath, candidate);
@@ -182,6 +122,38 @@ export class PersistentStateStore {
 			throw new Error(`task already exists: ${contract.id}`);
 		const task = createTaskRecord(contract);
 		this.transact((state) => state.tasks.push(task));
+		return structuredClone(task);
+	}
+
+	createTaskWithLedgerBinding(contract: TaskContract, binding: TaskLedgerBinding): TaskRecord {
+		const validation = validateTaskContract(contract);
+		if (!validation.valid) throw new Error(`cannot persist invalid task: ${validation.errors.join("; ")}`);
+		if (!binding.project_id.trim()) throw new Error("ledger binding project_id must not be empty");
+		if (!binding.project_task_id.trim()) throw new Error("ledger binding project_task_id must not be empty");
+		if (!binding.pph_task_id.trim()) throw new Error("ledger binding pph_task_id must not be empty");
+		if (!binding.phase.trim()) throw new Error("ledger binding phase must not be empty");
+		if (binding.unknowns.some((unknown) => !unknown.trim()))
+			throw new Error("ledger binding unknowns must not contain empty values");
+		if (binding.pph_task_id !== contract.id)
+			throw new Error("ledger binding pph_task_id must match Task Contract id");
+		if (!this.state.projects.some((project) => project.project_id === binding.project_id))
+			throw new Error(`unknown project: ${binding.project_id}`);
+		if (this.state.tasks.some((task) => task.id === contract.id))
+			throw new Error(`task already exists: ${contract.id}`);
+		if (
+			this.state.task_ledger.some(
+				(candidate) =>
+					candidate.project_id === binding.project_id && candidate.project_task_id === binding.project_task_id,
+			)
+		)
+			throw new Error(`project task already bound: ${binding.project_id}/${binding.project_task_id}`);
+		if (this.state.task_ledger.some((candidate) => candidate.pph_task_id === binding.pph_task_id))
+			throw new Error(`pph task already bound: ${binding.pph_task_id}`);
+		const task = createTaskRecord(contract);
+		this.transact((state) => {
+			state.tasks.push(structuredClone(task));
+			state.task_ledger.push(structuredClone(binding));
+		});
 		return structuredClone(task);
 	}
 
@@ -461,7 +433,7 @@ export class PersistentStateStore {
 	}
 
 	restoreSnapshot(snapshot: StateSnapshot): PersistentState {
-		const candidate = cloneState(snapshot.state);
+		const candidate = clonePersistentState(snapshot.state);
 		candidate.snapshots = [];
 		candidate.snapshot_payloads = {};
 		if (stateDigest(candidate) !== snapshot.digest) throw new Error("snapshot digest mismatch");

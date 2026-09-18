@@ -1,5 +1,5 @@
 import type { PersistentStateStore } from "./persistence.ts";
-import type { TaskLedgerBinding, TaskLedgerEntry, VerificationRecord } from "./types.ts";
+import type { PersistentState, TaskLedgerBinding, TaskLedgerEntry, VerificationRecord } from "./types.ts";
 
 export interface TaskLedgerBindingInput {
 	project_id: string;
@@ -41,6 +41,37 @@ function latestVerification(
 	return verifications
 		.filter((verification) => verification.task_id === taskId && verification.task_revision === taskRevision)
 		.at(-1);
+}
+
+export function projectTaskLedgerEntry(state: PersistentState, binding: TaskLedgerBinding): TaskLedgerEntry {
+	const task = state.tasks.find((candidate) => candidate.id === binding.pph_task_id);
+	if (!task) throw new TaskLedgerError(`dangling task ledger binding: ${binding.pph_task_id}`);
+	if (!task.role_profile_ref) throw new TaskLedgerError(`task has no owner role_profile_ref: ${task.id}`);
+	const verification = latestVerification(state.verifications, task.id, task.task_revision);
+	const acceptance = state.acceptances.find(
+		(entry) => entry.task_id === task.id && entry.task_revision === task.task_revision,
+	);
+	if (task.state === "DONE" && !acceptance)
+		throw new TaskLedgerError(`DONE task is missing current-revision AcceptanceRecord: ${task.id}`);
+	if (acceptance && task.state !== "DONE")
+		throw new TaskLedgerError(`AcceptanceRecord exists for non-DONE task: ${task.id}`);
+	const gateStatus = acceptance
+		? "PASS"
+		: verification?.status === "FAIL"
+			? "FAIL"
+			: verification?.status === "UNKNOWN"
+				? "UNKNOWN"
+				: "PENDING";
+	return {
+		...structuredClone(binding),
+		task_revision: task.task_revision,
+		owner: task.role_profile_ref,
+		scope: [...task.scope.files],
+		status: task.state,
+		verification_recipe: task.verification.recipe_ref ?? null,
+		evidence_refs: state.evidence.filter((evidence) => evidence.task_id === task.id).map((evidence) => evidence.id),
+		gate_status: gateStatus,
+	};
 }
 
 export class TaskLedger {
@@ -92,36 +123,6 @@ export class TaskLedger {
 	}
 
 	private project(binding: TaskLedgerBinding): TaskLedgerEntry {
-		const task = this.store.getTask(binding.pph_task_id);
-		if (!task) throw new TaskLedgerError(`dangling task ledger binding: ${binding.pph_task_id}`);
-		if (!task.role_profile_ref) throw new TaskLedgerError(`task has no owner role_profile_ref: ${task.id}`);
-		const state = this.store.read();
-		const verification = latestVerification(state.verifications, task.id, task.task_revision);
-		const acceptance = state.acceptances.find(
-			(entry) => entry.task_id === task.id && entry.task_revision === task.task_revision,
-		);
-		if (task.state === "DONE" && !acceptance)
-			throw new TaskLedgerError(`DONE task is missing current-revision AcceptanceRecord: ${task.id}`);
-		if (acceptance && task.state !== "DONE")
-			throw new TaskLedgerError(`AcceptanceRecord exists for non-DONE task: ${task.id}`);
-		const gateStatus = acceptance
-			? "PASS"
-			: verification?.status === "FAIL"
-				? "FAIL"
-				: verification?.status === "UNKNOWN"
-					? "UNKNOWN"
-					: "PENDING";
-		return {
-			...structuredClone(binding),
-			task_revision: task.task_revision,
-			owner: task.role_profile_ref,
-			scope: [...task.scope.files],
-			status: task.state,
-			verification_recipe: task.verification.recipe_ref ?? null,
-			evidence_refs: state.evidence
-				.filter((evidence) => evidence.task_id === task.id)
-				.map((evidence) => evidence.id),
-			gate_status: gateStatus,
-		};
+		return projectTaskLedgerEntry(this.store.read(), binding);
 	}
 }
