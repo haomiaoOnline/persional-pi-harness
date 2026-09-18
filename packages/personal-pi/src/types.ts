@@ -775,9 +775,11 @@ export interface EvidenceSummary {
 }
 
 export interface ProjectRecord {
-	id: string;
-	name: string;
-	working_directory: string;
+	project_id: string;
+	repo_path: string;
+	baseline_commit: string;
+	architecture_doc_ref: string;
+	task_ledger_ref: string;
 }
 
 export interface DispatchRecord {

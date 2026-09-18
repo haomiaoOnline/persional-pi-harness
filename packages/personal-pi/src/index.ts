@@ -27,6 +27,7 @@ export * from "./plugin.ts";
 export * from "./policy-calibration.ts";
 export * from "./process-worker.ts";
 export * from "./progressive-tools.ts";
+export * from "./project-registry.ts";
 export * from "./prompt.ts";
 export * from "./protocol.ts";
 export * from "./provider-resilience.ts";

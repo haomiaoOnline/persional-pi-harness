@@ -13,6 +13,7 @@ import type {
 	ExecutionTrace,
 	LoopUsage,
 	PersistentState,
+	ProjectRecord,
 	RecoveryDecision,
 	RegressionCase,
 	ResultContract,
@@ -282,8 +283,22 @@ export class PersistentStateStore {
 		this.transact((state) => state.regressions.push(structuredClone(regression)));
 	}
 
-	addProject(project: { id: string; name: string; working_directory: string }): void {
+	addProject(project: ProjectRecord): ProjectRecord {
+		if (this.state.projects.some((candidate) => candidate.project_id === project.project_id))
+			throw new Error(`project already exists: ${project.project_id}`);
+		if (this.state.projects.some((candidate) => candidate.repo_path === project.repo_path))
+			throw new Error(`repo_path already registered: ${project.repo_path}`);
 		this.transact((state) => state.projects.push(structuredClone(project)));
+		return structuredClone(project);
+	}
+
+	getProject(projectId: string): ProjectRecord | undefined {
+		const project = this.state.projects.find((candidate) => candidate.project_id === projectId);
+		return project ? structuredClone(project) : undefined;
+	}
+
+	listProjects(): ProjectRecord[] {
+		return this.state.projects.map((project) => structuredClone(project));
 	}
 
 	saveGraph(graph: TaskGraph): void {
