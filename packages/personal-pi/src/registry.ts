@@ -5,6 +5,7 @@ import type {
 	TaskContract,
 	ValidationResult,
 	WorkerPluginManifest,
+	WorkerStatus,
 	WorkerTier,
 	WorkerType,
 } from "./types.ts";
@@ -21,6 +22,8 @@ export interface WorkerRegistrationInput {
 	worker_type: WorkerType;
 	manifest: WorkerPluginManifest;
 	adapter: WorkerAdapter;
+	/** Trusted pre-registration availability result. Never defaults to available. */
+	available: boolean;
 	capabilities?: Partial<WorkerCapabilityDescriptor>;
 }
 
@@ -45,6 +48,12 @@ export interface WorkerSelectionCandidate {
 export interface WorkerCandidateValidation {
 	allowed: boolean;
 	reasons: string[];
+}
+
+export function workerStatusForRegistration(registration: Pick<RegisteredWorker, "available">): WorkerStatus {
+	return registration.available
+		? { worker_capability: "available", execution_mode: "normal", delivery_status: "normal" }
+		: { worker_capability: "unavailable", execution_mode: "root_only", delivery_status: "degraded" };
 }
 
 export class WorkerRegistrationError extends Error {
@@ -85,6 +94,7 @@ function registrationValidation(input: WorkerRegistrationInput): ValidationResul
 	const errors: string[] = [];
 	if (input.worker_id.length === 0) errors.push("worker_id must not be empty");
 	if (input.adapter.worker_id !== input.worker_id) errors.push("adapter worker_id must match worker_id");
+	if (typeof input.available !== "boolean") errors.push("available must be provided by a trusted availability check");
 	if (input.capabilities?.latency_ms !== undefined && input.capabilities.latency_ms < 0) {
 		errors.push("latency_ms must be non-negative");
 	}
@@ -140,7 +150,7 @@ export class WorkerRegistry {
 				languages: [...(input.capabilities?.languages ?? [])],
 				latency_ms: input.capabilities?.latency_ms ?? 0,
 			},
-			available: true,
+			available: input.available,
 		};
 		this.workers.set(input.worker_id, registration);
 		return cloneRegistration(registration);

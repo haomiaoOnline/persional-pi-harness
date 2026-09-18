@@ -128,6 +128,7 @@ describe("T14.2 Hermes CLI Worker Adapter", () => {
 			worker_id: "hermes-manifest-worker",
 			worker_type: "cli",
 			adapter: new HermesCliWorkerAdapter({ worker_id: "hermes-manifest-worker" }),
+			available: true,
 			source: readFileSync(manifestUrl, "utf8"),
 		});
 		expect(registry.select(syntheticTask()).worker_id).toBe("hermes-manifest-worker");
@@ -172,6 +173,11 @@ describe("T14.2 Hermes CLI Worker Adapter", () => {
 		expect(observation?.runtime_identity?.response_model).toBe(MODEL);
 		expect(observation?.observed_runtime_model).toBe(MODEL);
 		expect(observation?.platform_accepted_model).toBe(MODEL);
+		expect(result.model_identity).toEqual({
+			requested_model: MODEL,
+			platform_accepted_model: MODEL,
+			observed_runtime_model: MODEL,
+		});
 		expect(observation?.provider).toBe("custom");
 		expect(observation?.runtime_identity?.identity_source).toBe("post_api_request.response_model");
 		expect(observation?.result_digest).toBeTruthy();

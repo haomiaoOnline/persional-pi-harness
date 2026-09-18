@@ -13,6 +13,21 @@ export type WorkerTier = "cheap" | "standard" | "frontier";
 export type ReasoningDepth = "low" | "medium" | "high" | "extended";
 export type WorkerPluginAuthType = "none" | "api_key";
 export type WorkerInstanceState = "COLD" | "WARMING" | "IDLE" | "LEASED" | "BUSY" | "DEAD";
+export type WorkerCapability = "available" | "unavailable";
+export type WorkerDeliveryExecutionMode = "normal" | "root_only" | "degraded";
+export type DeliveryStatus = "normal" | "degraded";
+
+export interface WorkerStatus {
+	worker_capability: WorkerCapability;
+	execution_mode: WorkerDeliveryExecutionMode;
+	delivery_status: DeliveryStatus;
+}
+
+export interface ModelIdentity {
+	requested_model: string;
+	platform_accepted_model: string;
+	observed_runtime_model: string;
+}
 
 export interface WorkerPluginModel {
 	model: string;
@@ -510,6 +525,7 @@ export interface ResultContract {
 	artifacts: string[];
 	evidence: string[];
 	errors: string[];
+	model_identity: ModelIdentity;
 	requested_context?: string[];
 	work_receipt?: WorkReceipt;
 }
@@ -637,6 +653,8 @@ export interface RunRecord {
 	attempt: number;
 	worker_id: string;
 	lease_epoch: number;
+	worker_status: WorkerStatus;
+	model_identity: ModelIdentity;
 	status: RunStatus;
 	started_at: string;
 	ended_at?: string;
@@ -685,7 +703,7 @@ export interface ControlPlaneReconstruction {
 }
 
 export interface PersistentState {
-	version: 1;
+	version: 2;
 	projects: ProjectRecord[];
 	task_ledger: TaskLedgerBinding[];
 	acceptances: AcceptanceRecord[];
@@ -823,7 +841,9 @@ export interface DispatchRecord {
 	id: string;
 	task_id: string;
 	worker_id: string;
-	lease_epoch: number;
+	lease_epoch?: number;
 	mode: ExecutionMode;
+	worker_status: WorkerStatus;
+	requested_model: string;
 	created_at: string;
 }

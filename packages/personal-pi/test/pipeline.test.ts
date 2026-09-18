@@ -16,6 +16,16 @@ import {
 } from "../src/index.ts";
 
 const temporaryDirectories: string[] = [];
+const AVAILABLE_WORKER_STATUS = {
+	worker_capability: "available" as const,
+	execution_mode: "normal" as const,
+	delivery_status: "normal" as const,
+};
+const UNAVAILABLE_WORKER_STATUS = {
+	worker_capability: "unavailable" as const,
+	execution_mode: "root_only" as const,
+	delivery_status: "degraded" as const,
+};
 
 function makeTask(id: string, objective = "Return a verified result"): TaskContract {
 	return {
@@ -157,6 +167,7 @@ describe("T7.1 complete Personal PI pipeline", () => {
 				requirement: requirement(),
 				task,
 				worker,
+				worker_status: AVAILABLE_WORKER_STATUS,
 				snapshot: captureWorkspaceSnapshot("e2e-commit", [], []),
 				at: `2026-09-13T10:0${index}:00.000Z`,
 			});
@@ -200,6 +211,7 @@ describe("T7.1 complete Personal PI pipeline", () => {
 			requirement: requirement(),
 			task,
 			worker,
+			worker_status: AVAILABLE_WORKER_STATUS,
 			context_resolver: contextResolver,
 			snapshot: captureWorkspaceSnapshot("context-commit", [], []),
 		});
@@ -220,6 +232,7 @@ describe("T7.1 complete Personal PI pipeline", () => {
 				summary: "claims success without doing work",
 				evidence: ["worker_result"],
 			})),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			snapshot: captureWorkspaceSnapshot("anomaly-commit", [], []),
 		});
 
@@ -244,6 +257,11 @@ describe("T7.1 complete Personal PI pipeline", () => {
 				artifacts: [],
 				evidence: ["worker_result"],
 				errors: [],
+				model_identity: {
+					requested_model: "forged-request",
+					platform_accepted_model: "forged-platform",
+					observed_runtime_model: "forged-runtime",
+				},
 			}),
 		};
 
@@ -252,6 +270,7 @@ describe("T7.1 complete Personal PI pipeline", () => {
 			requirement: requirement(),
 			task,
 			worker,
+			worker_status: AVAILABLE_WORKER_STATUS,
 			snapshot: captureWorkspaceSnapshot("identity-commit", [], []),
 		});
 
@@ -260,6 +279,11 @@ describe("T7.1 complete Personal PI pipeline", () => {
 		expect(execution.result.task_id).toBe(task.id);
 		expect(execution.result.run_id).toBe(execution.run.id);
 		expect(execution.result.worker_id).toBe(worker.worker_id);
+		expect(execution.result.model_identity).toEqual({
+			requested_model: "unknown",
+			platform_accepted_model: "unknown",
+			observed_runtime_model: "unknown",
+		});
 		expect(store.read().results).toHaveLength(1);
 		expect(store.read().results[0]?.run_id).toBe(execution.run.id);
 	});
@@ -279,6 +303,7 @@ describe("T7.1 complete Personal PI pipeline", () => {
 				callbackCalls += 1;
 				return { status: "success", summary: "unreachable", evidence: ["worker_result"] };
 			}),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			snapshot: captureWorkspaceSnapshot("model-call-bound", [], []),
 		});
 
@@ -312,11 +337,70 @@ describe("T7.2 self-development", () => {
 			requirement: requirement(),
 			task,
 			worker,
+			worker_status: AVAILABLE_WORKER_STATUS,
 			snapshot: captureWorkspaceSnapshot("self-commit", [target], []),
 			current_snapshot: captureWorkspaceSnapshot("self-commit", [target], []),
 		});
 
 		expect(execution.task.state).toBe("DONE");
 		expect(readFileSync(target, "utf8")).toContain("return 'new'");
+	});
+
+	test("fails closed before Lease/Run/adapter execution when Worker capability is unavailable", async () => {
+		const store = new PersistentStateStore();
+		const task = makeTask("worker-unavailable");
+		let executions = 0;
+		const worker = new PiWorker("pi-unavailable", () => {
+			executions += 1;
+			return { status: "success", summary: "must not execute" };
+		});
+		const attempt = new PersonalPiPipeline({ state_store: store }).execute({
+			...planFor(task),
+			requirement: requirement(),
+			task,
+			worker,
+			worker_status: UNAVAILABLE_WORKER_STATUS,
+			snapshot: captureWorkspaceSnapshot("unavailable", [], []),
+		});
+
+		await expect(attempt).rejects.toThrow("Worker capability unavailable");
+		expect(executions).toBe(0);
+		expect(store.getTask(task.id)?.state).toBe("BLOCKED");
+		expect(store.read().runs).toEqual([]);
+		expect(store.read().leases).toEqual({});
+		expect(store.getLoopUsage(task.id).attempts).toBe(0);
+		expect(store.read().dispatches).toEqual([
+			expect.objectContaining({
+				worker_id: "pi-unavailable",
+				worker_status: UNAVAILABLE_WORKER_STATUS,
+				requested_model: "unknown",
+			}),
+		]);
+		expect(store.read().dispatches[0]).not.toHaveProperty("lease_epoch");
+	});
+
+	test("rejects a missing WorkerStatus before creating Task/Lease/Run", async () => {
+		const store = new PersistentStateStore();
+		const task = makeTask("worker-status-missing");
+		let executions = 0;
+		const worker = new PiWorker("pi-status-missing", () => {
+			executions += 1;
+			return { status: "success", summary: "must not execute" };
+		});
+		const request = {
+			...planFor(task),
+			requirement: requirement(),
+			task,
+			worker,
+			snapshot: captureWorkspaceSnapshot("missing-status", [], []),
+		};
+
+		await expect(new PersonalPiPipeline({ state_store: store }).execute(request as never)).rejects.toThrow(
+			"invalid WorkerStatus",
+		);
+		expect(executions).toBe(0);
+		expect(store.listTasks()).toEqual([]);
+		expect(store.read().runs).toEqual([]);
+		expect(store.read().leases).toEqual({});
 	});
 });

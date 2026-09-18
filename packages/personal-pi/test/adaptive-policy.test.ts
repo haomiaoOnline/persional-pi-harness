@@ -44,6 +44,7 @@ function registerWorker(workerId = "fixture-worker", costTier: "cheap" | "standa
 		worker_type: "cli",
 		manifest: fixtureManifest(costTier),
 		adapter: new PiWorker(workerId, async () => ({ status: "success", summary: "fixture" })),
+		available: true,
 		capabilities: { latency_ms: 20 },
 	});
 	return registry;

@@ -20,6 +20,12 @@ import {
 	TraceRecorder,
 } from "../src/index.ts";
 
+const AVAILABLE_WORKER_STATUS = {
+	worker_capability: "available" as const,
+	execution_mode: "normal" as const,
+	delivery_status: "normal" as const,
+};
+
 function makeTask(id: string): TaskContract {
 	return {
 		id,
@@ -220,6 +226,7 @@ describe("T11.1 execution trace", () => {
 					evidence_refs: ["worker_result"],
 				},
 			})),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			snapshot: captureWorkspaceSnapshot("trace-commit", [], []),
 			at: "2026-09-13T11:01:00.000Z",
 		});
@@ -241,6 +248,7 @@ describe("T11.1 execution trace", () => {
 				summary: "contract failure",
 				errors: ["controlled failure"],
 			})),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			snapshot: captureWorkspaceSnapshot("trace-failure-commit", [], []),
 			at: "2026-09-13T11:02:00.000Z",
 		});

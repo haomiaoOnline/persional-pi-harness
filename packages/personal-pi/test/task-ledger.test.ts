@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import { captureWorkspaceSnapshot, PersistentStateStore, type TaskContract, TaskStateMachine } from "../src/index.ts";
 import { TaskLedger } from "../src/task-ledger.ts";
+import { AVAILABLE_WORKER_STATUS, UNKNOWN_MODEL_IDENTITY } from "./v3-fixtures.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -258,7 +259,11 @@ describe("T2.7-B Task Ledger", () => {
 		const machine = new TaskStateMachine();
 		record = store.updateTask(machine.transition(record, "READY"));
 		record = store.updateTask(machine.transition(record, "RUNNING"));
-		const run = store.createRun(record.id, "worker-1", 1, "2026-09-18T00:00:00.000Z");
+		const run = store.createRun(record.id, "worker-1", 1, {
+			worker_status: AVAILABLE_WORKER_STATUS,
+			model_identity: UNKNOWN_MODEL_IDENTITY,
+			started_at: "2026-09-18T00:00:00.000Z",
+		});
 		store.saveResult({
 			task_id: record.id,
 			run_id: run.id,
@@ -270,6 +275,7 @@ describe("T2.7-B Task Ledger", () => {
 			artifacts: [],
 			evidence: [],
 			errors: [],
+			model_identity: UNKNOWN_MODEL_IDENTITY,
 			work_receipt: {
 				work_attempted: true,
 				effects_count: 0,

@@ -88,6 +88,11 @@ function makeRequest(
 				},
 			};
 		}),
+		worker_status: {
+			worker_capability: "available" as const,
+			execution_mode: "normal" as const,
+			delivery_status: "normal" as const,
+		},
 		command_runner: () => {
 			toolExecutions.count += 1;
 			return { command: "should-not-run", exit_code: 0, stdout: "", stderr: "" };

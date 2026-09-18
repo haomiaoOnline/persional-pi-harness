@@ -11,6 +11,7 @@ import {
 	type TaskContract,
 	TaskStateMachine,
 } from "../src/index.ts";
+import { AVAILABLE_WORKER_STATUS, UNKNOWN_MODEL_IDENTITY } from "./v3-fixtures.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -138,7 +139,10 @@ describe("T1.1-B Loop Budget", () => {
 		record = store.updateTask(machine.transition(record, "READY", "ready"));
 		record = store.updateTask(machine.transition(record, "RUNNING", "started"));
 		const lease = leaseManager.acquire(task.id, "worker-a");
-		const run = store.createRun(task.id, "worker-a", lease.lease_epoch);
+		const run = store.createRun(task.id, "worker-a", lease.lease_epoch, {
+			worker_status: AVAILABLE_WORKER_STATUS,
+			model_identity: UNKNOWN_MODEL_IDENTITY,
+		});
 		new LoopBudgetController(store).beforeRun(task);
 
 		const recovery = new RecoveryManager(store, leaseManager).recover({

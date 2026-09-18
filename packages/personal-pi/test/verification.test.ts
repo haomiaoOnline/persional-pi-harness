@@ -262,6 +262,11 @@ describe("T4.3–T4.4 Acceptance Gate and revision binding", () => {
 			artifacts: [],
 			evidence: ["stdout", "test_result"],
 			errors: [],
+			model_identity: {
+				requested_model: "unknown",
+				platform_accepted_model: "unknown",
+				observed_runtime_model: "unknown",
+			},
 			work_receipt: {
 				work_attempted: true,
 				effects_count: 0,

@@ -1,3 +1,4 @@
+import { accessSync, constants } from "node:fs";
 import type { ImageContent } from "@earendil-works/pi-ai";
 import type { AppMode } from "../../core/project-trust.ts";
 
@@ -10,6 +11,12 @@ export interface InteractiveIngressResult {
 	summary?: string;
 }
 
+export interface InteractiveWorkerStatus {
+	worker_capability: "available" | "unavailable";
+	execution_mode: "normal" | "root_only" | "degraded";
+	delivery_status: "normal" | "degraded";
+}
+
 export interface InteractiveWorkerRoute {
 	cwd: string;
 	command: string;
@@ -18,6 +25,7 @@ export interface InteractiveWorkerRoute {
 	model?: string;
 	thinking?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 	active_tools: string[];
+	worker_status: InteractiveWorkerStatus;
 }
 
 export interface InteractiveIngressFactoryContext {
@@ -29,6 +37,21 @@ export type InteractiveIngressHandler = (submission: InteractiveWorkSubmission) 
 export type InteractiveIngressFactory = (
 	context: InteractiveIngressFactoryContext,
 ) => InteractiveIngressHandler | Promise<InteractiveIngressHandler>;
+
+export function probeLocalInteractiveWorkerStatus(
+	command: string,
+	commandArgsPrefix: readonly string[],
+): InteractiveWorkerStatus {
+	try {
+		const cliEntry = commandArgsPrefix[0];
+		if (!command || !cliEntry) throw new Error("worker route is incomplete");
+		accessSync(command, constants.X_OK);
+		accessSync(cliEntry, constants.R_OK);
+		return { worker_capability: "available", execution_mode: "normal", delivery_status: "normal" };
+	} catch {
+		return { worker_capability: "unavailable", execution_mode: "root_only", delivery_status: "degraded" };
+	}
+}
 
 export async function createInteractiveIngressForMode(
 	mode: AppMode,

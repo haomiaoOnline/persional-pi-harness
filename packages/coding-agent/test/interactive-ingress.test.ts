@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import {
 	createInteractiveIngressForMode,
 	governedInteractiveBusyReason,
+	probeLocalInteractiveWorkerStatus,
 	routeInteractiveSubmission,
 } from "../src/modes/interactive/interactive-ingress.ts";
 
@@ -13,6 +14,11 @@ describe("T7.0 interactive ingress routing", () => {
 		provider: "test-provider",
 		model: "test-model",
 		active_tools: ["read"],
+		worker_status: {
+			worker_capability: "available" as const,
+			execution_mode: "normal" as const,
+			delivery_status: "normal" as const,
+		},
 	};
 
 	test("routes governed top-level work through ingress without raw prompt fallback", async () => {
@@ -69,5 +75,18 @@ describe("T7.0 interactive ingress routing", () => {
 		);
 		expect(governedInteractiveBusyReason(handler, { isCompacting: false, isStreaming: false })).toBeUndefined();
 		expect(governedInteractiveBusyReason(undefined, { isCompacting: true, isStreaming: true })).toBeUndefined();
+	});
+
+	test("derives availability from the local child command and CLI entry instead of assuming it", () => {
+		expect(probeLocalInteractiveWorkerStatus(process.execPath, [process.argv[1] ?? ""])).toEqual({
+			worker_capability: "available",
+			execution_mode: "normal",
+			delivery_status: "normal",
+		});
+		expect(probeLocalInteractiveWorkerStatus(process.execPath, ["/definitely/missing/pph-cli.js"])).toEqual({
+			worker_capability: "unavailable",
+			execution_mode: "root_only",
+			delivery_status: "degraded",
+		});
 	});
 });

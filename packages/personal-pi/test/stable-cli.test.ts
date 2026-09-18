@@ -5,12 +5,13 @@ import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import {
 	PersistentStateStore,
+	probeLocalStableCliWorkerStatus,
 	runPersonalPiStableCli,
 	TaskStateMachine,
 	type WorkerAdapter,
 	type WorkerProtocolRequest,
 } from "../src/index.ts";
-import { makeV3Task } from "./v3-fixtures.ts";
+import { AVAILABLE_WORKER_STATUS, makeV3Task, UNKNOWN_MODEL_IDENTITY } from "./v3-fixtures.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -53,6 +54,7 @@ function noOpWorker(): WorkerAdapter {
 				artifacts: [],
 				evidence: [],
 				errors: [],
+				model_identity: UNKNOWN_MODEL_IDENTITY,
 				work_receipt: {
 					work_attempted: true,
 					effects_count: 0,
@@ -102,6 +104,7 @@ describe("T2.7-C stable CLI", () => {
 			state_path: statePath,
 			task_id_factory: () => "pph-stable-1",
 			worker_factory: () => noOpWorker(),
+			worker_status_factory: () => AVAILABLE_WORKER_STATUS,
 		};
 
 		const registered = parsed(
@@ -156,6 +159,60 @@ describe("T2.7-C stable CLI", () => {
 		expect((inspected.task as Record<string, unknown>).id).toBe("pph-stable-1");
 		const gate = parsed(await runPersonalPiStableCli(["gate", "status", "--task", "pph-stable-1"], options));
 		expect(gate.gate_status).toBe("PASS");
+	});
+
+	test("never treats an injected worker or missing local CLI entry as implicitly available", async () => {
+		const root = temporaryDirectory();
+		const repository = gitRepository(root);
+		const statePath = join(root, "state.json");
+		const specPath = join(root, "task.json");
+		taskSpec(specPath);
+		const options = {
+			cwd: root,
+			state_path: statePath,
+			task_id_factory: () => "pph-stable-untrusted",
+			worker_factory: () => noOpWorker(),
+		};
+		const registered = parsed(
+			await runPersonalPiStableCli(
+				[
+					"project",
+					"register",
+					"--repo",
+					repository.path,
+					"--baseline",
+					repository.baseline,
+					"--architecture",
+					"ARCHITECTURE.md",
+					"--ledger",
+					"TASKS.md",
+				],
+				options,
+			),
+		);
+		const projectId = registered.project_id as string;
+		parsed(
+			await runPersonalPiStableCli(
+				["task", "create", "--project", projectId, "--project-task", "T1.04", "--phase", "P0", "--spec", specPath],
+				options,
+			),
+		);
+
+		const run = await runPersonalPiStableCli(
+			["task", "run", "--task", "pph-stable-untrusted", "--provider", "test", "--model", "test-model"],
+			options,
+		);
+		expect(run.exit_code).toBe(2);
+		const persisted = new PersistentStateStore(statePath).read();
+		expect(persisted.dispatches).toHaveLength(1);
+		expect(persisted.dispatches[0]?.worker_status.worker_capability).toBe("unavailable");
+		expect(persisted.dispatches[0]?.lease_epoch).toBeUndefined();
+		expect(persisted.runs).toEqual([]);
+		expect(probeLocalStableCliWorkerStatus(process.execPath, "/definitely/missing/pph-cli.js")).toEqual({
+			worker_capability: "unavailable",
+			execution_mode: "root_only",
+			delivery_status: "degraded",
+		});
 	});
 
 	test("inspect and gate status are physically read-only and stable across repeated calls", async () => {
@@ -245,7 +302,10 @@ describe("T2.7-C stable CLI", () => {
 		const machine = new TaskStateMachine();
 		task = store.updateTask(machine.transition(task, "READY"));
 		task = store.updateTask(machine.transition(task, "RUNNING"));
-		const run = store.createRun(task.id, "worker", 1);
+		const run = store.createRun(task.id, "worker", 1, {
+			worker_status: AVAILABLE_WORKER_STATUS,
+			model_identity: UNKNOWN_MODEL_IDENTITY,
+		});
 		store.saveResult({
 			task_id: task.id,
 			run_id: run.id,
@@ -257,6 +317,7 @@ describe("T2.7-C stable CLI", () => {
 			artifacts: [],
 			evidence: [],
 			errors: [],
+			model_identity: UNKNOWN_MODEL_IDENTITY,
 			work_receipt: {
 				work_attempted: true,
 				effects_count: 0,

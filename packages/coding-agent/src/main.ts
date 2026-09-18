@@ -67,6 +67,7 @@ import { InteractiveMode, runPrintMode, runRpcMode } from "./modes/index.ts";
 import {
 	createInteractiveIngressForMode,
 	type InteractiveIngressFactory,
+	probeLocalInteractiveWorkerStatus,
 } from "./modes/interactive/interactive-ingress.ts";
 import { initTheme, setThemeJsonValidator, stopThemeWatcher } from "./modes/interactive/theme/theme.ts";
 import { validateThemeJson } from "./modes/interactive/theme/theme-json.ts";
@@ -934,14 +935,17 @@ export async function main(args: string[], options?: MainOptions) {
 	const interactiveIngress = await createInteractiveIngressForMode(appMode, options?.interactiveIngressFactory, {
 		getWorkerRoute: () => {
 			const currentSession = runtime.session;
+			const cliEntry = process.argv[1];
+			const commandArgsPrefix = cliEntry ? [cliEntry] : [];
 			return {
 				cwd: runtime.cwd,
 				command: process.execPath,
-				command_args_prefix: [process.argv[1]],
+				command_args_prefix: commandArgsPrefix,
 				provider: currentSession.model?.provider,
 				model: currentSession.model?.id,
 				thinking: currentSession.thinkingLevel,
 				active_tools: currentSession.getActiveToolNames(),
+				worker_status: probeLocalInteractiveWorkerStatus(process.execPath, commandArgsPrefix),
 			};
 		},
 	});

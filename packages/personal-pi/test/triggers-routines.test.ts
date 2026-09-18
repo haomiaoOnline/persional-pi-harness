@@ -13,6 +13,17 @@ import {
 	TriggerGateway,
 } from "../src/index.ts";
 
+const AVAILABLE_WORKER_STATUS = {
+	worker_capability: "available" as const,
+	execution_mode: "normal" as const,
+	delivery_status: "normal" as const,
+};
+const UNKNOWN_MODEL_IDENTITY = {
+	requested_model: "unknown",
+	platform_accepted_model: "unknown",
+	observed_runtime_model: "unknown",
+};
+
 function makeTask(id: string, topic = "daily summary"): TaskContract {
 	return {
 		id,
@@ -187,6 +198,7 @@ describe("T7.3 Trigger Gateway", () => {
 				evidence: ["worker_result"],
 				work_receipt: legalNoOpReceipt(),
 			})),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			snapshot: captureWorkspaceSnapshot("scheduled-commit", [], []),
 		});
 
@@ -211,6 +223,7 @@ describe("T7.4 Demonstration-based Routine Capture", () => {
 				evidence: ["worker_result"],
 				work_receipt: legalNoOpReceipt(),
 			})),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			snapshot: captureWorkspaceSnapshot("routine-commit", [], []),
 		});
 		const playbook = new ReferenceArchitecturePlaybook();
@@ -241,6 +254,7 @@ describe("T7.4 Demonstration-based Routine Capture", () => {
 				evidence: ["worker_result"],
 				work_receipt: legalNoOpReceipt(),
 			})),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			snapshot: captureWorkspaceSnapshot("routine-commit", [], []),
 		});
 
@@ -259,6 +273,8 @@ describe("T7.4 Demonstration-based Routine Capture", () => {
 			attempt: 1,
 			worker_id: "pi",
 			lease_epoch: 1,
+			worker_status: AVAILABLE_WORKER_STATUS,
+			model_identity: UNKNOWN_MODEL_IDENTITY,
 			status: "SUCCEEDED" as const,
 			started_at: "now",
 		};
@@ -273,6 +289,7 @@ describe("T7.4 Demonstration-based Routine Capture", () => {
 			artifacts: [],
 			evidence: ["worker_result"],
 			errors: [],
+			model_identity: UNKNOWN_MODEL_IDENTITY,
 		};
 		const fakeEvidence = {
 			id: "evidence",

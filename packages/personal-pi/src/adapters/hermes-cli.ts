@@ -26,6 +26,8 @@ import {
 	parseWorkerOutput,
 	runJsonlProcess,
 	safeEvidence,
+	trustedModelIdentity,
+	withTrustedModelIdentity,
 } from "./cli-runtime.ts";
 
 const HERMES_BACKEND = "hermes-cli";
@@ -323,8 +325,8 @@ function observationFor(
 	return {
 		backend: HERMES_BACKEND,
 		requested_model: requestedModel,
-		platform_accepted_model: identity?.configured_model ?? null,
-		observed_runtime_model: identity?.response_model ?? null,
+		platform_accepted_model: identity?.configured_model ?? "unknown",
+		observed_runtime_model: identity?.response_model ?? "unknown",
 		provider: identity?.provider ?? null,
 		session_id_sha256: sessionDigest(identity?.hermes_session_id),
 		process_pid: observation.process_pid ?? null,
@@ -374,10 +376,18 @@ export class HermesCliWorkerAdapter implements WorkerAdapter {
 		return this.last_observation ? structuredClone(this.last_observation) : undefined;
 	}
 
+	getModelIdentity() {
+		return trustedModelIdentity(this.last_observation, this.requested_model);
+	}
+
 	async execute(request: WorkerProtocolRequest, controls?: WorkerExecutionControls): Promise<ResultContract> {
 		this.last_observation = undefined;
 		const boundRequest = request.run_id ? request : { ...request, run_id: randomUUID() };
-		const delegate = new PiWorker(this.worker_id, (input) => this.invoke(boundRequest, input, controls));
+		const delegate = new PiWorker(
+			this.worker_id,
+			(input) => this.invoke(boundRequest, input, controls),
+			this.requested_model,
+		);
 		const result = await delegate.execute(boundRequest, controls);
 		const observation = this.last_observation as unknown as Record<string, unknown> | undefined;
 		if (observation !== undefined) {
@@ -385,7 +395,7 @@ export class HermesCliWorkerAdapter implements WorkerAdapter {
 			observation.evidence_digest = digestJson(result.evidence);
 			this.last_observation = observation as unknown as HermesWorkerObservation;
 		}
-		return result;
+		return this.last_observation ? withTrustedModelIdentity(result, this.last_observation) : result;
 	}
 
 	private async invoke(

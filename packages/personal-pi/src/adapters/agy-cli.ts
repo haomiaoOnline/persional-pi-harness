@@ -24,6 +24,8 @@ import {
 	parseWorkerOutput,
 	runJsonlProcess,
 	safeEvidence,
+	trustedModelIdentity,
+	withTrustedModelIdentity,
 } from "./cli-runtime.ts";
 
 type AgyIdentitySource = "agy-stream-json-response" | "none";
@@ -34,7 +36,7 @@ export interface AgyRuntimeMetadata {
 	request_id_sha256: string | null;
 	requested_model: string;
 	configured_model: string | null;
-	observed_runtime_model: string | null;
+	observed_runtime_model: string;
 	provider_backend: string | null;
 	identity_source: AgyIdentitySource;
 	identity_fields_seen: string[];
@@ -128,7 +130,7 @@ function observeResponseIdentity(
 			metadata.identity_fields_seen,
 			`${prefix}.${record.response_model ? "response_model" : "runtime_model"}`,
 		);
-		if (metadata.observed_runtime_model && metadata.observed_runtime_model !== model) {
+		if (metadata.observed_runtime_model !== "unknown" && metadata.observed_runtime_model !== model) {
 			observation.protocol_error ??= "Agy emitted conflicting response-side runtime model values";
 		} else {
 			metadata.observed_runtime_model = model;
@@ -285,7 +287,7 @@ function checkObservedBudget(task: TaskContract, observation: CliObservation): s
 function identityErrors(metadata: AgyRuntimeMetadata): string[] {
 	const errors: string[] = [];
 	if (!metadata.conversation_id_sha256) errors.push("missing_conversation_id");
-	if (!metadata.observed_runtime_model) errors.push("missing_response_model");
+	if (metadata.observed_runtime_model === "unknown") errors.push("missing_response_model");
 	if (!metadata.provider_backend) errors.push("missing_provider_backend");
 	return errors;
 }
@@ -316,14 +318,25 @@ export class AgyCliWorkerAdapter implements WorkerAdapter {
 		return this.last_observation ? structuredClone(this.last_observation) : undefined;
 	}
 
+	getModelIdentity() {
+		return trustedModelIdentity(this.last_observation, this.requested_model);
+	}
+
 	getLastAgyRun(): AgyRuntimeMetadata | undefined {
 		return this.last_agy_run ? structuredClone(this.last_agy_run) : undefined;
 	}
 
 	async execute(request: WorkerProtocolRequest, controls?: WorkerExecutionControls): Promise<ResultContract> {
+		this.last_observation = undefined;
+		this.last_agy_run = undefined;
 		const denial = noToolBridgeDenial(request);
-		const delegate = new PiWorker(this.worker_id, (input) => this.invoke(request, input, controls, denial));
-		return delegate.execute(request, controls);
+		const delegate = new PiWorker(
+			this.worker_id,
+			(input) => this.invoke(request, input, controls, denial),
+			this.requested_model,
+		);
+		const result = await delegate.execute(request, controls);
+		return this.last_observation ? withTrustedModelIdentity(result, this.last_observation) : result;
 	}
 
 	private async invoke(
@@ -365,7 +378,7 @@ export class AgyCliWorkerAdapter implements WorkerAdapter {
 			request_id_sha256: null,
 			requested_model: this.requested_model,
 			configured_model: null,
-			observed_runtime_model: null,
+			observed_runtime_model: "unknown",
 			provider_backend: null,
 			identity_source: "none",
 			identity_fields_seen: [],
@@ -409,7 +422,9 @@ export class AgyCliWorkerAdapter implements WorkerAdapter {
 		const observation = processResult.observation;
 		metadata.ended_at = new Date().toISOString();
 		metadata.identity_source =
-			metadata.observed_runtime_model && metadata.provider_backend ? "agy-stream-json-response" : "none";
+			metadata.observed_runtime_model !== "unknown" && metadata.provider_backend
+				? "agy-stream-json-response"
+				: "none";
 		this.last_agy_run = structuredClone(metadata);
 		const elapsed = Date.parse(metadata.ended_at) - Date.parse(metadata.started_at);
 		const evidence = safeEvidence(
@@ -432,6 +447,11 @@ export class AgyCliWorkerAdapter implements WorkerAdapter {
 				observation,
 				"BLOCKED",
 				elapsed,
+				undefined,
+				{
+					observed_runtime_model:
+						metadata.identity_source === "agy-stream-json-response" ? metadata.observed_runtime_model : undefined,
+				},
 			);
 			throw processResult.budget_error;
 		}
@@ -501,6 +521,10 @@ export class AgyCliWorkerAdapter implements WorkerAdapter {
 			output.status,
 			elapsed,
 			accountInputTokens(request.task, observation.usage),
+			{
+				observed_runtime_model:
+					metadata.identity_source === "agy-stream-json-response" ? metadata.observed_runtime_model : undefined,
+			},
 		);
 		return output;
 	}

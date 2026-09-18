@@ -7,6 +7,7 @@ import {
 	type TaskContract,
 	TaskStateMachine,
 } from "../src/index.ts";
+import { AVAILABLE_WORKER_STATUS, UNAVAILABLE_WORKER_STATUS, UNKNOWN_MODEL_IDENTITY } from "./v3-fixtures.ts";
 
 function makeTask(id: string): TaskContract {
 	return {
@@ -84,7 +85,11 @@ function startRunning(
 	store.updateTask(record);
 	new LoopBudgetController(store).beforeRun(task);
 	const lease = leases.acquire(task.id, workerId, at);
-	const run = store.createRun(task.id, workerId, lease.lease_epoch, at);
+	const run = store.createRun(task.id, workerId, lease.lease_epoch, {
+		worker_status: AVAILABLE_WORKER_STATUS,
+		model_identity: UNKNOWN_MODEL_IDENTITY,
+		started_at: at,
+	});
 	return { lease, run };
 }
 
@@ -100,6 +105,7 @@ function validResult(taskId: string, runId: string, workerId: string, epoch: num
 		artifacts: [],
 		evidence: ["worker_result"],
 		errors: [],
+		model_identity: UNKNOWN_MODEL_IDENTITY,
 	};
 }
 
@@ -202,7 +208,10 @@ describe("T9.4 bounded automatic recovery", () => {
 			fault: "timeout",
 			at: "2026-09-13T00:00:01.000Z",
 		});
-		const second = manager.startRetry(task.id, firstPlan.next_worker_id ?? "worker-a", "2026-09-13T00:00:02.000Z");
+		const second = manager.startRetry(task.id, firstPlan.next_worker_id ?? "worker-a", {
+			worker_status: AVAILABLE_WORKER_STATUS,
+			at: "2026-09-13T00:00:02.000Z",
+		});
 		const secondPlan = manager.recover({
 			task_id: task.id,
 			run_id: second.run.id,
@@ -212,7 +221,12 @@ describe("T9.4 bounded automatic recovery", () => {
 
 		expect(secondPlan.action).toBe("BLOCK");
 		expect(store.getTask(task.id)?.state).toBe("BLOCKED");
-		expect(() => manager.startRetry(task.id, "worker-c", "2026-09-13T00:00:04.000Z")).toThrow("not READY");
+		expect(() =>
+			manager.startRetry(task.id, "worker-c", {
+				worker_status: AVAILABLE_WORKER_STATUS,
+				at: "2026-09-13T00:00:04.000Z",
+			}),
+		).toThrow("not READY");
 		expect(store.read().decisions.filter((decision) => decision.decision_type === "recovery")).toHaveLength(2);
 	});
 
@@ -237,7 +251,10 @@ describe("T9.4 bounded automatic recovery", () => {
 		const task = makeTask("stale");
 		const first = startRunning(store, leases, task, "worker-a", "2026-09-13T00:00:00.000Z");
 		manager.recover({ task_id: task.id, run_id: first.run.id, fault: "crash", candidate_worker_id: "worker-b" });
-		const second = manager.startRetry(task.id, "worker-b", "2026-09-13T00:00:01.000Z");
+		const second = manager.startRetry(task.id, "worker-b", {
+			worker_status: AVAILABLE_WORKER_STATUS,
+			at: "2026-09-13T00:00:01.000Z",
+		});
 		const admission = manager.admitResult(
 			first.lease,
 			validResult(task.id, first.run.id, "worker-a", first.lease.lease_epoch),
@@ -245,5 +262,24 @@ describe("T9.4 bounded automatic recovery", () => {
 
 		expect(admission).toMatchObject({ accepted: false, reason: "stale_result" });
 		expect(leases.acceptResult(second.lease).accepted).toBe(true);
+	});
+
+	test("does not create a recovery Lease or Run when the replacement Worker is unavailable", () => {
+		const store = new PersistentStateStore();
+		const leases = new LeaseManager(store);
+		const manager = new RecoveryManager(store, leases);
+		const task = makeTask("unavailable-retry");
+		const first = startRunning(store, leases, task, "worker-a", "2026-09-13T00:00:00.000Z");
+		manager.recover({ task_id: task.id, run_id: first.run.id, fault: "timeout" });
+		const runsBefore = store.getRuns(task.id).length;
+
+		expect(() =>
+			manager.startRetry(task.id, "worker-b", {
+				worker_status: UNAVAILABLE_WORKER_STATUS,
+				at: "2026-09-13T00:00:01.000Z",
+			}),
+		).toThrow("recovery Worker is unavailable");
+		expect(store.getRuns(task.id)).toHaveLength(runsBefore);
+		expect(leases.currentLease(task.id)).toBeUndefined();
 	});
 });

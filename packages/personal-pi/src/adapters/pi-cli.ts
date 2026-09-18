@@ -21,6 +21,8 @@ import {
 	parseWorkerOutput,
 	runJsonlProcess,
 	safeEvidence,
+	trustedModelIdentity,
+	withTrustedModelIdentity,
 } from "./cli-runtime.ts";
 
 const PI_TOOLS = new Set(["read", "write", "edit", "grep", "find", "ls", "bash"]);
@@ -268,11 +270,21 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 		return this.last_observation ? structuredClone(this.last_observation) : undefined;
 	}
 
+	getModelIdentity() {
+		return trustedModelIdentity(this.last_observation, this.requested_model);
+	}
+
 	async execute(request: WorkerProtocolRequest, controls?: WorkerExecutionControls): Promise<ResultContract> {
+		this.last_observation = undefined;
 		const tools = effectiveTools(request.task);
 		const denial = policyDenial(request, tools);
-		const delegate = new PiWorker(this.worker_id, (input) => this.invoke(request, input, controls, tools, denial));
-		return delegate.execute(request, controls);
+		const delegate = new PiWorker(
+			this.worker_id,
+			(input) => this.invoke(request, input, controls, tools, denial),
+			this.requested_model,
+		);
+		const result = await delegate.execute(request, controls);
+		return this.last_observation ? withTrustedModelIdentity(result, this.last_observation) : result;
 	}
 
 	private async invoke(
@@ -375,6 +387,11 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 				observation,
 				"BLOCKED",
 				elapsed,
+				undefined,
+				{
+					platform_accepted_model: observation.model,
+					observed_runtime_model: observation.model,
+				},
 			);
 			throw processResult.budget_error;
 		}
@@ -491,6 +508,11 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 			observation,
 			output.status,
 			elapsed,
+			undefined,
+			{
+				platform_accepted_model: observation.model,
+				observed_runtime_model: observation.model,
+			},
 		);
 		return output;
 	}

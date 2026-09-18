@@ -5,7 +5,7 @@ import { PiAgentWorkerAdapter } from "./adapters/pi-cli.ts";
 import { IngressGate } from "./ingress.ts";
 import { PersistentStateStore } from "./persistence.ts";
 import { createPlanApproval, PersonalPiPipeline } from "./pipeline.ts";
-import type { WorkspaceSnapshot } from "./types.ts";
+import type { WorkerStatus, WorkspaceSnapshot } from "./types.ts";
 import { captureWorkspaceSnapshot } from "./verification.ts";
 
 const PI_TOOLS = new Set(["read", "write", "edit", "grep", "find", "ls", "bash"]);
@@ -27,6 +27,7 @@ export interface PersonalPiInteractiveWorkerRoute {
 	model?: string;
 	thinking?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 	active_tools: string[];
+	worker_status: WorkerStatus;
 }
 
 export interface PersonalPiInteractiveContext {
@@ -81,7 +82,10 @@ export function createPersonalPiInteractiveIngressFactory(options: PersonalPiInt
 			const route = context.getWorkerRoute();
 			if (!route.provider || !route.model)
 				throw new Error("interactive ingress requires an active provider and model");
-			if (!route.command || route.command_args_prefix.length === 0)
+			if (
+				route.worker_status.worker_capability === "available" &&
+				(!route.command || route.command_args_prefix.length === 0)
+			)
 				throw new Error("interactive ingress worker route is unavailable");
 
 			const statePath = options.state_path ?? join(route.cwd, ".pph", "personal-pi-state.json");
@@ -175,6 +179,7 @@ export function createPersonalPiInteractiveIngressFactory(options: PersonalPiInt
 				},
 				plan_approval: createPlanApproval(PLAN_ASSESSMENT, "interactive-ingress"),
 				worker,
+				worker_status: route.worker_status,
 				snapshot: initialSnapshot,
 				workspace_snapshot_provider: (artifacts) => gitSnapshot(route.cwd, artifacts),
 			});

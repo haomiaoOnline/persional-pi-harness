@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createSanitizedEnvironment } from "./adapters/cli-runtime.ts";
+import { createModelIdentity } from "./result.ts";
 import type {
 	JsonValue,
 	ResolvedContext,
@@ -120,6 +121,7 @@ function failureOutput(message: string): WorkerExecutionOutput {
  */
 export class ProcessWorkerAdapter implements WorkerProcessLifecycle {
 	readonly worker_id: string;
+	readonly requested_model = "unknown";
 	readonly worker_instance_id: string;
 	readonly adapter_id: string;
 	readonly workspace_path: string;
@@ -250,8 +252,16 @@ export class ProcessWorkerAdapter implements WorkerProcessLifecycle {
 		};
 	}
 
+	getModelIdentity() {
+		return createModelIdentity(this.requested_model);
+	}
+
 	async execute(request: WorkerProtocolRequest, controls?: WorkerExecutionControls) {
-		const delegate = new PiWorker(this.worker_id, (input) => this.executeInProcess(request, input));
+		const delegate = new PiWorker(
+			this.worker_id,
+			(input) => this.executeInProcess(request, input),
+			this.requested_model,
+		);
 		return delegate.execute(request, controls);
 	}
 

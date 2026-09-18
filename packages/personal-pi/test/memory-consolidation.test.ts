@@ -12,7 +12,7 @@ import {
 	type RunRecord,
 	TriggerGateway,
 } from "../src/index.ts";
-import { makeV3Task } from "./v3-fixtures.ts";
+import { AVAILABLE_WORKER_STATUS, makeV3Task, UNKNOWN_MODEL_IDENTITY } from "./v3-fixtures.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -24,6 +24,8 @@ function completedInput() {
 		attempt: 1,
 		worker_id: "worker-memory",
 		lease_epoch: 1,
+		worker_status: AVAILABLE_WORKER_STATUS,
+		model_identity: UNKNOWN_MODEL_IDENTITY,
 		status: "SUCCEEDED",
 		started_at: "2026-09-15T00:00:00.000Z",
 	};
@@ -38,6 +40,7 @@ function completedInput() {
 		artifacts: ["tmp/memory.txt"],
 		evidence: ["worker_result"],
 		errors: [],
+		model_identity: UNKNOWN_MODEL_IDENTITY,
 		work_receipt: {
 			work_attempted: true,
 			effects_count: 2,

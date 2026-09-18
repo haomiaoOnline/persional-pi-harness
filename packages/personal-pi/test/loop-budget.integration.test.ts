@@ -20,7 +20,14 @@ import {
 	TaskStateMachine,
 	V3_FEEDBACK_PATHS,
 } from "../src/index.ts";
-import { boundedLoopBudget, makeV3Task, planFor, requirementFor } from "./v3-fixtures.ts";
+import {
+	AVAILABLE_WORKER_STATUS,
+	boundedLoopBudget,
+	makeV3Task,
+	planFor,
+	requirementFor,
+	UNKNOWN_MODEL_IDENTITY,
+} from "./v3-fixtures.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -52,6 +59,7 @@ describe("T1.1-B loop budget runtime integration", () => {
 				evidence: ["worker_result"],
 				changed_files: ["tmp/repair-loop.txt"],
 			})),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			command_runner: () => ({
 				command: "deterministic-check",
 				exit_code: 1,
@@ -71,7 +79,9 @@ describe("T1.1-B loop budget runtime integration", () => {
 			reason: "Verifier rejected the first Worker result",
 		});
 		expect(recovery.action).toBe("RETRY");
-		const retry = new RecoveryManager(store, leases).startRetry(task.id, "repair-worker-2");
+		const retry = new RecoveryManager(store, leases).startRetry(task.id, "repair-worker-2", {
+			worker_status: AVAILABLE_WORKER_STATUS,
+		});
 		new LoopBudgetController(store).beforeModelCall(task);
 		new LoopBudgetController(store).beforeToolCall(task);
 		store.saveResult({
@@ -85,6 +95,7 @@ describe("T1.1-B loop budget runtime integration", () => {
 			artifacts: [],
 			evidence: [],
 			errors: ["injected repair failure"],
+			model_identity: UNKNOWN_MODEL_IDENTITY,
 		});
 		const blocked = new RecoveryManager(store, leases).recover({
 			task_id: task.id,
@@ -127,7 +138,10 @@ describe("T1.1-B loop budget runtime integration", () => {
 		record = store.updateTask(machine.transition(record, "RUNNING", "running"));
 		const leases = new LeaseManager(store);
 		const firstLease = leases.acquire(task.id, "worker-a");
-		const firstRun = store.createRun(task.id, firstLease.worker_id, firstLease.lease_epoch);
+		const firstRun = store.createRun(task.id, firstLease.worker_id, firstLease.lease_epoch, {
+			worker_status: AVAILABLE_WORKER_STATUS,
+			model_identity: UNKNOWN_MODEL_IDENTITY,
+		});
 		new LoopBudgetController(store).beforeRun(task);
 		const manager = new RecoveryManager(store, leases);
 

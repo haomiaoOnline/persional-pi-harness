@@ -2,9 +2,11 @@ import { type ChildProcessWithoutNullStreams, type SpawnOptions, spawn } from "n
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { StringDecoder } from "node:string_decoder";
-import { validateResultContract } from "../result.ts";
+import { createModelIdentity, validateResultContract } from "../result.ts";
 import type {
 	JsonValue,
+	ModelIdentity,
+	ResultContract,
 	TaskContract,
 	WorkerExecutionControls,
 	WorkerExecutionInput,
@@ -97,8 +99,8 @@ export interface JsonlProcessResult {
 export interface ExternalWorkerObservation {
 	backend: string;
 	requested_model: string;
-	platform_accepted_model: string | null;
-	observed_runtime_model: string | null;
+	platform_accepted_model: string;
+	observed_runtime_model: string;
 	provider: string | null;
 	session_id_sha256: string | null;
 	process_pid: number | null;
@@ -474,6 +476,7 @@ export function parseWorkerOutput(text: string): { output?: WorkerExecutionOutpu
 		run_id: "external-worker-run",
 		worker_id: "external-worker",
 		lease_epoch: 1,
+		model_identity: createModelIdentity("unknown"),
 	};
 	const validation = validateResultContract(candidate);
 	if (!validation.valid || !validation.value) return { errors: validation.errors };
@@ -506,14 +509,15 @@ export function externalObservation(
 	status: string,
 	elapsedMs: number,
 	inputAccounting?: InputTokenAccounting,
+	identity: { platform_accepted_model?: string; observed_runtime_model?: string } = {},
 ): ExternalWorkerObservation {
-	const observedModel = observation.model ?? null;
 	const accounting = inputAccounting ?? accountInputTokens({ loop_budget: undefined }, observation.usage);
+	const modelIdentity = createModelIdentity(requestedModel, identity);
 	return {
 		backend,
-		requested_model: requestedModel,
-		platform_accepted_model: observedModel,
-		observed_runtime_model: observedModel,
+		requested_model: modelIdentity.requested_model,
+		platform_accepted_model: modelIdentity.platform_accepted_model,
+		observed_runtime_model: modelIdentity.observed_runtime_model,
 		provider: observation.provider ?? null,
 		session_id_sha256: sessionDigest(observation.session_id),
 		process_pid: observation.process_pid ?? null,
@@ -528,6 +532,34 @@ export function externalObservation(
 		timed_out: observation.timed_out,
 		protocol_error: observation.protocol_error,
 	};
+}
+
+export function withTrustedModelIdentity(
+	result: ResultContract,
+	observation: Pick<
+		ExternalWorkerObservation,
+		"requested_model" | "platform_accepted_model" | "observed_runtime_model"
+	>,
+): ResultContract {
+	return {
+		...result,
+		model_identity: trustedModelIdentity(observation, observation.requested_model),
+	};
+}
+
+export function trustedModelIdentity(
+	observation:
+		| Pick<ExternalWorkerObservation, "requested_model" | "platform_accepted_model" | "observed_runtime_model">
+		| undefined,
+	requestedModel: string,
+): ModelIdentity {
+	return observation
+		? {
+				requested_model: observation.requested_model,
+				platform_accepted_model: observation.platform_accepted_model,
+				observed_runtime_model: observation.observed_runtime_model,
+			}
+		: createModelIdentity(requestedModel);
 }
 
 export function safeEvidence(

@@ -101,6 +101,11 @@ describe("external CLI Worker adapters", () => {
 		const extra = parseWorkerOutput(`${successText().slice(0, -1)},"secret_field":"bad"}`);
 		expect(extra.output).toBeUndefined();
 		expect(extra.errors[0]).toContain("unsupported fields");
+		const forgedIdentity = parseWorkerOutput(
+			`${successText().slice(0, -1)},"model_identity":{"requested_model":"x","platform_accepted_model":"x","observed_runtime_model":"x"}}`,
+		);
+		expect(forgedIdentity.output).toBeUndefined();
+		expect(forgedIdentity.errors[0]).toContain("unsupported fields");
 	});
 
 	test("sanitizes environment names even when secret-like variables exist", () => {
@@ -153,6 +158,11 @@ describe("external CLI Worker adapters", () => {
 		expect(prompt).not.toContain("idempotency-adapter-pi");
 		const observation = adapter.getLastObservation();
 		expect(observation?.observed_runtime_model).toBe("ArkCoding/deepseek-v4-flash-ga-260731");
+		expect(result.model_identity).toEqual({
+			requested_model: "ArkCoding/deepseek-v4-flash-ga-260731",
+			platform_accepted_model: "ArkCoding/deepseek-v4-flash-ga-260731",
+			observed_runtime_model: "ArkCoding/deepseek-v4-flash-ga-260731",
+		});
 		expect(observation?.provider).toBe("opencodex");
 		expect(observation?.input_tokens).toBe(12);
 	});
@@ -216,7 +226,13 @@ describe("external CLI Worker adapters", () => {
 		expect(captured?.command).toBe("codex");
 		expect(captured?.args).toContain("-");
 		expect(captured?.env.OPENAI_API_KEY).toBeUndefined();
-		expect(adapter.getLastObservation()?.observed_runtime_model).toBeNull();
+		expect(adapter.getLastObservation()?.platform_accepted_model).toBe("unknown");
+		expect(adapter.getLastObservation()?.observed_runtime_model).toBe("unknown");
+		expect(result.model_identity).toEqual({
+			requested_model: "gpt-5.6-sol",
+			platform_accepted_model: "unknown",
+			observed_runtime_model: "unknown",
+		});
 		expect(adapter.getLastObservation()?.input_tokens).toBe(40);
 		expect(adapter.getLastObservation()?.input_accounting.mode).toBe("provider_total_fail_closed");
 

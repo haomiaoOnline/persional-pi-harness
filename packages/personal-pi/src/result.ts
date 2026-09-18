@@ -1,6 +1,14 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import type { BatchResultEnvelope, ResultContract, ResultStatus, ValidationResult, WorkReceipt } from "./types.ts";
+import type {
+	BatchResultEnvelope,
+	ModelIdentity,
+	ResultContract,
+	ResultStatus,
+	ValidationResult,
+	WorkerStatus,
+	WorkReceipt,
+} from "./types.ts";
 
 const ResultStatusSchema = Type.Union([
 	Type.Literal("success"),
@@ -8,6 +16,24 @@ const ResultStatusSchema = Type.Union([
 	Type.Literal("timeout"),
 	Type.Literal("INSUFFICIENT_CONTEXT"),
 ]);
+
+export const WorkerStatusSchema = Type.Object(
+	{
+		worker_capability: Type.Union([Type.Literal("available"), Type.Literal("unavailable")]),
+		execution_mode: Type.Union([Type.Literal("normal"), Type.Literal("root_only"), Type.Literal("degraded")]),
+		delivery_status: Type.Union([Type.Literal("normal"), Type.Literal("degraded")]),
+	},
+	{ additionalProperties: false },
+);
+
+export const ModelIdentitySchema = Type.Object(
+	{
+		requested_model: Type.String({ minLength: 1 }),
+		platform_accepted_model: Type.String({ minLength: 1 }),
+		observed_runtime_model: Type.String({ minLength: 1 }),
+	},
+	{ additionalProperties: false },
+);
 
 const WorkReceiptSchema = Type.Object(
 	{
@@ -48,6 +74,7 @@ const ResultContractSchema = Type.Object(
 		artifacts: Type.Array(Type.String()),
 		evidence: Type.Array(Type.String()),
 		errors: Type.Array(Type.String()),
+		model_identity: ModelIdentitySchema,
 		requested_context: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
 		work_receipt: Type.Optional(WorkReceiptSchema),
 	},
@@ -65,6 +92,52 @@ const BatchResultEnvelopeSchema = Type.Object(
 );
 
 export { BatchResultEnvelopeSchema, ResultContractSchema, ResultItemSchema, ResultStatusSchema };
+
+export function createModelIdentity(
+	requestedModel: string,
+	options: { platform_accepted_model?: string; observed_runtime_model?: string } = {},
+): ModelIdentity {
+	return {
+		requested_model: requestedModel.trim() || "unknown",
+		platform_accepted_model: options.platform_accepted_model?.trim() || "unknown",
+		observed_runtime_model: options.observed_runtime_model?.trim() || "unknown",
+	};
+}
+
+export function validateModelIdentity(value: unknown): ValidationResult<ModelIdentity> {
+	if (Value.Check(ModelIdentitySchema, value)) return { valid: true, value: value as ModelIdentity, errors: [] };
+	return {
+		valid: false,
+		errors: [...Value.Errors(ModelIdentitySchema, value)].map((error) => {
+			const path = "path" in error && typeof error.path === "string" ? error.path : "/";
+			return `${path || "/"}: ${error.message}`;
+		}),
+	};
+}
+
+export function validateWorkerStatus(value: unknown): ValidationResult<WorkerStatus> {
+	if (!Value.Check(WorkerStatusSchema, value)) {
+		return {
+			valid: false,
+			errors: [...Value.Errors(WorkerStatusSchema, value)].map((error) => {
+				const path = "path" in error && typeof error.path === "string" ? error.path : "/";
+				return `${path || "/"}: ${error.message}`;
+			}),
+		};
+	}
+	const status = value as WorkerStatus;
+	const errors: string[] = [];
+	if (
+		status.worker_capability === "unavailable" &&
+		(status.execution_mode !== "root_only" || status.delivery_status !== "degraded")
+	)
+		errors.push("unavailable Worker must use execution_mode=root_only and delivery_status=degraded");
+	if (status.execution_mode === "root_only" && status.worker_capability !== "unavailable")
+		errors.push("execution_mode=root_only requires worker_capability=unavailable");
+	if (status.execution_mode === "degraded" && status.delivery_status !== "degraded")
+		errors.push("execution_mode=degraded requires delivery_status=degraded");
+	return errors.length === 0 ? { valid: true, value: status, errors: [] } : { valid: false, errors };
+}
 
 export function createWorkReceipt(
 	changedFiles: readonly string[],

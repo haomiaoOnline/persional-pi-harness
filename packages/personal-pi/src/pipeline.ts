@@ -20,7 +20,7 @@ import {
 import { createProtocolEnvelope } from "./protocol.ts";
 import { type DefinitionOfReadyInput, evaluateDefinitionOfReady } from "./readiness.ts";
 import type { VerificationRecipeRegistry } from "./recipes.ts";
-import { ensureWorkReceipt, validateResultContract } from "./result.ts";
+import { createModelIdentity, ensureWorkReceipt, validateResultContract, validateWorkerStatus } from "./result.ts";
 import { createTaskRecord, TaskStateMachine } from "./state-machine.ts";
 import { computeGraphEfficiencyMetrics, createRegressionCase, TraceRecorder } from "./trace.ts";
 import type {
@@ -47,6 +47,7 @@ import type {
 	VerificationRecord,
 	WorkerExecutionControls,
 	WorkerProtocolRequest,
+	WorkerStatus,
 	WorkspaceSnapshot,
 } from "./types.ts";
 import {
@@ -88,6 +89,7 @@ export interface PipelineRequest {
 	requirement: RequirementContract;
 	task: TaskContract;
 	worker: WorkerAdapter;
+	worker_status: WorkerStatus;
 	plan_checklist: PlanQualityChecklist;
 	plan_approval: PlanApproval;
 	plan_assessment?: ArchitectureCommercialAssessment;
@@ -145,6 +147,7 @@ function failureResult(
 	workerId: string,
 	error: unknown,
 	summary = "worker adapter threw before returning a Result Contract",
+	requestedModel = "unknown",
 ): ResultContract {
 	return {
 		task_id: request.task.id,
@@ -157,6 +160,7 @@ function failureResult(
 		artifacts: [],
 		evidence: [],
 		errors: [error instanceof Error ? error.message : String(error)],
+		model_identity: createModelIdentity(requestedModel),
 		work_receipt: {
 			work_attempted: false,
 			effects_count: 0,
@@ -169,19 +173,33 @@ function failureResult(
 	};
 }
 
-function normalizeResult(request: WorkerProtocolRequest, result: ResultContract, workerId: string): ResultContract {
+function normalizeResult(
+	request: WorkerProtocolRequest,
+	result: ResultContract,
+	workerId: string,
+	requestedModel: string,
+): ResultContract {
 	const validation = validateResultContract(result);
 	if (validation.valid) {
 		const identityErrors = [
 			result.task_id === request.task.id ? undefined : `task_id mismatch: expected ${request.task.id}`,
 			result.run_id === request.run_id ? undefined : `run_id mismatch: expected ${request.run_id}`,
 			result.worker_id === workerId ? undefined : `worker_id mismatch: expected ${workerId}`,
+			result.model_identity.requested_model === requestedModel
+				? undefined
+				: `requested_model mismatch: expected ${requestedModel}`,
 			result.lease_epoch === request.protocol.lease_epoch
 				? undefined
 				: `lease_epoch mismatch: expected ${request.protocol.lease_epoch}`,
 		].filter((error): error is string => error !== undefined);
 		if (identityErrors.length === 0) return ensureWorkReceipt(result);
-		return failureResult(request, workerId, new Error(identityErrors.join("; ")), "worker result identity mismatch");
+		return failureResult(
+			request,
+			workerId,
+			new Error(identityErrors.join("; ")),
+			"worker result identity mismatch",
+			requestedModel,
+		);
 	}
 	return {
 		task_id: request.task.id,
@@ -194,6 +212,7 @@ function normalizeResult(request: WorkerProtocolRequest, result: ResultContract,
 		artifacts: [],
 		evidence: [],
 		errors: validation.errors,
+		model_identity: createModelIdentity(requestedModel),
 	};
 }
 
@@ -242,6 +261,11 @@ export class PersonalPiPipeline {
 
 	async execute(request: PipelineRequest): Promise<PipelineExecution> {
 		const at = request.at ?? new Date().toISOString();
+		const requestedModel = request.worker.requested_model?.trim() || "unknown";
+		const workerStatus = request.worker_status;
+		const workerStatusValidation = validateWorkerStatus(workerStatus);
+		if (!workerStatusValidation.valid)
+			throw new PipelineStageError("DISPATCH", `invalid WorkerStatus: ${workerStatusValidation.errors.join("; ")}`);
 		const tracer = new TraceRecorder(request.task.id, undefined, at);
 		const lifecycleEvidence: string[] = [];
 		if (
@@ -315,7 +339,7 @@ export class PersonalPiPipeline {
 			reasoning_depth: dispatch.reasoning_depth,
 			graph_width: 1,
 			graph_depth: 1,
-			active_workers: 1,
+			active_workers: workerStatus.worker_capability === "available" ? 1 : 0,
 			handoff_count: 0,
 			replan_count: 0,
 		});
@@ -402,6 +426,25 @@ export class PersonalPiPipeline {
 		task = this.stateStore.updateTask(
 			new TaskStateMachine().transition(task, "READY", "Definition of Ready passed", at),
 		);
+		if (workerStatus.worker_capability === "unavailable") {
+			this.stateStore.addDispatch({
+				id: randomUUID(),
+				task_id: task.id,
+				worker_id: request.worker.worker_id,
+				mode: dispatchMode(dispatch.mode),
+				worker_status: structuredClone(workerStatus),
+				requested_model: requestedModel,
+				created_at: at,
+			});
+			const reason = "Worker capability unavailable; root-only degraded delivery requires an explicit root executor";
+			task = this.stateStore.updateTask(new TaskStateMachine().transition(task, "BLOCKED", reason, at));
+			tracer.record("WORKER", `${request.worker.worker_id}:unavailable/root_only/degraded`, at);
+			tracer.record("RUN", "blocked before Lease/Run creation", at);
+			tracer.finish("BLOCKED", at);
+			tracer.setGraphEfficiencyMetrics(computeGraphEfficiencyMetrics(tracer.snapshot()));
+			this.stateStore.addTrace(tracer.snapshot());
+			throw new PipelineStageError("WORKER", reason, task.id);
+		}
 		task = this.stateStore.updateTask(
 			new TaskStateMachine().transition(task, "RUNNING", "dispatch policy accepted", at),
 		);
@@ -427,7 +470,11 @@ export class PersonalPiPipeline {
 			throw new PipelineStageError("RUN", reason, task.id);
 		}
 		const lease = this.leaseManager.acquire(task.id, request.worker.worker_id, at);
-		const run = this.stateStore.createRun(task.id, request.worker.worker_id, lease.lease_epoch, at);
+		const run = this.stateStore.createRun(task.id, request.worker.worker_id, lease.lease_epoch, {
+			worker_status: workerStatus,
+			model_identity: createModelIdentity(requestedModel),
+			started_at: at,
+		});
 		tracer.attachRun(run.id);
 		tracer.record("RUN", "Run created", at);
 		this.stateStore.addDispatch({
@@ -436,6 +483,8 @@ export class PersonalPiPipeline {
 			worker_id: request.worker.worker_id,
 			lease_epoch: lease.lease_epoch,
 			mode: dispatchMode(dispatch.mode),
+			worker_status: structuredClone(workerStatus),
+			requested_model: requestedModel,
 			created_at: at,
 		});
 
@@ -456,15 +505,22 @@ export class PersonalPiPipeline {
 				beforeModelCall: () => this.loopBudgetController.beforeModelCall(request.task),
 				beforeToolCall: () => this.loopBudgetController.beforeToolCall(request.task),
 			};
-			result = normalizeResult(
-				workerRequest,
-				await request.worker.execute(workerRequest, controls),
-				request.worker.worker_id,
-			);
+			const workerResult = await request.worker.execute(workerRequest, controls);
+			const trustedResult = {
+				...workerResult,
+				model_identity: request.worker.getModelIdentity?.() ?? createModelIdentity(requestedModel),
+			};
+			result = normalizeResult(workerRequest, trustedResult, request.worker.worker_id, requestedModel);
 		} catch (error) {
 			if (error instanceof LoopBudgetExhaustedError || error instanceof LoopBudgetMissingError) {
 				const reason = error.message;
-				const blockedResult = failureResult(workerRequest, request.worker.worker_id, error);
+				const blockedResult = failureResult(
+					workerRequest,
+					request.worker.worker_id,
+					error,
+					undefined,
+					requestedModel,
+				);
 				this.stateStore.saveResult(blockedResult, at);
 				task = this.stateStore.updateTask(new TaskStateMachine().transition(task, "BLOCKED", reason, at));
 				const decision = createDecisionRecord("loop_budget", "BLOCKED", reason, [task.id, run.id], at);
@@ -483,7 +539,7 @@ export class PersonalPiPipeline {
 				this.stateStore.addTrace(tracer.snapshot());
 				throw new PipelineStageError("RUN", reason, task.id);
 			}
-			result = failureResult(workerRequest, request.worker.worker_id, error);
+			result = failureResult(workerRequest, request.worker.worker_id, error, undefined, requestedModel);
 		}
 		if (!this.leaseManager.acceptResult(lease).accepted) {
 			throw new PipelineStageError("RESULT", "Worker result rejected by fencing lease", task.id);

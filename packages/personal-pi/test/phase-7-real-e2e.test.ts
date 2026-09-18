@@ -14,7 +14,7 @@ import {
 	type WorkerAdapter,
 	type WorkerProtocolRequest,
 } from "../src/index.ts";
-import { makeV3Task, planFor, requirementFor } from "./v3-fixtures.ts";
+import { AVAILABLE_WORKER_STATUS, makeV3Task, planFor, requirementFor, UNKNOWN_MODEL_IDENTITY } from "./v3-fixtures.ts";
 
 const temporaryDirectories: string[] = [];
 const workerScript = fileURLToPath(new URL("../scripts/local-e2e-worker.mjs", import.meta.url));
@@ -45,6 +45,7 @@ class LocalProcessWorker implements WorkerAdapter {
 				artifacts: [this.target],
 				evidence: ["worker_process", "artifact"],
 				errors: [],
+				model_identity: UNKNOWN_MODEL_IDENTITY,
 				work_receipt: {
 					work_attempted: true,
 					effects_count: 1,
@@ -66,6 +67,7 @@ class LocalProcessWorker implements WorkerAdapter {
 				artifacts: [],
 				evidence: ["worker_process"],
 				errors: [error instanceof Error ? error.message : String(error)],
+				model_identity: UNKNOWN_MODEL_IDENTITY,
 			};
 		}
 	}
@@ -132,6 +134,7 @@ describe("T7.1 real local E2E", () => {
 				requirement: requirementFor(`verified ${action} artifact`),
 				task,
 				worker: new LocalProcessWorker(`process-${id}`, action, target),
+				worker_status: AVAILABLE_WORKER_STATUS,
 				command_runner: () => commandEvidence(action, target, command),
 				snapshot: captureWorkspaceSnapshot(`real-${id}`, [target], [target]),
 				current_snapshot: captureWorkspaceSnapshot(`real-${id}`, [target], [target]),

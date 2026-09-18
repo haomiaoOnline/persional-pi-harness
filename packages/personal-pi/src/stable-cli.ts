@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { accessSync, constants, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { PiAgentWorkerAdapter } from "./adapters/pi-cli.ts";
 import { DeterministicTaskCompiler, IngressGate, type TaskIngressRequest } from "./ingress.ts";
@@ -16,6 +16,7 @@ import type {
 	TaskContract,
 	TaskLedgerBinding,
 	TaskRecord,
+	WorkerStatus,
 	WorkspaceSnapshot,
 } from "./types.ts";
 import { captureWorkspaceSnapshot, sanitizeResultForVerification, VerificationEngine } from "./verification.ts";
@@ -41,6 +42,7 @@ export interface PersonalPiStableCliOptions {
 	permission_gate_path?: string | URL;
 	task_id_factory?: () => string;
 	worker_factory?: (request: StableCliWorkerRequest) => WorkerAdapter;
+	worker_status_factory?: (request: StableCliWorkerRequest) => WorkerStatus;
 }
 
 interface ParsedFlags {
@@ -195,6 +197,17 @@ function roleProfile(state: PersistentState, task: TaskRecord): RoleProfile | un
 	return structuredClone(role);
 }
 
+export function probeLocalStableCliWorkerStatus(command: string, cliEntry: string | undefined): WorkerStatus {
+	try {
+		if (!command || !cliEntry) throw new Error("worker route is incomplete");
+		accessSync(command, constants.X_OK);
+		accessSync(cliEntry, constants.R_OK);
+		return { worker_capability: "available", execution_mode: "normal", delivery_status: "normal" };
+	} catch {
+		return { worker_capability: "unavailable", execution_mode: "root_only", delivery_status: "degraded" };
+	}
+}
+
 function createDefaultWorker(request: StableCliWorkerRequest, options: PersonalPiStableCliOptions): WorkerAdapter {
 	if (request.task.execution.worker_type !== "pi")
 		throw new Error(`stable task run currently requires worker_type=pi, got ${request.task.execution.worker_type}`);
@@ -286,7 +299,13 @@ async function taskRun(flags: ParsedFlags, options: PersonalPiStableCliOptions, 
 	if (!new Set(["off", "minimal", "low", "medium", "high", "xhigh", "max"]).has(thinking))
 		throw new Error(`invalid --thinking value: ${thinking}`);
 	const workerRequest = { task, provider, model, thinking };
-	const worker = options.worker_factory?.(workerRequest) ?? createDefaultWorker(workerRequest, options);
+	const injectedWorker = options.worker_factory?.(workerRequest);
+	const worker = injectedWorker ?? createDefaultWorker(workerRequest, options);
+	const workerStatus =
+		options.worker_status_factory?.(workerRequest) ??
+		(injectedWorker
+			? { worker_capability: "unavailable", execution_mode: "root_only", delivery_status: "degraded" }
+			: probeLocalStableCliWorkerStatus(process.execPath, process.argv[1]));
 	const snapshot = gitSnapshot(project.repo_path, []);
 	const pipeline = new PersonalPiPipeline({ state_store: store });
 	const gate = new IngressGate({ pipeline });
@@ -317,6 +336,7 @@ async function taskRun(flags: ParsedFlags, options: PersonalPiStableCliOptions, 
 		},
 		plan_approval: createPlanApproval(PLAN_ASSESSMENT, "stable-cli"),
 		worker,
+		worker_status: workerStatus,
 		role_profile: roleProfile(state, task),
 		snapshot,
 		workspace_snapshot_provider: (artifacts) => gitSnapshot(project.repo_path, artifacts),

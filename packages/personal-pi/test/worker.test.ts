@@ -11,6 +11,7 @@ import {
 	type TaskContract,
 	validateBatchResultEnvelope,
 	validateResultContract,
+	validateWorkerStatus,
 } from "../src/index.ts";
 
 function makeTask(overrides: Partial<TaskContract> = {}): TaskContract {
@@ -89,6 +90,11 @@ function result(status: ResultContract["status"]): ResultContract {
 		artifacts: [],
 		evidence: ["stdout"],
 		errors: status === "failure" ? ["failed"] : [],
+		model_identity: {
+			requested_model: "unknown",
+			platform_accepted_model: "unknown",
+			observed_runtime_model: "unknown",
+		},
 	};
 }
 
@@ -97,6 +103,35 @@ describe("T3.3 Result Contract", () => {
 		const candidate = result(status);
 		if (status === "INSUFFICIENT_CONTEXT") candidate.requested_context = ["context:api-contract"];
 		expect(validateResultContract(candidate).valid).toBe(true);
+	});
+
+	test("requires explicit three-layer model identity and preserves literal unknown", () => {
+		const candidate = result("success");
+		expect(validateResultContract(candidate).valid).toBe(true);
+		expect(candidate.model_identity).toEqual({
+			requested_model: "unknown",
+			platform_accepted_model: "unknown",
+			observed_runtime_model: "unknown",
+		});
+		const { model_identity: _identity, ...missingIdentity } = candidate;
+		expect(validateResultContract(missingIdentity).valid).toBe(false);
+	});
+
+	test("enforces unavailable WorkerStatus as root_only degraded delivery", () => {
+		expect(
+			validateWorkerStatus({
+				worker_capability: "unavailable",
+				execution_mode: "root_only",
+				delivery_status: "degraded",
+			}).valid,
+		).toBe(true);
+		expect(
+			validateWorkerStatus({
+				worker_capability: "unavailable",
+				execution_mode: "normal",
+				delivery_status: "normal",
+			}).valid,
+		).toBe(false);
 	});
 
 	test("requires a reason for an explicit no-op receipt", () => {

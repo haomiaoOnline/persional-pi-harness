@@ -2,9 +2,9 @@ import type { LeaseManager } from "./lease.ts";
 import { LoopBudgetController, LoopBudgetExhaustedError, LoopBudgetMissingError } from "./loop-budget.ts";
 import type { PersistentStateStore } from "./persistence.ts";
 import { createDecisionRecord } from "./planning.ts";
-import { validateResultContract } from "./result.ts";
+import { createModelIdentity, validateResultContract, validateWorkerStatus } from "./result.ts";
 import { TaskStateMachine } from "./state-machine.ts";
-import type { DecisionRecord, Lease, LeaseDecision, RunRecord, TaskRecord, TaskStatus } from "./types.ts";
+import type { DecisionRecord, Lease, LeaseDecision, RunRecord, TaskRecord, TaskStatus, WorkerStatus } from "./types.ts";
 
 export type RecoveryFault = "timeout" | "crash" | "malformed_output" | "wrong_result";
 export type RecoveryAction = "RETRY" | "RESUME" | "REASSIGN" | "BLOCK";
@@ -165,10 +165,20 @@ export class RecoveryManager {
 		};
 	}
 
-	startRetry(taskId: string, workerId: string, at = new Date().toISOString()): RecoveryStartedRun {
+	startRetry(
+		taskId: string,
+		workerId: string,
+		options: { worker_status: WorkerStatus; requested_model?: string; at?: string },
+	): RecoveryStartedRun {
 		const task = this.stateStore.getTask(taskId);
 		if (!task) throw new RecoveryError(`unknown task: ${taskId}`);
 		if (task.state !== "READY") throw new RecoveryError(`task is not READY for recovery: ${task.state}`);
+		const workerStatusValidation = validateWorkerStatus(options.worker_status);
+		if (!workerStatusValidation.valid)
+			throw new RecoveryError(`invalid WorkerStatus: ${workerStatusValidation.errors.join("; ")}`);
+		if (options.worker_status.worker_capability !== "available")
+			throw new RecoveryError("recovery Worker is unavailable; no Lease or Run may be created");
+		const at = options.at ?? new Date().toISOString();
 		try {
 			this.loopBudgetController.beforeRun(task);
 		} catch (error) {
@@ -177,7 +187,11 @@ export class RecoveryManager {
 		const lease = this.leaseManager.acquire(task.id, workerId, at);
 		const running = new TaskStateMachine().transition(task, "RUNNING", "recovery retry started", at);
 		const updated = this.stateStore.updateTask(running);
-		const run = this.stateStore.createRun(task.id, workerId, lease.lease_epoch, at);
+		const run = this.stateStore.createRun(task.id, workerId, lease.lease_epoch, {
+			worker_status: options.worker_status,
+			model_identity: createModelIdentity(options.requested_model ?? "unknown"),
+			started_at: at,
+		});
 		return { task: updated, run, lease };
 	}
 

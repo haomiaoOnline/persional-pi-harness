@@ -253,6 +253,12 @@ describe("Level B process-backed Worker Instances", () => {
 		]);
 		expect(resultA.status).toBe("success");
 		expect(resultB.status).toBe("success");
+		expect(resultA.model_identity).toEqual({
+			requested_model: "unknown",
+			platform_accepted_model: "unknown",
+			observed_runtime_model: "unknown",
+		});
+		expect(resilientA.getModelIdentity()).toEqual(resultA.model_identity);
 		expect(provider.status("pi-provider")).toMatchObject({ requests_used: 2, quota_remaining: 0, state: "CLOSED" });
 		expect(resultA.evidence).toContain("pi-provider:admission=ALLOW");
 		expect(resultB.evidence).toContain("pi-provider:admission=ALLOW");

@@ -10,6 +10,7 @@ import {
 	validateResultContract,
 	WorkerRegistry,
 	WorkerSuccessRateTracker,
+	workerStatusForRegistration,
 } from "../src/index.ts";
 
 const codexManifestUrl = new URL("../examples/worker-plugins/codex-cli.plugin_manifest.yaml", import.meta.url);
@@ -94,6 +95,7 @@ function registerTwoWorkers(registry: WorkerRegistry): void {
 			evidence: ["worker_result"],
 			work_receipt: legalNoOpReceipt(),
 		})),
+		available: true,
 		capabilities: { languages: ["typescript"], latency_ms: 120 },
 	});
 	registry.register({
@@ -106,6 +108,7 @@ function registerTwoWorkers(registry: WorkerRegistry): void {
 			evidence: ["worker_result"],
 			work_receipt: legalNoOpReceipt(),
 		})),
+		available: true,
 		capabilities: { languages: ["typescript", "javascript"], latency_ms: 180 },
 	});
 }
@@ -134,13 +137,23 @@ describe("T12.1-T12.3 Worker Registry and Selection", () => {
 		registerTwoWorkers(registry);
 
 		expect(registry.select(makeTask()).worker_id).toBe("codex-worker");
-		registry.setAvailability("codex-worker", false);
+		const unavailable = registry.setAvailability("codex-worker", false);
+		expect(workerStatusForRegistration(unavailable)).toEqual({
+			worker_capability: "unavailable",
+			execution_mode: "root_only",
+			delivery_status: "degraded",
+		});
 		expect(registry.select(makeTask()).worker_id).toBe("claude-worker");
 		registry.setAvailability("claude-worker", false);
 		expect(() => registry.select(makeTask())).toThrow(NoWorkerAvailableError);
 
 		const browserTask = makeTask("browser-task", ["browser"]);
-		registry.setAvailability("claude-worker", true);
+		const available = registry.setAvailability("claude-worker", true);
+		expect(workerStatusForRegistration(available)).toEqual({
+			worker_capability: "available",
+			execution_mode: "normal",
+			delivery_status: "normal",
+		});
 		expect(registry.select(browserTask).worker_id).toBe("claude-worker");
 	});
 
@@ -162,6 +175,7 @@ describe("T12.1-T12.3 Worker Registry and Selection", () => {
 				worker_type: "cli",
 				manifest: plugin,
 				adapter: new PiWorker(workerId, () => ({ status: "success", summary: workerId })),
+				available: true,
 			});
 		}
 		for (let index = 0; index < 3; index += 1) {
@@ -180,13 +194,20 @@ describe("T12.1-T12.3 Worker Registry and Selection", () => {
 		const adapter = new PiWorker("other-id", () => ({ status: "success", summary: "unused" }));
 
 		expect(() =>
-			registry.register({ worker_id: "codex-worker", worker_type: "cli", manifest: plugin, adapter }),
+			registry.register({
+				worker_id: "codex-worker",
+				worker_type: "cli",
+				manifest: plugin,
+				adapter,
+				available: true,
+			}),
 		).toThrow("adapter worker_id must match worker_id");
 		registry.register({
 			worker_id: "codex-worker",
 			worker_type: "cli",
 			manifest: plugin,
 			adapter: new PiWorker("codex-worker", () => ({ status: "success", summary: "registered" })),
+			available: true,
 		});
 		expect(() =>
 			registry.register({
@@ -194,7 +215,24 @@ describe("T12.1-T12.3 Worker Registry and Selection", () => {
 				worker_type: "cli",
 				manifest: plugin,
 				adapter: new PiWorker("codex-worker", () => ({ status: "success", summary: "duplicate" })),
+				available: true,
 			}),
 		).toThrow("worker already registered");
+	});
+
+	test("never defaults a Worker registration to available", () => {
+		const registry = new WorkerRegistry();
+		const plugin = manifest(codexManifestUrl);
+		const adapter = new PiWorker("availability-required", () => ({ status: "success", summary: "unused" }));
+		const untrusted = {
+			worker_id: "availability-required",
+			worker_type: "cli" as const,
+			manifest: plugin,
+			adapter,
+		};
+
+		expect(() => registry.register(untrusted as unknown as Parameters<WorkerRegistry["register"]>[0])).toThrow(
+			"available must be provided by a trusted availability check",
+		);
 	});
 });

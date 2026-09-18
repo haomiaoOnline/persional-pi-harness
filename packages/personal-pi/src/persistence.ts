@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { validateResultContract } from "./result.ts";
+import { validateModelIdentity, validateResultContract, validateWorkerStatus } from "./result.ts";
 import { validateRoleProfile } from "./roles.ts";
 import { validateTaskContract } from "./schema.ts";
 import { clonePersistentState, createEmptyPersistentState, loadPersistentState } from "./state-file.ts";
@@ -14,6 +14,7 @@ import type {
 	EvidenceRecord,
 	ExecutionTrace,
 	LoopUsage,
+	ModelIdentity,
 	PersistentState,
 	ProjectRecord,
 	RecoveryDecision,
@@ -28,6 +29,7 @@ import type {
 	TaskRecord,
 	VerificationRecord,
 	WorkerInstanceRecord,
+	WorkerStatus,
 	WorkspaceSnapshot,
 } from "./types.ts";
 import { AcceptanceGate } from "./verification.ts";
@@ -51,6 +53,40 @@ function assertDoneAcceptanceInvariant(previous: PersistentState, candidate: Per
 		const result = candidate.results.find((entry) => entry.run_id === acceptance.run_id);
 		if (!result || result.task_id !== task.id || result.status !== "success")
 			throw new Error(`DONE task ${task.id} is not backed by a successful persisted Result`);
+	}
+}
+
+function assertWorkerRuntimeInvariant(state: PersistentState): void {
+	for (const dispatch of state.dispatches) {
+		const status = validateWorkerStatus(dispatch.worker_status);
+		if (!status.valid)
+			throw new Error(`Dispatch ${dispatch.id} has invalid WorkerStatus: ${status.errors.join("; ")}`);
+		if (!dispatch.requested_model.trim()) throw new Error(`Dispatch ${dispatch.id} has empty requested_model`);
+		if (dispatch.worker_status.worker_capability === "unavailable" && dispatch.lease_epoch !== undefined)
+			throw new Error(`unavailable Worker Dispatch ${dispatch.id} must not have a lease_epoch`);
+		if (dispatch.worker_status.worker_capability === "available" && dispatch.lease_epoch === undefined)
+			throw new Error(`available Worker Dispatch ${dispatch.id} requires a lease_epoch`);
+	}
+	for (const run of state.runs) {
+		const status = validateWorkerStatus(run.worker_status);
+		if (!status.valid) throw new Error(`Run ${run.id} has invalid WorkerStatus: ${status.errors.join("; ")}`);
+		if (run.worker_status.worker_capability !== "available")
+			throw new Error(`Run ${run.id} cannot exist when worker_capability=unavailable`);
+		const identity = validateModelIdentity(run.model_identity);
+		if (!identity.valid) throw new Error(`Run ${run.id} has invalid ModelIdentity: ${identity.errors.join("; ")}`);
+	}
+	for (const result of state.results) {
+		const validation = validateResultContract(result);
+		if (!validation.valid) throw new Error(`Result ${result.run_id} is invalid: ${validation.errors.join("; ")}`);
+		const run = state.runs.find((candidate) => candidate.id === result.run_id);
+		if (!run) throw new Error(`Result ${result.run_id} has no persisted Run`);
+		if (
+			run.task_id !== result.task_id ||
+			run.worker_id !== result.worker_id ||
+			run.lease_epoch !== result.lease_epoch ||
+			run.model_identity.requested_model !== result.model_identity.requested_model
+		)
+			throw new Error(`Result ${result.run_id} identity does not match its persisted Run`);
 	}
 }
 
@@ -81,6 +117,7 @@ export class PersistentStateStore {
 			this.state = clonePersistentState(options?.initialState ?? createEmptyPersistentState());
 			if (this.filePath && existsSync(this.filePath)) this.state = loadPersistentState(this.filePath);
 		}
+		assertWorkerRuntimeInvariant(this.state);
 	}
 
 	read(): PersistentState {
@@ -90,6 +127,7 @@ export class PersistentStateStore {
 	transact(mutation: PersistentStateMutation): PersistentState {
 		const candidate = clonePersistentState(this.state);
 		mutation(candidate);
+		assertWorkerRuntimeInvariant(candidate);
 		assertDoneAcceptanceInvariant(this.state, candidate);
 		if (this.filePath) writeAtomically(this.filePath, candidate);
 		this.state = candidate;
@@ -224,8 +262,21 @@ export class PersistentStateStore {
 		return { task: structuredClone(accepted), acceptance: structuredClone(acceptance) };
 	}
 
-	createRun(taskId: string, workerId: string, leaseEpoch: number, startedAt = new Date().toISOString()): RunRecord {
+	createRun(
+		taskId: string,
+		workerId: string,
+		leaseEpoch: number,
+		metadata: { worker_status: WorkerStatus; model_identity: ModelIdentity; started_at?: string },
+	): RunRecord {
 		if (!this.state.tasks.some((task) => task.id === taskId)) throw new Error(`unknown task: ${taskId}`);
+		const workerStatusValidation = validateWorkerStatus(metadata.worker_status);
+		if (!workerStatusValidation.valid)
+			throw new Error(`cannot persist Run with invalid WorkerStatus: ${workerStatusValidation.errors.join("; ")}`);
+		if (metadata.worker_status.worker_capability !== "available")
+			throw new Error("cannot create Run when worker_capability=unavailable");
+		const modelIdentityValidation = validateModelIdentity(metadata.model_identity);
+		if (!modelIdentityValidation.valid)
+			throw new Error(`cannot persist Run with invalid ModelIdentity: ${modelIdentityValidation.errors.join("; ")}`);
 		const attempts = this.state.runs.filter((run) => run.task_id === taskId).map((run) => run.attempt);
 		const run: RunRecord = {
 			id: randomUUID(),
@@ -233,8 +284,10 @@ export class PersistentStateStore {
 			attempt: attempts.length > 0 ? Math.max(...attempts) + 1 : 1,
 			worker_id: workerId,
 			lease_epoch: leaseEpoch,
+			worker_status: structuredClone(metadata.worker_status),
+			model_identity: structuredClone(metadata.model_identity),
 			status: "RUNNING",
-			started_at: startedAt,
+			started_at: metadata.started_at ?? new Date().toISOString(),
 		};
 		this.transact((state) => state.runs.push(run));
 		return structuredClone(run);
@@ -248,16 +301,24 @@ export class PersistentStateStore {
 		const validation = validateResultContract(result);
 		if (!validation.valid) throw new Error(`cannot persist invalid result: ${validation.errors.join("; ")}`);
 		this.transact((state) => {
+			const run = state.runs.find((candidate) => candidate.id === result.run_id);
+			if (!run) throw new Error(`unknown Run for Result: ${result.run_id}`);
+			if (
+				run.task_id !== result.task_id ||
+				run.worker_id !== result.worker_id ||
+				run.lease_epoch !== result.lease_epoch
+			)
+				throw new Error(`Result identity does not match persisted Run: ${result.run_id}`);
+			if (run.model_identity.requested_model !== result.model_identity.requested_model)
+				throw new Error(`Result requested_model does not match persisted Run: ${result.run_id}`);
 			const existing = state.results.findIndex((candidate) => candidate.run_id === result.run_id);
 			if (existing >= 0) state.results[existing] = structuredClone(result);
 			else state.results.push(structuredClone(result));
-			const run = state.runs.find((candidate) => candidate.id === result.run_id);
-			if (run) {
-				run.status = result.status === "success" ? "SUCCEEDED" : result.status === "timeout" ? "TIMEOUT" : "FAILED";
-				run.ended_at = endedAt;
-				run.result_id = result.run_id;
-				run.failure_reason = result.errors.length > 0 ? result.errors.join("; ") : undefined;
-			}
+			run.model_identity = structuredClone(result.model_identity);
+			run.status = result.status === "success" ? "SUCCEEDED" : result.status === "timeout" ? "TIMEOUT" : "FAILED";
+			run.ended_at = endedAt;
+			run.result_id = result.run_id;
+			run.failure_reason = result.errors.length > 0 ? result.errors.join("; ") : undefined;
 		});
 	}
 
@@ -385,6 +446,16 @@ export class PersistentStateStore {
 	}
 
 	addDispatch(dispatch: DispatchRecord): void {
+		const workerStatusValidation = validateWorkerStatus(dispatch.worker_status);
+		if (!workerStatusValidation.valid)
+			throw new Error(
+				`cannot persist Dispatch with invalid WorkerStatus: ${workerStatusValidation.errors.join("; ")}`,
+			);
+		if (!dispatch.requested_model.trim()) throw new Error("Dispatch requested_model must not be empty");
+		if (dispatch.worker_status.worker_capability === "unavailable" && dispatch.lease_epoch !== undefined)
+			throw new Error("unavailable Worker Dispatch must not have a lease_epoch");
+		if (dispatch.worker_status.worker_capability === "available" && dispatch.lease_epoch === undefined)
+			throw new Error("available Worker Dispatch requires a lease_epoch");
 		this.transact((state) => state.dispatches.push(structuredClone(dispatch)));
 	}
 
@@ -449,6 +520,7 @@ export class PersistentStateStore {
 			state: structuredClone(snapshot.state),
 		};
 		candidate.snapshot_payloads = knownPayloads;
+		assertWorkerRuntimeInvariant(candidate);
 		if (this.filePath) writeAtomically(this.filePath, candidate);
 		this.state = candidate;
 		return this.read();

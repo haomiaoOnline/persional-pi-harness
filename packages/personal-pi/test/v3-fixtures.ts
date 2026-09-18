@@ -1,10 +1,30 @@
 import {
 	createPlanApproval,
+	type ModelIdentity,
 	type PlanQualityChecklist,
 	ReferenceArchitecturePlaybook,
 	type RequirementContract,
 	type TaskContract,
+	type WorkerStatus,
 } from "../src/index.ts";
+
+export const AVAILABLE_WORKER_STATUS: WorkerStatus = {
+	worker_capability: "available",
+	execution_mode: "normal",
+	delivery_status: "normal",
+};
+
+export const UNAVAILABLE_WORKER_STATUS: WorkerStatus = {
+	worker_capability: "unavailable",
+	execution_mode: "root_only",
+	delivery_status: "degraded",
+};
+
+export const UNKNOWN_MODEL_IDENTITY: ModelIdentity = {
+	requested_model: "unknown",
+	platform_accepted_model: "unknown",
+	observed_runtime_model: "unknown",
+};
 
 export function boundedLoopBudget(overrides: Partial<NonNullable<TaskContract["loop_budget"]>> = {}) {
 	return {

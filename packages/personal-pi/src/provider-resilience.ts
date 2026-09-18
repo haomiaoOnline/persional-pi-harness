@@ -1,7 +1,8 @@
 export type ProviderCircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 export type ProviderAdmissionAction = "ALLOW" | "QUEUE" | "FALLBACK";
 
-import type { ResultContract, WorkerExecutionControls, WorkerProtocolRequest } from "./types.ts";
+import { createModelIdentity } from "./result.ts";
+import type { ModelIdentity, ResultContract, WorkerExecutionControls, WorkerProtocolRequest } from "./types.ts";
 import type { WorkerAdapter } from "./worker.ts";
 
 export interface ProviderResilienceConfig {
@@ -243,6 +244,7 @@ export interface ProviderResilientWorkerAdapterOptions {
 function providerAdmissionFailure(
 	request: WorkerProtocolRequest,
 	workerId: string,
+	requestedModel: string,
 	admission: ProviderAdmission,
 ): ResultContract {
 	return {
@@ -259,6 +261,7 @@ function providerAdmissionFailure(
 			`${admission.provider_id}:queue_depth=${admission.queue_depth}`,
 		],
 		errors: [`provider backpressure: ${admission.reason}`],
+		model_identity: createModelIdentity(requestedModel),
 		work_receipt: {
 			work_attempted: false,
 			effects_count: 0,
@@ -275,6 +278,7 @@ function providerAdmissionFailure(
 export class ProviderResilientWorkerAdapter implements WorkerAdapter {
 	readonly worker_id: string;
 	readonly provider_id: string;
+	readonly requested_model: string;
 	private readonly adapter: WorkerAdapter;
 	private readonly controller: ProviderResilienceController;
 	private readonly fallbackProviderId?: string;
@@ -284,17 +288,23 @@ export class ProviderResilientWorkerAdapter implements WorkerAdapter {
 		if (!options.provider_id) throw new ProviderResilienceError("provider_id must not be empty");
 		this.worker_id = options.adapter.worker_id;
 		this.provider_id = options.provider_id;
+		this.requested_model = options.adapter.requested_model?.trim() || "unknown";
 		this.adapter = options.adapter;
 		this.controller = options.controller;
 		this.fallbackProviderId = options.fallback_provider_id;
 		this.responseStatus = options.response_status ?? ((result) => (result.status === "success" ? 200 : 500));
 	}
 
+	getModelIdentity(): ModelIdentity {
+		return this.adapter.getModelIdentity?.() ?? createModelIdentity(this.requested_model);
+	}
+
 	async execute(request: WorkerProtocolRequest, controls?: WorkerExecutionControls): Promise<ResultContract> {
 		const admission = this.controller.admit(this.provider_id, {
 			fallback_provider_id: this.fallbackProviderId,
 		});
-		if (admission.action === "QUEUE") return providerAdmissionFailure(request, this.worker_id, admission);
+		if (admission.action === "QUEUE")
+			return providerAdmissionFailure(request, this.worker_id, this.requested_model, admission);
 		try {
 			const result = await this.adapter.execute(request, controls);
 			this.controller.recordResponse(admission.provider_id, this.responseStatus(result));

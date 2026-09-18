@@ -149,6 +149,7 @@ describe("Agy CLI candidate adapter boundary", () => {
 			worker_type: "cli",
 			manifest: parsed.value,
 			adapter,
+			available: true,
 		});
 
 		expect(registered.manifest.worker_plugin.adapter_entry).toBe("adapters/agy-cli.ts");
@@ -172,14 +173,14 @@ describe("Agy CLI candidate adapter boundary", () => {
 		expect(adapter.getLastAgyRun()).toMatchObject({
 			conversation_id_sha256: createHash("sha256").update("agy-conversation-test-1").digest("hex").slice(0, 16),
 			configured_model: "gemini-3.8-flash-low",
-			observed_runtime_model: null,
+			observed_runtime_model: "unknown",
 			provider_backend: null,
 			identity_source: "none",
 		});
 		expect(adapter.getLastObservation()).toMatchObject({
 			backend: "agy-cli",
-			platform_accepted_model: null,
-			observed_runtime_model: null,
+			platform_accepted_model: "unknown",
+			observed_runtime_model: "unknown",
 			provider: null,
 		});
 		expect(seen[0]?.args).toEqual(
@@ -212,8 +213,14 @@ describe("Agy CLI candidate adapter boundary", () => {
 			finish_reason: "stop",
 		});
 		expect(adapter.getLastObservation()).toMatchObject({
+			platform_accepted_model: "unknown",
 			observed_runtime_model: "gemini-3.8-flash-low-observed",
 			provider: "google-antigravity",
+		});
+		expect(result.model_identity).toEqual({
+			requested_model: "gemini-3.8-flash-low",
+			platform_accepted_model: "unknown",
+			observed_runtime_model: "gemini-3.8-flash-low-observed",
 		});
 	});
 });

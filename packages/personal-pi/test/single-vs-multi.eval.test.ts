@@ -16,7 +16,7 @@ import {
 	WorkerPool,
 	type WorkerProtocolRequest,
 } from "../src/index.ts";
-import { makeV3Task, planFor, requirementFor } from "./v3-fixtures.ts";
+import { AVAILABLE_WORKER_STATUS, makeV3Task, planFor, requirementFor, UNKNOWN_MODEL_IDENTITY } from "./v3-fixtures.ts";
 
 const runProcess = promisify(execFile);
 const temporaryDirectories: string[] = [];
@@ -49,6 +49,7 @@ class AsyncLocalProcessWorker implements WorkerAdapter {
 				artifacts: [target],
 				evidence: ["worker_process", "artifact"],
 				errors: [],
+				model_identity: UNKNOWN_MODEL_IDENTITY,
 				work_receipt: {
 					work_attempted: true,
 					effects_count: 1,
@@ -70,6 +71,7 @@ class AsyncLocalProcessWorker implements WorkerAdapter {
 				artifacts: [],
 				evidence: ["worker_process"],
 				errors: [error instanceof Error ? error.message : String(error)],
+				model_identity: UNKNOWN_MODEL_IDENTITY,
 			};
 		}
 	}
@@ -149,6 +151,7 @@ async function runMode(
 				requirement: requirementFor(`verified ${action} artifact`),
 				task,
 				worker: workers.get(workerId) ?? poolLease.adapter,
+				worker_status: AVAILABLE_WORKER_STATUS,
 				command_runner: (command) => verifyArtifact(action, target, command),
 				snapshot: captureWorkspaceSnapshot(`${mode}-${caseId}`, [target], [target]),
 				current_snapshot: captureWorkspaceSnapshot(`${mode}-${caseId}`, [target], [target]),

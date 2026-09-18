@@ -95,6 +95,11 @@ describe("T7.0 bundled interactive Personal PI composition", () => {
 				model: "fake-model",
 				thinking: "low",
 				active_tools: ["read"],
+				worker_status: {
+					worker_capability: "available",
+					execution_mode: "normal",
+					delivery_status: "normal",
+				},
 			}),
 		});
 		const rawFallback = vi.fn(async () => ({ summary: "must not run" }));
@@ -123,10 +128,14 @@ describe("T7.0 bundled interactive Personal PI composition", () => {
 		expect(state.loop_usage["interactive-task-1"]?.attempts).toBe(1);
 	});
 
-	test("fails closed before raw fallback when the worker route is unavailable", async () => {
+	test("persists degraded dispatch and fails closed before raw fallback when the worker is unavailable", async () => {
 		const cwd = temporaryDirectory();
 		initializeGitRepository(cwd);
-		const handler = createPersonalPiInteractiveIngressFactory({ task_id_factory: () => "blocked-task" })({
+		const statePath = join(cwd, ".pph", "state.json");
+		const handler = createPersonalPiInteractiveIngressFactory({
+			state_path: statePath,
+			task_id_factory: () => "blocked-task",
+		})({
 			getWorkerRoute: () => ({
 				cwd,
 				command: process.execPath,
@@ -134,13 +143,21 @@ describe("T7.0 bundled interactive Personal PI composition", () => {
 				provider: "fake-provider",
 				model: "fake-model",
 				active_tools: [],
+				worker_status: {
+					worker_capability: "unavailable",
+					execution_mode: "root_only",
+					delivery_status: "degraded",
+				},
 			}),
 		});
 		const rawFallback = vi.fn(async () => ({ summary: "must not run" }));
 
-		await expect(routeInteractiveSubmission(handler, { text: "blocked work" }, rawFallback)).rejects.toThrow(
-			"worker route is unavailable",
-		);
+		await expect(routeInteractiveSubmission(handler, { text: "blocked work" }, rawFallback)).rejects.toThrow();
 		expect(rawFallback).not.toHaveBeenCalled();
+		const state = new PersistentStateStore(statePath).read();
+		expect(state.dispatches).toHaveLength(1);
+		expect(state.dispatches[0]?.worker_status.worker_capability).toBe("unavailable");
+		expect(state.dispatches[0]?.lease_epoch).toBeUndefined();
+		expect(state.runs).toEqual([]);
 	});
 });

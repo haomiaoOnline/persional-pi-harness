@@ -3,7 +3,7 @@ import type { PersistentState } from "./types.ts";
 
 export function createEmptyPersistentState(): PersistentState {
 	return {
-		version: 1,
+		version: 2,
 		projects: [],
 		task_ledger: [],
 		acceptances: [],
@@ -56,7 +56,12 @@ export function clonePersistentState(state: PersistentState): PersistentState {
 export function loadPersistentState(path: string): PersistentState {
 	if (!existsSync(path)) return createEmptyPersistentState();
 	const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-	if (!parsed || typeof parsed !== "object" || (parsed as { version?: unknown }).version !== 1) {
+	if (parsed && typeof parsed === "object" && (parsed as { version?: unknown }).version === 1) {
+		throw new Error(
+			`legacy persistent state at ${path} lacks T3.2-B WorkerStatus/ModelIdentity; explicit migration is required`,
+		);
+	}
+	if (!parsed || typeof parsed !== "object" || (parsed as { version?: unknown }).version !== 2) {
 		throw new Error(`unsupported persistent state at ${path}`);
 	}
 	return normalizePersistentState(parsed as Partial<PersistentState>);

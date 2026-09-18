@@ -7,7 +7,7 @@ import {
 	PiWorker,
 	type TaskContract,
 } from "../src/index.ts";
-import { makeV3Task, planFor, requirementFor } from "./v3-fixtures.ts";
+import { AVAILABLE_WORKER_STATUS, makeV3Task, planFor, requirementFor } from "./v3-fixtures.ts";
 
 function legalNoOpReceipt() {
 	return {
@@ -54,6 +54,7 @@ describe("v3.1 pipeline control integration", () => {
 				evidence: ["worker_result"],
 				work_receipt: legalNoOpReceipt(),
 			})),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			command_runner: (command) => {
 				calls.push(`run:${command}`);
 				return { command, exit_code: 0, stdout: "ok", stderr: "" };
@@ -117,6 +118,7 @@ describe("v3.1 pipeline control integration", () => {
 				evidence: ["worker_result"],
 				work_receipt: legalNoOpReceipt(),
 			})),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			command_runner: () => {
 				calls += 1;
 				return { command: "npm publish", exit_code: 0, stdout: "unexpected", stderr: "" };
@@ -144,6 +146,7 @@ describe("v3.1 pipeline control integration", () => {
 				evidence: ["worker_result"],
 				work_receipt: legalNoOpReceipt(),
 			})),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			command_runner: () => {
 				calls += 1;
 				return { command: "node --test", exit_code: 0, stdout: "unexpected", stderr: "" };
@@ -191,6 +194,7 @@ describe("v3.1 pipeline control integration", () => {
 					evidence_refs: ["worker_result"],
 				},
 			})),
+			worker_status: AVAILABLE_WORKER_STATUS,
 			command_runner: (command) => ({ command, exit_code: 0, stdout: "ok", stderr: "" }),
 			command_risk_classifier: new CommandRiskClassifier(),
 			lifecycle_hooks: new LifecycleHookManager(),
