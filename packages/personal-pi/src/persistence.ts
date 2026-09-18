@@ -6,6 +6,7 @@ import { validateRoleProfile } from "./roles.ts";
 import { validateTaskContract } from "./schema.ts";
 import { createTaskRecord, TaskStateMachine } from "./state-machine.ts";
 import type {
+	AcceptanceRecord,
 	ControlPlaneReconstruction,
 	DecisionRecord,
 	DispatchRecord,
@@ -22,15 +23,20 @@ import type {
 	StateSnapshot,
 	TaskContract,
 	TaskGraph,
+	TaskLedgerBinding,
 	TaskRecord,
 	VerificationRecord,
 	WorkerInstanceRecord,
+	WorkspaceSnapshot,
 } from "./types.ts";
+import { AcceptanceGate } from "./verification.ts";
 
 function emptyState(): PersistentState {
 	return {
 		version: 1,
 		projects: [],
+		task_ledger: [],
+		acceptances: [],
 		tasks: [],
 		graphs: [],
 		dispatches: [],
@@ -59,6 +65,8 @@ function normalizeState(state: Partial<PersistentState>): PersistentState {
 	return {
 		...base,
 		...state,
+		task_ledger: state.task_ledger ?? [],
+		acceptances: state.acceptances ?? [],
 		traces: state.traces ?? [],
 		regressions: state.regressions ?? [],
 		budget_usage: state.budget_usage ?? {},
@@ -69,6 +77,28 @@ function normalizeState(state: Partial<PersistentState>): PersistentState {
 		loop_usage: state.loop_usage ?? {},
 		snapshot_payloads: state.snapshot_payloads ?? {},
 	};
+}
+
+function assertDoneAcceptanceInvariant(previous: PersistentState, candidate: PersistentState): void {
+	for (const task of candidate.tasks) {
+		const previousTask = previous.tasks.find((entry) => entry.id === task.id);
+		if (task.state !== "DONE" || previousTask?.state === "DONE") continue;
+		const acceptance = candidate.acceptances.find(
+			(entry) => entry.task_id === task.id && entry.task_revision === task.task_revision,
+		);
+		if (!acceptance) throw new Error(`DONE task ${task.id} is missing a current-revision AcceptanceRecord`);
+		const verification = candidate.verifications.find((entry) => entry.id === acceptance.verification_id);
+		if (
+			!verification ||
+			verification.task_id !== task.id ||
+			verification.task_revision !== task.task_revision ||
+			verification.status !== "PASS"
+		)
+			throw new Error(`DONE task ${task.id} is not backed by current-revision Verification PASS`);
+		const result = candidate.results.find((entry) => entry.run_id === acceptance.run_id);
+		if (!result || result.task_id !== task.id || result.status !== "success")
+			throw new Error(`DONE task ${task.id} is not backed by a successful persisted Result`);
+	}
 }
 
 function cloneState(state: PersistentState): PersistentState {
@@ -120,6 +150,7 @@ export class PersistentStateStore {
 	transact(mutation: PersistentStateMutation): PersistentState {
 		const candidate = cloneState(this.state);
 		mutation(candidate);
+		assertDoneAcceptanceInvariant(this.state, candidate);
 		if (this.filePath) writeAtomically(this.filePath, candidate);
 		this.state = candidate;
 		return this.read();
@@ -166,6 +197,8 @@ export class PersistentStateStore {
 	updateTask(task: TaskRecord): TaskRecord {
 		const index = this.state.tasks.findIndex((candidate) => candidate.id === task.id);
 		if (index === -1) throw new Error(`unknown task: ${task.id}`);
+		if (task.state === "DONE")
+			throw new Error("DONE must be persisted through acceptTask() after independent Verification PASS");
 		const { state: _state, audit_log: _auditLog, ...contract } = task;
 		const validation = validateTaskContract(contract);
 		if (!validation.valid) throw new Error(`cannot persist invalid task: ${validation.errors.join("; ")}`);
@@ -173,6 +206,50 @@ export class PersistentStateStore {
 			state.tasks[index] = structuredClone(task);
 		});
 		return structuredClone(task);
+	}
+
+	acceptTask(
+		taskId: string,
+		verificationId: string,
+		resultRunId: string,
+		currentSnapshot: WorkspaceSnapshot,
+		acceptedAt = new Date().toISOString(),
+		acceptanceGate = new AcceptanceGate(),
+	): { task: TaskRecord; acceptance: AcceptanceRecord } {
+		const taskIndex = this.state.tasks.findIndex((candidate) => candidate.id === taskId);
+		if (taskIndex === -1) throw new Error(`unknown task: ${taskId}`);
+		const task = structuredClone(this.state.tasks[taskIndex]);
+		const verification = this.state.verifications.find((candidate) => candidate.id === verificationId);
+		if (!verification) throw new Error(`unknown verification: ${verificationId}`);
+		if (verification.task_id !== taskId)
+			throw new Error(`verification ${verificationId} does not belong to task ${taskId}`);
+		const result = this.state.results.find((candidate) => candidate.run_id === resultRunId);
+		if (!result) throw new Error(`unknown persisted result: ${resultRunId}`);
+		if (result.task_id !== taskId) throw new Error(`result ${resultRunId} does not belong to task ${taskId}`);
+		const accepted = acceptanceGate.markDone(task, verification, currentSnapshot, result);
+		const acceptance: AcceptanceRecord = {
+			id: randomUUID(),
+			task_id: taskId,
+			task_revision: task.task_revision,
+			verification_id: verificationId,
+			run_id: resultRunId,
+			accepted_at: acceptedAt,
+		};
+		this.transact((state) => {
+			const current = state.tasks[taskIndex];
+			if (
+				!current ||
+				current.id !== taskId ||
+				current.task_revision !== task.task_revision ||
+				current.state !== task.state
+			)
+				throw new Error(`task changed during acceptance: ${taskId}`);
+			if (state.acceptances.some((entry) => entry.task_id === taskId && entry.task_revision === task.task_revision))
+				throw new Error(`task revision already accepted: ${taskId}@${task.task_revision}`);
+			state.acceptances.push(structuredClone(acceptance));
+			state.tasks[taskIndex] = structuredClone(accepted);
+		});
+		return { task: structuredClone(accepted), acceptance: structuredClone(acceptance) };
 	}
 
 	createRun(taskId: string, workerId: string, leaseEpoch: number, startedAt = new Date().toISOString()): RunRecord {
@@ -303,6 +380,28 @@ export class PersistentStateStore {
 
 	listProjects(): ProjectRecord[] {
 		return this.state.projects.map((project) => structuredClone(project));
+	}
+
+	addTaskLedgerBinding(binding: TaskLedgerBinding): TaskLedgerBinding {
+		if (!this.state.projects.some((project) => project.project_id === binding.project_id))
+			throw new Error(`unknown project: ${binding.project_id}`);
+		if (!this.state.tasks.some((task) => task.id === binding.pph_task_id))
+			throw new Error(`unknown task: ${binding.pph_task_id}`);
+		if (
+			this.state.task_ledger.some(
+				(candidate) =>
+					candidate.project_id === binding.project_id && candidate.project_task_id === binding.project_task_id,
+			)
+		)
+			throw new Error(`project task already bound: ${binding.project_id}/${binding.project_task_id}`);
+		if (this.state.task_ledger.some((candidate) => candidate.pph_task_id === binding.pph_task_id))
+			throw new Error(`pph task already bound: ${binding.pph_task_id}`);
+		this.transact((state) => state.task_ledger.push(structuredClone(binding)));
+		return structuredClone(binding);
+	}
+
+	listTaskLedgerBindings(): TaskLedgerBinding[] {
+		return this.state.task_ledger.map((binding) => structuredClone(binding));
 	}
 
 	saveGraph(graph: TaskGraph): void {

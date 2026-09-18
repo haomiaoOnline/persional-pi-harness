@@ -687,6 +687,8 @@ export interface ControlPlaneReconstruction {
 export interface PersistentState {
 	version: 1;
 	projects: ProjectRecord[];
+	task_ledger: TaskLedgerBinding[];
+	acceptances: AcceptanceRecord[];
 	tasks: TaskRecord[];
 	graphs: TaskGraph[];
 	dispatches: DispatchRecord[];
@@ -780,6 +782,41 @@ export interface ProjectRecord {
 	baseline_commit: string;
 	architecture_doc_ref: string;
 	task_ledger_ref: string;
+}
+
+export type TaskLedgerGateStatus = "PENDING" | "PASS" | "FAIL" | "UNKNOWN";
+
+/**
+ * Persistent identity/ownership metadata for an external project task.
+ * Mutable execution status is deliberately excluded and projected from the
+ * canonical TaskRecord/Verification state instead.
+ */
+export interface TaskLedgerBinding {
+	project_id: string;
+	project_task_id: string;
+	pph_task_id: string;
+	phase: string;
+	unknowns: string[];
+}
+
+/** Machine-readable Task Ledger view defined by the v3.4 architecture. */
+export interface TaskLedgerEntry extends TaskLedgerBinding {
+	task_revision: number;
+	owner: string;
+	scope: string[];
+	status: TaskStatus;
+	verification_recipe: string | null;
+	evidence_refs: string[];
+	gate_status: TaskLedgerGateStatus;
+}
+
+export interface AcceptanceRecord {
+	id: string;
+	task_id: string;
+	task_revision: number;
+	verification_id: string;
+	run_id: string;
+	accepted_at: string;
 }
 
 export interface DispatchRecord {

@@ -638,7 +638,14 @@ export class PersonalPiPipeline {
 					request.workspace_snapshot_provider?.(result.artifacts) ??
 					request.current_snapshot ??
 					verificationSnapshot;
-				task = this.acceptanceGate.markDone(task, verification, acceptanceSnapshot, result);
+				task = this.stateStore.acceptTask(
+					task.id,
+					verification.id,
+					result.run_id,
+					acceptanceSnapshot,
+					at,
+					this.acceptanceGate,
+				).task;
 			} catch (error) {
 				if (!(error instanceof Error) || !error.message.startsWith("work_receipt_anomaly:")) throw error;
 				const reason = error.message;
@@ -660,7 +667,7 @@ export class PersonalPiPipeline {
 				at,
 			);
 		}
-		this.stateStore.updateTask(task);
+		if (task.state !== "DONE") this.stateStore.updateTask(task);
 		if (task.state !== "DONE") {
 			this.stateStore.markRunFailed(
 				run.id,
