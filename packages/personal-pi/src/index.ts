@@ -7,6 +7,7 @@ export * from "./artifacts.ts";
 export * from "./bound-coverage.ts";
 export * from "./command-risk.ts";
 export * from "./context.ts";
+export * from "./context-budget.ts";
 export * from "./effects.ts";
 export * from "./evidence.ts";
 export * from "./external-gaps.ts";

@@ -27,6 +27,7 @@ export function createEmptyPersistentState(): PersistentState {
 		lease_epochs: {},
 		worker_instances: {},
 		loop_usage: {},
+		context_budget: {},
 		traces: [],
 		regressions: [],
 		snapshots: [],
@@ -53,6 +54,7 @@ export function normalizePersistentState(state: Partial<PersistentState>): Persi
 		lease_epochs: state.lease_epochs ?? {},
 		worker_instances: state.worker_instances ?? {},
 		loop_usage: state.loop_usage ?? {},
+		context_budget: state.context_budget ?? {},
 		snapshot_payloads: state.snapshot_payloads ?? {},
 	};
 }

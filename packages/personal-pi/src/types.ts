@@ -152,6 +152,40 @@ export interface LoopUsage {
 export interface WorkerExecutionControls {
 	beforeModelCall(): LoopUsage;
 	beforeToolCall(): LoopUsage;
+	observeContextUsage?(observation: ContextBudgetObservation): ContextBudgetWatermark;
+}
+
+export type ContextBudgetLayer = "tool_output" | "prompt" | "run" | "task";
+export type ContextBudgetWatermark = "LOW" | "WARNING" | "REBUILD" | "HARD";
+
+export interface ContextBudgetMetrics {
+	tokens: number;
+	tool_calls: number;
+	raw_log_bytes: number;
+	injected_context_bytes: number;
+	duplicate_ratio: number;
+	state_growth_bytes: number;
+	elapsed_ms: number;
+	retries: number;
+}
+
+export interface ContextBudgetObservation {
+	layer: Exclude<ContextBudgetLayer, "task">;
+	metrics: ContextBudgetMetrics;
+}
+
+export interface ContextBudgetLayerState {
+	token_limit: number;
+	metrics: ContextBudgetMetrics;
+	watermark: ContextBudgetWatermark;
+}
+
+export interface ContextBudgetState {
+	task_id: string;
+	run_id: string;
+	context_limit: number;
+	layers: Record<ContextBudgetLayer, ContextBudgetLayerState>;
+	updated_at: string;
 }
 
 export interface TaskVerification {
@@ -830,6 +864,7 @@ export interface PersistentState {
 	/** Level-B Worker Instance 的非机密运行时身份与生命周期快照。 */
 	worker_instances: Record<string, WorkerInstanceRecord>;
 	loop_usage: Record<string, LoopUsage>;
+	context_budget: Record<string, ContextBudgetState>;
 	traces: ExecutionTrace[];
 	regressions: RegressionCase[];
 	snapshots: Array<Pick<StateSnapshot, "id" | "created_at" | "digest">>;

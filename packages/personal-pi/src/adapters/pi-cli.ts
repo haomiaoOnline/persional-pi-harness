@@ -2,8 +2,10 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ArtifactStore } from "../artifacts.ts";
 import { validateToolResultEnvelope } from "../tool-gateway.ts";
 import type {
+	ContextBudgetMetrics,
 	ResultContract,
 	TaskContract,
 	ToolResultEnvelope,
@@ -39,6 +41,7 @@ export interface PiAgentWorkerAdapterOptions {
 	model?: string;
 	thinking?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 	timeout_ms?: number;
+	context_limit?: number;
 	home_dir?: string;
 	pi_config_dir?: string;
 	run_process?: (options: {
@@ -223,6 +226,51 @@ function checkObservedBudget(task: TaskContract, observation: CliObservation): s
 	return undefined;
 }
 
+function tokenCountFromUsage(observation: CliObservation): number {
+	const usage = observation.usage;
+	if (!usage) return Number.NaN;
+	if (usage.total_tokens !== undefined) return usage.total_tokens;
+	if (usage.input_tokens === undefined && usage.output_tokens === undefined) return Number.NaN;
+	return (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0);
+}
+
+function promptContextMetrics(
+	request: WorkerProtocolRequest,
+	observation: CliObservation,
+	started: number,
+): ContextBudgetMetrics {
+	return {
+		tokens: tokenCountFromUsage(observation),
+		tool_calls: observation.tool_calls,
+		raw_log_bytes: observation.stdout_bytes + observation.stderr_bytes,
+		injected_context_bytes: Buffer.byteLength(request.resolved_context?.text ?? "", "utf8"),
+		duplicate_ratio: 0,
+		state_growth_bytes: 0,
+		elapsed_ms: Math.max(0, Date.now() - started),
+		retries: 0,
+	};
+}
+
+function toolContextMetrics(request: WorkerProtocolRequest, envelope: ToolResultEnvelope): ContextBudgetMetrics {
+	const summary = [envelope.stdout_summary, envelope.stderr_summary].filter(Boolean).join("\n");
+	const artifact = request.tool_artifact_root
+		? new ArtifactStore(request.tool_artifact_root).get(envelope.artifact_id)
+		: undefined;
+	const artifactPayload = artifact ? asRecord(artifact.payload) : undefined;
+	const rawBytes =
+		typeof artifactPayload?.size_bytes === "number" ? artifactPayload.size_bytes : Buffer.byteLength(summary, "utf8");
+	return {
+		tokens: Math.max(1, Math.ceil(summary.length / 4)),
+		tool_calls: 1,
+		raw_log_bytes: rawBytes,
+		injected_context_bytes: Buffer.byteLength(summary, "utf8"),
+		duplicate_ratio: 0,
+		state_growth_bytes: 0,
+		elapsed_ms: Math.max(0, envelope.duration),
+		retries: 0,
+	};
+}
+
 function observeTool(
 	event: Record<string, unknown>,
 	observation: CliObservation,
@@ -290,6 +338,7 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 	readonly worker_id: string;
 	readonly backend = "pi-agent";
 	readonly requested_model: string;
+	readonly context_limit?: number;
 	private readonly command: string;
 	private readonly command_args_prefix: string[];
 	private readonly permission_gate_path?: string | URL;
@@ -311,6 +360,10 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 		this.requested_model = options.model ?? "ArkCoding/deepseek-v4-flash-ga-260731";
 		this.thinking = options.thinking ?? "high";
 		this.timeout_ms = options.timeout_ms ?? 60_000;
+		this.context_limit =
+			options.context_limit !== undefined && Number.isFinite(options.context_limit) && options.context_limit > 0
+				? options.context_limit
+				: undefined;
 		this.home_dir = options.home_dir ?? homedir();
 		this.pi_config_dir = options.pi_config_dir ?? resolve(this.home_dir, ".pi", "agent");
 		this.run_process = options.run_process ?? runJsonlProcess;
@@ -414,6 +467,8 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 		});
 		const started = Date.now();
 		let assistantMessages = 0;
+		let runTokens = 0;
+		let runToolRawBytes = 0;
 		const processResult = await this.run_process({
 			command: this.command,
 			args,
@@ -435,6 +490,22 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 				}
 				if (record.type === "message_end" || record.type === "turn_end")
 					captureAssistantMessage(record, observation, () => undefined);
+				if (record.type === "message_end" && controls?.observeContextUsage) {
+					const promptMetrics = promptContextMetrics(request, observation, started);
+					controls.observeContextUsage({ layer: "prompt", metrics: promptMetrics });
+					runTokens =
+						Number.isFinite(runTokens) && Number.isFinite(promptMetrics.tokens)
+							? runTokens + promptMetrics.tokens
+							: Number.NaN;
+					controls.observeContextUsage({
+						layer: "run",
+						metrics: {
+							...promptMetrics,
+							tokens: runTokens,
+							raw_log_bytes: promptMetrics.raw_log_bytes + runToolRawBytes,
+						},
+					});
+				}
 				const budgetViolation = checkObservedBudget(request.task, observation);
 				if (budgetViolation) {
 					observation.budget_violation = budgetViolation;
@@ -445,6 +516,31 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 					if (violation) {
 						observation.protocol_error = violation;
 						return { terminate: true, reason: violation };
+					}
+					if (record.type === "tool_execution_end" && controls?.observeContextUsage) {
+						const envelope = observation.tool_results.at(-1);
+						if (envelope) {
+							const toolMetrics = toolContextMetrics(request, envelope);
+							controls.observeContextUsage({ layer: "tool_output", metrics: toolMetrics });
+							runTokens =
+								Number.isFinite(runTokens) && Number.isFinite(toolMetrics.tokens)
+									? runTokens + toolMetrics.tokens
+									: Number.NaN;
+							runToolRawBytes += toolMetrics.raw_log_bytes;
+							controls.observeContextUsage({
+								layer: "run",
+								metrics: {
+									...toolMetrics,
+									tokens: runTokens,
+									tool_calls: observation.tool_calls,
+									raw_log_bytes: observation.stdout_bytes + observation.stderr_bytes + runToolRawBytes,
+									injected_context_bytes:
+										Buffer.byteLength(request.resolved_context?.text ?? "", "utf8") +
+										toolMetrics.injected_context_bytes,
+									elapsed_ms: Math.max(0, Date.now() - started),
+								},
+							});
+						}
 					}
 				}
 				return undefined;

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { accessSync, constants } from "node:fs";
+import { ContextRebuildRequiredError } from "./context-budget.ts";
 import { LoopBudgetExhaustedError, LoopBudgetMissingError } from "./loop-budget.ts";
 import { buildPromptPayload } from "./prompt.ts";
 import { createModelIdentity, createWorkReceipt, validateResultContract } from "./result.ts";
@@ -20,6 +21,7 @@ import type {
 export interface WorkerAdapter {
 	readonly worker_id: string;
 	readonly requested_model?: string;
+	readonly context_limit?: number;
 	getModelIdentity?(): ModelIdentity;
 	getToolResults?(): ToolResultEnvelope[];
 	execute(request: WorkerProtocolRequest, controls?: WorkerExecutionControls): Promise<ResultContract>;
@@ -192,7 +194,12 @@ export class PiWorker implements WorkerAdapter {
 						this.requested_model,
 					);
 		} catch (error) {
-			if (error instanceof LoopBudgetExhaustedError || error instanceof LoopBudgetMissingError) throw error;
+			if (
+				error instanceof LoopBudgetExhaustedError ||
+				error instanceof LoopBudgetMissingError ||
+				error instanceof ContextRebuildRequiredError
+			)
+				throw error;
 			const message = error instanceof Error ? error.message : String(error);
 			return failureResult(request, this.worker_id, "worker execution failed", [message], this.requested_model);
 		}

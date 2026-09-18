@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { validateContextBudgetState } from "./context-budget.ts";
 import { deliveryEvidencePackageDigest, validateDeliveryEvidencePackage } from "./evidence.ts";
 import { validateMasterHandoffReceipt } from "./handoff.ts";
 import {
@@ -16,6 +17,7 @@ import { createTaskRecord, TaskStateMachine } from "./state-machine.ts";
 import { validateToolResultEnvelope } from "./tool-gateway.ts";
 import type {
 	AcceptanceRecord,
+	ContextBudgetState,
 	ControlPlaneReconstruction,
 	DecisionRecord,
 	DeliveryActionRecord,
@@ -197,6 +199,18 @@ function assertDeliveryAuthorizationStateInvariant(state: PersistentState): void
 	}
 }
 
+function assertContextBudgetStateInvariant(state: PersistentState): void {
+	for (const [taskId, budget] of Object.entries(state.context_budget)) {
+		validateContextBudgetState(budget);
+		if (budget.task_id !== taskId) throw new Error(`context budget key does not match task_id: ${taskId}`);
+		const task = state.tasks.find((candidate) => candidate.id === taskId);
+		if (!task) throw new Error(`context budget references unknown task: ${taskId}`);
+		const run = state.runs.find((candidate) => candidate.id === budget.run_id);
+		if (!run || run.task_id !== taskId)
+			throw new Error(`context budget run does not belong to task: ${budget.run_id}`);
+	}
+}
+
 function assertWorkerRuntimeInvariant(state: PersistentState): void {
 	for (const dispatch of state.dispatches) {
 		const status = validateWorkerStatus(dispatch.worker_status);
@@ -366,6 +380,7 @@ export class PersistentStateStore {
 		}
 		assertWorkerRuntimeInvariant(this.state);
 		assertDeliveryAuthorizationStateInvariant(this.state);
+		assertContextBudgetStateInvariant(this.state);
 	}
 
 	read(): PersistentState {
@@ -384,6 +399,7 @@ export class PersistentStateStore {
 		assertCanonicalEvidenceHistoryInvariant(this.state, candidate);
 		assertImmutableDeliveryHistoryInvariant(this.state, candidate);
 		assertDeliveryAuthorizationStateInvariant(candidate);
+		assertContextBudgetStateInvariant(candidate);
 		if (this.filePath) writeAtomically(this.filePath, candidate);
 		this.state = candidate;
 		return this.read();
@@ -406,6 +422,34 @@ export class PersistentStateStore {
 
 	listWorkerInstances(): WorkerInstanceRecord[] {
 		return Object.values(this.state.worker_instances).map((instance) => structuredClone(instance));
+	}
+
+	saveContextBudgetState(budget: ContextBudgetState): ContextBudgetState {
+		validateContextBudgetState(budget);
+		this.transact((state) => {
+			state.context_budget[budget.task_id] = structuredClone(budget);
+		});
+		return structuredClone(budget);
+	}
+
+	getContextBudgetState(taskId: string): ContextBudgetState | undefined {
+		const budget = this.state.context_budget[taskId];
+		return budget ? structuredClone(budget) : undefined;
+	}
+
+	updateContextBudgetState(
+		taskId: string,
+		update: (current: ContextBudgetState) => ContextBudgetState,
+	): ContextBudgetState {
+		const current = this.state.context_budget[taskId];
+		if (!current) throw new Error(`unknown context budget state: ${taskId}`);
+		const next = update(structuredClone(current));
+		if (next.task_id !== taskId) throw new Error(`context budget update cannot change task_id: ${taskId}`);
+		validateContextBudgetState(next);
+		this.transact((state) => {
+			state.context_budget[taskId] = structuredClone(next);
+		});
+		return structuredClone(next);
 	}
 
 	createTask(contract: TaskContract): TaskRecord {
@@ -672,6 +716,17 @@ export class PersistentStateStore {
 			if (["SUCCEEDED", "RUNNING", "PENDING"].includes(run.status)) run.status = "FAILED";
 			run.ended_at = endedAt;
 			run.failure_reason = reason;
+		});
+	}
+
+	closeRunForContextRebuild(runId: string, endedAt = new Date().toISOString()): void {
+		this.transact((state) => {
+			const run = state.runs.find((candidate) => candidate.id === runId);
+			if (!run) throw new Error(`unknown Run: ${runId}`);
+			if (run.status !== "RUNNING") throw new Error(`context rebuild can only close a RUNNING Run: ${runId}`);
+			if (run.result_id) throw new Error(`context rebuild Run already has a Result: ${runId}`);
+			run.status = "SUCCEEDED";
+			run.ended_at = endedAt;
 		});
 	}
 
@@ -985,6 +1040,7 @@ export class PersistentStateStore {
 		assertWorkerRuntimeInvariant(candidate);
 		assertImmutableDeliveryHistoryInvariant(this.state, candidate);
 		assertDeliveryAuthorizationStateInvariant(candidate);
+		assertContextBudgetStateInvariant(candidate);
 		if (this.filePath) writeAtomically(this.filePath, candidate);
 		this.state = candidate;
 		return this.read();

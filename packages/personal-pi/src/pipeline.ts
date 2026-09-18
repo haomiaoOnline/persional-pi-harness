@@ -1,7 +1,19 @@
 import { createHash, randomUUID } from "node:crypto";
 import { ArtifactStore } from "./artifacts.ts";
 import { authorizeCommand, type CommandApproval, CommandRiskClassifier } from "./command-risk.ts";
-import { type ContextResolver, evaluateContextReadiness, FreshContextBuilder } from "./context.ts";
+import {
+	ContextCompactionPolicy,
+	type ContextResolver,
+	evaluateContextReadiness,
+	FreshContextBuilder,
+} from "./context.ts";
+import {
+	ContextRebuildRequiredError,
+	contextBudgetMetricsAreValid,
+	createContextBudgetState,
+	updateContextBudgetLayer,
+	zeroContextBudgetMetrics,
+} from "./context-budget.ts";
 import { createDeliveryEvidencePackage, EvidenceCollector } from "./evidence.ts";
 import { buildMasterHandoffReceipt, createArchivedHandoffFailure } from "./handoff.ts";
 import { LeaseManager } from "./lease.ts";
@@ -30,11 +42,14 @@ import type {
 	AcceptanceRecord,
 	ArchitectureCommercialAssessment,
 	CommandEvidence,
+	ContextBudgetMetrics,
 	DecisionRecord,
 	DispatchDecision,
 	DispatchRecord,
 	EvidenceRecord,
+	EvidenceSummary,
 	ExecutionTrace,
+	Lease,
 	MasterHandoffReceipt,
 	PermissionRequest,
 	PlanApproval,
@@ -556,98 +571,35 @@ export class PersonalPiPipeline {
 		);
 		tracer.record("DOR", "Definition of Ready passed", at);
 		tracer.record("WORKER", request.worker.worker_id, at);
-		try {
-			this.loopBudgetController.beforeRun(request.task);
-		} catch (error) {
-			const reason = error instanceof LoopBudgetExhaustedError ? error.message : String(error);
-			task = this.stateStore.updateTask(new TaskStateMachine().transition(task, "BLOCKED", reason, at));
-			const decision = createDecisionRecord("loop_budget", "BLOCKED", reason, [task.id], at);
-			this.stateStore.addDecision(decision);
-			tracer.addDecision(decision);
-			tracer.record("RUN", "blocked before Run creation", at);
-			tracer.setMetrics({
-				token_per_task: 0,
-				cache_hit_rate: 0,
-				worker_tier: request.task.execution.worker_tier,
-			});
-			tracer.finish("BLOCKED", at);
-			tracer.setGraphEfficiencyMetrics(computeGraphEfficiencyMetrics(tracer.snapshot()));
-			this.stateStore.addTrace(tracer.snapshot());
-			throw new PipelineStageError("RUN", reason, task.id);
-		}
-		const lease = this.leaseManager.acquire(task.id, request.worker.worker_id, at);
-		const run = this.stateStore.createRun(task.id, request.worker.worker_id, lease.lease_epoch, {
-			worker_status: workerStatus,
-			model_identity: createModelIdentity(requestedModel),
-			started_at: at,
-			workspace_commit_hash: request.snapshot.commit_hash,
-		});
-		tracer.attachRun(run.id);
-		tracer.record("RUN", "Run created", at);
-		this.stateStore.addDispatch({
-			id: randomUUID(),
-			task_id: task.id,
-			worker_id: request.worker.worker_id,
-			lease_epoch: lease.lease_epoch,
-			mode: dispatchMode(dispatch.mode),
-			worker_status: structuredClone(workerStatus),
-			requested_model: requestedModel,
-			created_at: at,
-		});
-
-		const protocol = createProtocolEnvelope(task, lease.lease_epoch, calculatePlanDigest(planAssessment));
-		const workerRequest: WorkerProtocolRequest = {
-			task: request.task,
-			protocol,
-			role_profile: request.role_profile,
-			requested_actions: request.requested_actions,
-			permission_request: request.permission_request,
-			run_id: run.id,
-			resolved_context: resolvedContext,
-			tool_artifact_root: this.artifactStore.storageRootPath(),
-		};
-		let result: ResultContract;
+		let run!: RunRecord;
+		let lease!: Lease;
+		let workerRequest!: WorkerProtocolRequest;
+		let result!: ResultContract;
 		let workerToolResults: ToolResultEnvelope[] = [];
-		try {
-			this.loopBudgetController.beforeModelCall(request.task);
-			const controls: WorkerExecutionControls = {
-				beforeModelCall: () => this.loopBudgetController.beforeModelCall(request.task),
-				beforeToolCall: () => this.loopBudgetController.beforeToolCall(request.task),
-			};
-			const workerResult = await request.worker.execute(workerRequest, controls);
-			workerToolResults = request.worker.getToolResults?.() ?? [];
-			const trustedResult = {
-				...workerResult,
-				model_identity: request.worker.getModelIdentity?.() ?? createModelIdentity(requestedModel),
-			};
-			result = normalizeResult(workerRequest, trustedResult, request.worker.worker_id, requestedModel);
-		} catch (error) {
-			if (error instanceof LoopBudgetExhaustedError || error instanceof LoopBudgetMissingError) {
-				const reason = error.message;
-				const blockedResult = failureResult(
-					workerRequest,
-					request.worker.worker_id,
-					error,
-					undefined,
-					requestedModel,
-				);
-				this.stateStore.saveResult(blockedResult, at);
+		let suppressOptionalContext = false;
+		const workerContextLimit =
+			request.worker.context_limit &&
+			Number.isFinite(request.worker.context_limit) &&
+			request.worker.context_limit > 0
+				? request.worker.context_limit
+				: request.task.context.budget.max_input_tokens;
+		const taskTokenLimit = request.task.loop_budget
+			? request.task.loop_budget.max_input_tokens + request.task.loop_budget.max_output_tokens
+			: request.task.context.budget.max_input_tokens;
+
+		while (true) {
+			try {
+				this.loopBudgetController.beforeRun(request.task);
+			} catch (error) {
+				const reason = error instanceof LoopBudgetExhaustedError ? error.message : String(error);
 				task = this.stateStore.updateTask(new TaskStateMachine().transition(task, "BLOCKED", reason, at));
-				this.persistMasterHandoff({
-					task,
-					result: blockedResult,
-					git_sha: request.snapshot.commit_hash,
-					plan_assessment: planAssessment,
-				});
-				const decision = createDecisionRecord("loop_budget", "BLOCKED", reason, [task.id, run.id], at);
+				const decision = createDecisionRecord("loop_budget", "BLOCKED", reason, [task.id], at);
 				this.stateStore.addDecision(decision);
 				tracer.addDecision(decision);
-				tracer.record("RESULT", "blocked before model call", at);
-				tracer.record("ACCEPTANCE", "loop budget exhaustion requires human review", at);
-				this.leaseManager.release(lease);
+				tracer.record("RUN", "blocked before Run creation", at);
 				tracer.setMetrics({
-					token_per_task: resolvedContext?.total_tokens ?? 0,
-					cache_hit_rate: resolvedContext?.cache_hit ? 1 : 0,
+					token_per_task: 0,
+					cache_hit_rate: 0,
 					worker_tier: request.task.execution.worker_tier,
 				});
 				tracer.finish("BLOCKED", at);
@@ -655,7 +607,264 @@ export class PersonalPiPipeline {
 				this.stateStore.addTrace(tracer.snapshot());
 				throw new PipelineStageError("RUN", reason, task.id);
 			}
-			result = failureResult(workerRequest, request.worker.worker_id, error, undefined, requestedModel);
+
+			lease = this.leaseManager.acquire(task.id, request.worker.worker_id, at);
+			run = this.stateStore.createRun(task.id, request.worker.worker_id, lease.lease_epoch, {
+				worker_status: workerStatus,
+				model_identity: createModelIdentity(requestedModel),
+				started_at: at,
+				workspace_commit_hash: request.snapshot.commit_hash,
+			});
+			tracer.attachRun(run.id);
+			tracer.record("RUN", "Run created", at);
+			this.stateStore.addDispatch({
+				id: randomUUID(),
+				task_id: task.id,
+				worker_id: request.worker.worker_id,
+				lease_epoch: lease.lease_epoch,
+				mode: dispatchMode(dispatch.mode),
+				worker_status: structuredClone(workerStatus),
+				requested_model: requestedModel,
+				created_at: at,
+			});
+
+			const previousBudget = this.stateStore.getContextBudgetState(task.id);
+			let contextBudget = createContextBudgetState({
+				task_id: task.id,
+				run_id: run.id,
+				context_limit: workerContextLimit,
+				layer_token_limits: {
+					tool_output: request.task.context.budget.max_input_tokens,
+					prompt: workerContextLimit,
+					run: workerContextLimit,
+					task: taskTokenLimit,
+				},
+				updated_at: at,
+			});
+			if (previousBudget) {
+				contextBudget = updateContextBudgetLayer(contextBudget, "task", previousBudget.layers.task.metrics, at);
+			}
+			const injectedBytes = Buffer.byteLength(resolvedContext?.text ?? "", "utf8");
+			for (const layer of ["prompt", "run"] as const) {
+				contextBudget = updateContextBudgetLayer(
+					contextBudget,
+					layer,
+					{ ...zeroContextBudgetMetrics(), injected_context_bytes: injectedBytes },
+					at,
+				);
+			}
+			this.stateStore.saveContextBudgetState(contextBudget);
+
+			const protocol = createProtocolEnvelope(task, lease.lease_epoch, calculatePlanDigest(planAssessment));
+			workerRequest = {
+				task: request.task,
+				protocol,
+				role_profile: request.role_profile,
+				requested_actions: request.requested_actions,
+				permission_request: request.permission_request,
+				run_id: run.id,
+				resolved_context: resolvedContext,
+				tool_artifact_root: this.artifactStore.storageRootPath(),
+			};
+			try {
+				this.loopBudgetController.beforeModelCall(request.task);
+				const controls: WorkerExecutionControls = {
+					beforeModelCall: () => this.loopBudgetController.beforeModelCall(request.task),
+					beforeToolCall: () => this.loopBudgetController.beforeToolCall(request.task),
+					observeContextUsage: (observation) => {
+						if (!contextBudgetMetricsAreValid(observation.metrics)) {
+							throw new ContextRebuildRequiredError(
+								observation.layer,
+								`context accounting unavailable for ${observation.layer}`,
+							);
+						}
+						const current = this.stateStore.getContextBudgetState(task.id);
+						if (!current || current.run_id !== run.id)
+							throw new ContextRebuildRequiredError(observation.layer, "context budget state is stale");
+						const previousRunMetrics = current.layers.run.metrics;
+						const previousTaskWatermark = current.layers.task.watermark;
+						let next = updateContextBudgetLayer(current, observation.layer, observation.metrics, at);
+						if (observation.layer === "run") {
+							const taskMetrics: ContextBudgetMetrics = {
+								tokens:
+									next.layers.task.metrics.tokens +
+									Math.max(0, observation.metrics.tokens - previousRunMetrics.tokens),
+								tool_calls:
+									next.layers.task.metrics.tool_calls +
+									Math.max(0, observation.metrics.tool_calls - previousRunMetrics.tool_calls),
+								raw_log_bytes:
+									next.layers.task.metrics.raw_log_bytes +
+									Math.max(0, observation.metrics.raw_log_bytes - previousRunMetrics.raw_log_bytes),
+								injected_context_bytes:
+									next.layers.task.metrics.injected_context_bytes +
+									Math.max(
+										0,
+										observation.metrics.injected_context_bytes - previousRunMetrics.injected_context_bytes,
+									),
+								duplicate_ratio: Math.max(
+									next.layers.task.metrics.duplicate_ratio,
+									observation.metrics.duplicate_ratio,
+								),
+								state_growth_bytes:
+									next.layers.task.metrics.state_growth_bytes +
+									Math.max(0, observation.metrics.state_growth_bytes - previousRunMetrics.state_growth_bytes),
+								elapsed_ms:
+									next.layers.task.metrics.elapsed_ms +
+									Math.max(0, observation.metrics.elapsed_ms - previousRunMetrics.elapsed_ms),
+								retries: Math.max(next.layers.task.metrics.retries, run.attempt - 1),
+							};
+							next = updateContextBudgetLayer(next, "task", taskMetrics, at);
+						}
+						this.stateStore.saveContextBudgetState(next);
+						const observedWatermark = next.layers[observation.layer].watermark;
+						const taskWatermark = next.layers.task.watermark;
+						if (observedWatermark === "WARNING" || taskWatermark === "WARNING") suppressOptionalContext = true;
+						if (observedWatermark === "HARD" || taskWatermark === "HARD") {
+							const usage = this.loopBudgetController.usage(task.id);
+							throw new LoopBudgetExhaustedError({
+								allowed: false,
+								projected: usage,
+								exhausted: ["max_input_tokens"],
+								reasons: ["loop budget exhausted: context HARD watermark"],
+							});
+						}
+						if (
+							observedWatermark === "REBUILD" ||
+							(taskWatermark === "REBUILD" && previousTaskWatermark !== "REBUILD")
+						)
+							throw new ContextRebuildRequiredError(observation.layer);
+						return observedWatermark;
+					},
+				};
+				const workerResult = await request.worker.execute(workerRequest, controls);
+				workerToolResults = request.worker.getToolResults?.() ?? [];
+				const trustedResult = {
+					...workerResult,
+					model_identity: request.worker.getModelIdentity?.() ?? createModelIdentity(requestedModel),
+				};
+				result = normalizeResult(workerRequest, trustedResult, request.worker.worker_id, requestedModel);
+				break;
+			} catch (error) {
+				if (error instanceof ContextRebuildRequiredError) {
+					workerToolResults = request.worker.getToolResults?.() ?? [];
+					this.stateStore.closeRunForContextRebuild(run.id, at);
+					this.leaseManager.release(lease);
+					const budgetState = this.stateStore.getContextBudgetState(task.id);
+					if (!budgetState) throw new PipelineStageError("RUN", "context budget state missing", task.id);
+					const budgetArtifact = this.artifactStore.put(
+						"context_budget_state",
+						1,
+						JSON.parse(JSON.stringify(budgetState)),
+						task.id,
+						task.task_revision,
+					);
+					const summaries: EvidenceSummary[] = [
+						{
+							task_id: task.id,
+							status: "UNKNOWN",
+							summary: `context rebuild: ${error.message}`,
+							evidence_ref: budgetArtifact.digest,
+						},
+						...workerToolResults.map((toolResult) => ({
+							task_id: task.id,
+							status: "UNKNOWN" as const,
+							summary: [toolResult.stdout_summary, toolResult.stderr_summary].filter(Boolean).join(" | "),
+							evidence_ref: toolResult.artifact_id,
+						})),
+					];
+					const report = new ContextCompactionPolicy().buildReport(summaries);
+					const reportArtifact = this.artifactStore.put(
+						"context_compaction_report",
+						1,
+						{ report, source_refs: summaries.map((summary) => summary.evidence_ref) },
+						task.id,
+						task.task_revision,
+					);
+					let freshRequired: ResolvedContext | undefined;
+					if (request.context_resolver) {
+						freshRequired = request.context_resolver.resolve(
+							{ ...request.task.context, optional: [] },
+							{ reuse_cache: false },
+						);
+					}
+					let freshItems = [...(freshRequired?.items ?? [])];
+					let freshTokens = freshItems.reduce((sum, item) => sum + item.token_estimate, 0);
+					if (request.handoff_task_ids && request.handoff_task_ids.length > 0) {
+						const receipts = request.handoff_task_ids.map((taskId) => {
+							const receipt = this.stateStore.getHandoffReceipt(taskId);
+							if (!receipt) throw new Error(`missing persisted Master handoff receipt for ${taskId}`);
+							return receipt;
+						});
+						const receiptContext = new FreshContextBuilder().build(
+							receipts,
+							Math.max(1, request.task.context.budget.max_input_tokens - freshTokens),
+						);
+						freshItems = [...freshItems, ...receiptContext.items];
+						freshTokens += receiptContext.total_tokens;
+					}
+					const remaining = request.task.context.budget.max_input_tokens - freshTokens;
+					if (remaining < 1) {
+						throw new LoopBudgetExhaustedError({
+							allowed: false,
+							projected: this.loopBudgetController.usage(task.id),
+							exhausted: ["max_input_tokens"],
+							reasons: ["loop budget exhausted: no room for Fresh Context rebuild state"],
+						});
+					}
+					const reportContent = report.slice(0, remaining * 4);
+					freshItems.push({
+						digest: reportArtifact.digest,
+						content: reportContent,
+						token_estimate: Math.max(1, Math.ceil(reportContent.length / 4)),
+					});
+					resolvedContext = {
+						items: freshItems,
+						text: freshItems.map((item) => item.content).join("\n\n"),
+						total_tokens: freshItems.reduce((sum, item) => sum + item.token_estimate, 0),
+						cache_hit: false,
+						omitted_optional: suppressOptionalContext ? [...request.task.context.optional] : [],
+						manifest_digest: createHash("sha256")
+							.update(JSON.stringify(freshItems.map((item) => item.digest)))
+							.digest("hex"),
+					};
+					continue;
+				}
+				if (error instanceof LoopBudgetExhaustedError || error instanceof LoopBudgetMissingError) {
+					const reason = error.message;
+					const blockedResult = failureResult(
+						workerRequest,
+						request.worker.worker_id,
+						error,
+						undefined,
+						requestedModel,
+					);
+					this.stateStore.saveResult(blockedResult, at);
+					task = this.stateStore.updateTask(new TaskStateMachine().transition(task, "BLOCKED", reason, at));
+					this.persistMasterHandoff({
+						task,
+						result: blockedResult,
+						git_sha: request.snapshot.commit_hash,
+						plan_assessment: planAssessment,
+					});
+					const decision = createDecisionRecord("loop_budget", "BLOCKED", reason, [task.id, run.id], at);
+					this.stateStore.addDecision(decision);
+					tracer.addDecision(decision);
+					tracer.record("RESULT", "blocked before model call", at);
+					tracer.record("ACCEPTANCE", "loop budget exhaustion requires human review", at);
+					this.leaseManager.release(lease);
+					tracer.setMetrics({
+						token_per_task: resolvedContext?.total_tokens ?? 0,
+						cache_hit_rate: resolvedContext?.cache_hit ? 1 : 0,
+						worker_tier: request.task.execution.worker_tier,
+					});
+					tracer.finish("BLOCKED", at);
+					tracer.setGraphEfficiencyMetrics(computeGraphEfficiencyMetrics(tracer.snapshot()));
+					this.stateStore.addTrace(tracer.snapshot());
+					throw new PipelineStageError("RUN", reason, task.id);
+				}
+				result = failureResult(workerRequest, request.worker.worker_id, error, undefined, requestedModel);
+				break;
+			}
 		}
 		if (!this.leaseManager.acceptResult(lease).accepted) {
 			throw new PipelineStageError("RESULT", "Worker result rejected by fencing lease", task.id);

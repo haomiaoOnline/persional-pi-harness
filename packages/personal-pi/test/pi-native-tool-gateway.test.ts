@@ -378,6 +378,49 @@ describe("Pi native T4.2-C Tool Gateway boundary", () => {
 		});
 	});
 
+	test("reports provider prompt/run context usage through WorkerExecutionControls", async () => {
+		const directory = temporaryDirectory();
+		const task = makeV3Task("pi-context-usage", {
+			execution: { ...makeV3Task("pi-context-usage").execution, allowed_tools: [] },
+		});
+		const observed: Array<{ layer: string; tokens: number }> = [];
+		const adapter = new PiAgentWorkerAdapter({
+			worker_id: "pi-context-usage",
+			context_limit: 100,
+			run_process: async (options) => {
+				const observation = createCliObservation();
+				observation.exit_code = 0;
+				emitIdentityAndResult(options, observation);
+				return { observation };
+			},
+		});
+		const emptyUsage = {
+			attempts: 0,
+			model_calls: 0,
+			tool_calls: 0,
+			handoffs: 0,
+			elapsed_ms: 0,
+			input_tokens: 0,
+			output_tokens: 0,
+			cost_usd: 0,
+			state_growth_bytes: 0,
+		};
+
+		const result = await adapter.execute(requestFor(task, join(directory, "artifacts")), {
+			beforeModelCall: () => emptyUsage,
+			beforeToolCall: () => emptyUsage,
+			observeContextUsage: (entry) => {
+				observed.push({ layer: entry.layer, tokens: entry.metrics.tokens });
+				return "LOW";
+			},
+		});
+
+		expect(result.status).toBe("success");
+		expect(adapter.context_limit).toBe(100);
+		expect(observed).toContainEqual({ layer: "prompt", tokens: 20 });
+		expect(observed).toContainEqual({ layer: "run", tokens: 20 });
+	});
+
 	test("constrains native read scopes to Task scope.files even when filesystem.read allows the whole workspace", async () => {
 		const directory = temporaryDirectory();
 		const base = makeV3Task("pi-native-read-allowlist");
