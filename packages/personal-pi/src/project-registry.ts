@@ -1,12 +1,15 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import type { PersistentStateStore } from "./persistence.ts";
 import type { ProjectRecord } from "./types.ts";
 
-export type ProjectBaselineVerifier = (repoPath: string, baselineCommit: string) => boolean;
+export type ProjectRegistrationInput = Omit<ProjectRecord, "project_id">;
+export type ProjectBaselineResolver = (repoPath: string, baselineCommit: string) => string | undefined;
 
 export interface ProjectRegistryOptions {
-	baseline_verifier?: ProjectBaselineVerifier;
+	baseline_resolver?: ProjectBaselineResolver;
 }
 
 export class ProjectRegistryError extends Error {
@@ -16,13 +19,15 @@ export class ProjectRegistryError extends Error {
 	}
 }
 
-export const gitProjectBaselineVerifier: ProjectBaselineVerifier = (repoPath, baselineCommit) => {
+export const gitProjectBaselineResolver: ProjectBaselineResolver = (repoPath, baselineCommit) => {
 	const result = spawnSync(
 		"git",
 		["-C", repoPath, "rev-parse", "--verify", "--quiet", "--end-of-options", `${baselineCommit}^{commit}`],
-		{ stdio: "ignore" },
+		{ encoding: "utf8" },
 	);
-	return result.status === 0;
+	if (result.status !== 0) return undefined;
+	const resolvedCommit = result.stdout.trim();
+	return resolvedCommit.length > 0 ? resolvedCommit : undefined;
 };
 
 function requiredField(value: string, field: keyof ProjectRecord): string {
@@ -31,33 +36,55 @@ function requiredField(value: string, field: keyof ProjectRecord): string {
 	return normalized;
 }
 
-function normalizeProject(project: ProjectRecord): ProjectRecord {
+function normalizeRegistration(project: ProjectRegistrationInput): ProjectRegistrationInput {
+	const requestedRepoPath = resolve(requiredField(project.repo_path, "repo_path"));
+	let repoPath: string;
+	try {
+		repoPath = realpathSync(requestedRepoPath);
+	} catch {
+		throw new ProjectRegistryError(`repo_path does not exist: ${requestedRepoPath}`);
+	}
 	return {
-		project_id: requiredField(project.project_id, "project_id"),
-		repo_path: resolve(requiredField(project.repo_path, "repo_path")),
+		repo_path: repoPath,
 		baseline_commit: requiredField(project.baseline_commit, "baseline_commit"),
 		architecture_doc_ref: requiredField(project.architecture_doc_ref, "architecture_doc_ref"),
 		task_ledger_ref: requiredField(project.task_ledger_ref, "task_ledger_ref"),
 	};
 }
 
+function generateProjectId(project: ProjectRegistrationInput): string {
+	const digest = createHash("sha256")
+		.update(JSON.stringify([project.repo_path, project.baseline_commit, project.architecture_doc_ref]))
+		.digest("hex");
+	return `project-${digest.slice(0, 24)}`;
+}
+
 export class ProjectRegistry {
 	private readonly store: PersistentStateStore;
-	private readonly baselineVerifier: ProjectBaselineVerifier;
+	private readonly baselineResolver: ProjectBaselineResolver;
 
 	constructor(store: PersistentStateStore, options: ProjectRegistryOptions = {}) {
 		this.store = store;
-		this.baselineVerifier = options.baseline_verifier ?? gitProjectBaselineVerifier;
+		this.baselineResolver = options.baseline_resolver ?? gitProjectBaselineResolver;
 	}
 
-	register(project: ProjectRecord): ProjectRecord {
-		const normalized = normalizeProject(project);
-		if (this.store.getProject(normalized.project_id))
-			throw new ProjectRegistryError(`project_id already registered: ${normalized.project_id}`);
-		if (this.store.listProjects().some((candidate) => candidate.repo_path === normalized.repo_path))
-			throw new ProjectRegistryError(`repo_path already registered: ${normalized.repo_path}`);
-		this.assertBaselineExists(normalized);
-		return this.store.addProject(normalized);
+	register(project: ProjectRegistrationInput): ProjectRecord {
+		const normalized = normalizeRegistration(project);
+		const resolvedBaseline = this.baselineResolver(normalized.repo_path, normalized.baseline_commit);
+		if (!resolvedBaseline)
+			throw new ProjectRegistryError(
+				`baseline_commit does not exist in repo: ${normalized.repo_path} (${normalized.baseline_commit})`,
+			);
+		const record: ProjectRecord = {
+			...normalized,
+			baseline_commit: resolvedBaseline,
+			project_id: generateProjectId({ ...normalized, baseline_commit: resolvedBaseline }),
+		};
+		if (this.store.getProject(record.project_id))
+			throw new ProjectRegistryError(`project_id already registered: ${record.project_id}`);
+		if (this.store.listProjects().some((candidate) => candidate.repo_path === record.repo_path))
+			throw new ProjectRegistryError(`repo_path already registered: ${record.repo_path}`);
+		return this.store.addProject(record);
 	}
 
 	resolve(projectId: string): ProjectRecord {
@@ -69,7 +96,7 @@ export class ProjectRegistry {
 	}
 
 	private assertBaselineExists(project: ProjectRecord): void {
-		if (this.baselineVerifier(project.repo_path, project.baseline_commit)) return;
+		if (this.baselineResolver(project.repo_path, project.baseline_commit) === project.baseline_commit) return;
 		throw new ProjectRegistryError(
 			`baseline_commit does not exist in repo: ${project.project_id} (${project.baseline_commit})`,
 		);
