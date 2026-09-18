@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { validateMasterHandoffReceipt } from "./handoff.ts";
 import { validateModelIdentity, validateResultContract, validateWorkerStatus } from "./result.ts";
 import { validateRoleProfile } from "./roles.ts";
 import { validateTaskContract } from "./schema.ts";
@@ -14,6 +15,8 @@ import type {
 	EvidenceRecord,
 	ExecutionTrace,
 	LoopUsage,
+	MasterHandoffBinding,
+	MasterHandoffReceipt,
 	ModelIdentity,
 	PersistentState,
 	ProjectRecord,
@@ -88,6 +91,86 @@ function assertWorkerRuntimeInvariant(state: PersistentState): void {
 		)
 			throw new Error(`Result ${result.run_id} identity does not match its persisted Run`);
 	}
+	for (const receipt of state.handoff_receipts) {
+		const validation = validateMasterHandoffReceipt(receipt);
+		if (!validation.valid)
+			throw new Error(`Master handoff ${receipt.task_id} is invalid: ${validation.errors.join("; ")}`);
+		const task = state.tasks.find((candidate) => candidate.id === receipt.task_id);
+		if (!task) throw new Error(`Master handoff ${receipt.task_id} has no persisted Task`);
+		if (task.state !== receipt.status)
+			throw new Error(`Master handoff ${receipt.task_id} is stale for task state ${task.state}`);
+		const binding = state.handoff_bindings[receipt.task_id];
+		if (!binding) throw new Error(`Master handoff ${receipt.task_id} is missing controller provenance`);
+		if (binding.task_id !== receipt.task_id || binding.task_revision !== task.task_revision)
+			throw new Error(`Master handoff ${receipt.task_id} provenance is stale for task revision`);
+		const latestRun = state.runs.filter((candidate) => candidate.task_id === receipt.task_id).at(-1);
+		if (!latestRun || latestRun.id !== binding.run_id)
+			throw new Error(`Master handoff ${receipt.task_id} is not bound to the latest Run`);
+		if (latestRun.task_revision !== task.task_revision)
+			throw new Error(`Master handoff ${receipt.task_id} Run belongs to a different task revision`);
+		const result = state.results.find((candidate) => candidate.run_id === binding.run_id);
+		if (!result?.work_receipt)
+			throw new Error(`Master handoff ${receipt.task_id} has no canonical terminal Work Receipt`);
+		const workReceiptDigest = createHash("sha256").update(JSON.stringify(result.work_receipt)).digest("hex");
+		if (
+			binding.git_sha !== receipt.git_sha ||
+			binding.work_receipt_digest !== workReceiptDigest ||
+			JSON.stringify(receipt.work_receipt) !== JSON.stringify(result.work_receipt)
+		)
+			throw new Error(`Master handoff ${receipt.task_id} provenance does not match the terminal Result`);
+		const canonicalEvidenceRefs = state.evidence
+			.filter((candidate) => candidate.task_id === receipt.task_id && candidate.run_id === binding.run_id)
+			.map((candidate) => candidate.id)
+			.sort();
+		const receiptEvidenceRefs = [...receipt.evidence_refs].sort();
+		if (
+			JSON.stringify(canonicalEvidenceRefs) !== JSON.stringify(receiptEvidenceRefs) ||
+			JSON.stringify([...binding.evidence_refs].sort()) !== JSON.stringify(receiptEvidenceRefs)
+		)
+			throw new Error(`Master handoff ${receipt.task_id} Evidence refs do not match the terminal Run`);
+		if (binding.provenance_stage === "verified") {
+			if (!binding.verification_id || receipt.evidence_refs.length === 0)
+				throw new Error(`verified Master handoff ${receipt.task_id} requires Evidence and Verification provenance`);
+			const verification = state.verifications.find((candidate) => candidate.id === binding.verification_id);
+			if (
+				!verification ||
+				verification.task_id !== receipt.task_id ||
+				verification.task_revision !== task.task_revision ||
+				verification.commit_hash !== receipt.git_sha
+			)
+				throw new Error(`Master handoff ${receipt.task_id} verification provenance is invalid`);
+		} else {
+			if (binding.verification_id || receipt.evidence_refs.length > 0)
+				throw new Error(
+					`pre-verification Master handoff ${receipt.task_id} cannot carry Verification/Evidence provenance`,
+				);
+			if (latestRun.workspace_commit_hash !== receipt.git_sha)
+				throw new Error(`Master handoff ${receipt.task_id} git_sha does not match the terminal Run snapshot`);
+		}
+		for (const evidenceRef of receipt.evidence_refs) {
+			const evidence = state.evidence.find((candidate) => candidate.id === evidenceRef);
+			if (!evidence || evidence.task_id !== receipt.task_id)
+				throw new Error(`Master handoff ${receipt.task_id} has non-canonical Evidence ref ${evidenceRef}`);
+		}
+		if (receipt.acceptance === "PASS") {
+			const acceptance = binding.acceptance_id
+				? state.acceptances.find((candidate) => candidate.id === binding.acceptance_id)
+				: undefined;
+			if (
+				!acceptance ||
+				acceptance.task_id !== receipt.task_id ||
+				acceptance.task_revision !== task.task_revision ||
+				acceptance.run_id !== binding.run_id ||
+				acceptance.verification_id !== binding.verification_id
+			)
+				throw new Error(`Master handoff ${receipt.task_id} claims PASS without canonical Acceptance`);
+		} else if (binding.acceptance_id) {
+			throw new Error(`non-PASS Master handoff ${receipt.task_id} must not bind Acceptance`);
+		}
+	}
+	for (const taskId of Object.keys(state.handoff_bindings))
+		if (!state.handoff_receipts.some((receipt) => receipt.task_id === taskId))
+			throw new Error(`orphan Master handoff provenance: ${taskId}`);
 }
 
 function stateDigest(state: PersistentState): string {
@@ -122,6 +205,10 @@ export class PersistentStateStore {
 
 	read(): PersistentState {
 		return clonePersistentState(this.state);
+	}
+
+	artifactStoreRootPath(): string | undefined {
+		return this.filePath ? `${this.filePath}.artifacts` : undefined;
 	}
 
 	transact(mutation: PersistentStateMutation): PersistentState {
@@ -213,6 +300,12 @@ export class PersistentStateStore {
 		const validation = validateTaskContract(contract);
 		if (!validation.valid) throw new Error(`cannot persist invalid task: ${validation.errors.join("; ")}`);
 		this.transact((state) => {
+			const previous = state.tasks[index];
+			const binding = state.handoff_bindings[task.id];
+			if (binding && previous && (previous.state !== task.state || previous.task_revision !== task.task_revision)) {
+				state.handoff_receipts = state.handoff_receipts.filter((receipt) => receipt.task_id !== task.id);
+				delete state.handoff_bindings[task.id];
+			}
 			state.tasks[index] = structuredClone(task);
 		});
 		return structuredClone(task);
@@ -266,7 +359,12 @@ export class PersistentStateStore {
 		taskId: string,
 		workerId: string,
 		leaseEpoch: number,
-		metadata: { worker_status: WorkerStatus; model_identity: ModelIdentity; started_at?: string },
+		metadata: {
+			worker_status: WorkerStatus;
+			model_identity: ModelIdentity;
+			started_at?: string;
+			workspace_commit_hash?: string;
+		},
 	): RunRecord {
 		if (!this.state.tasks.some((task) => task.id === taskId)) throw new Error(`unknown task: ${taskId}`);
 		const workerStatusValidation = validateWorkerStatus(metadata.worker_status);
@@ -281,6 +379,7 @@ export class PersistentStateStore {
 		const run: RunRecord = {
 			id: randomUUID(),
 			task_id: taskId,
+			task_revision: this.state.tasks.find((task) => task.id === taskId)?.task_revision,
 			attempt: attempts.length > 0 ? Math.max(...attempts) + 1 : 1,
 			worker_id: workerId,
 			lease_epoch: leaseEpoch,
@@ -288,6 +387,7 @@ export class PersistentStateStore {
 			model_identity: structuredClone(metadata.model_identity),
 			status: "RUNNING",
 			started_at: metadata.started_at ?? new Date().toISOString(),
+			workspace_commit_hash: metadata.workspace_commit_hash,
 		};
 		this.transact((state) => state.runs.push(run));
 		return structuredClone(run);
@@ -338,6 +438,104 @@ export class PersistentStateStore {
 
 	saveVerification(verification: VerificationRecord): void {
 		this.transact((state) => state.verifications.push(structuredClone(verification)));
+	}
+
+	saveHandoffReceipt(
+		receipt: MasterHandoffReceipt,
+		provenance: Pick<MasterHandoffBinding, "task_revision" | "run_id" | "verification_id" | "acceptance_id">,
+	): MasterHandoffReceipt {
+		const validation = validateMasterHandoffReceipt(receipt);
+		if (!validation.valid) throw new Error(`cannot persist invalid Master handoff: ${validation.errors.join("; ")}`);
+		this.transact((state) => {
+			const task = state.tasks.find((candidate) => candidate.id === receipt.task_id);
+			if (!task) throw new Error(`unknown task for Master handoff: ${receipt.task_id}`);
+			if (task.state !== receipt.status)
+				throw new Error(`Master handoff status does not match task ${receipt.task_id}`);
+			if (task.task_revision !== provenance.task_revision)
+				throw new Error(`Master handoff task revision is stale: ${receipt.task_id}`);
+			const latestRun = state.runs.filter((candidate) => candidate.task_id === receipt.task_id).at(-1);
+			if (!latestRun || latestRun.id !== provenance.run_id)
+				throw new Error(`Master handoff must bind the latest Run: ${receipt.task_id}`);
+			if (latestRun.task_revision !== task.task_revision)
+				throw new Error(`Master handoff Run task revision mismatch: ${receipt.task_id}`);
+			const result = state.results.find((candidate) => candidate.run_id === provenance.run_id);
+			if (!result?.work_receipt)
+				throw new Error(`Master handoff requires the persisted terminal Work Receipt: ${receipt.task_id}`);
+			if (JSON.stringify(receipt.work_receipt) !== JSON.stringify(result.work_receipt))
+				throw new Error(`Master handoff Work Receipt does not match terminal Result: ${receipt.task_id}`);
+			const canonicalEvidenceRefs = state.evidence
+				.filter((candidate) => candidate.task_id === receipt.task_id && candidate.run_id === provenance.run_id)
+				.map((candidate) => candidate.id)
+				.sort();
+			if (JSON.stringify(canonicalEvidenceRefs) !== JSON.stringify([...receipt.evidence_refs].sort()))
+				throw new Error(`Master handoff Evidence refs do not match terminal Run: ${receipt.task_id}`);
+			const provenanceStage = provenance.verification_id ? "verified" : "pre_verification";
+			if (provenanceStage === "verified") {
+				if (receipt.evidence_refs.length === 0)
+					throw new Error(`verified Master handoff requires canonical Evidence: ${receipt.task_id}`);
+				const verification = state.verifications.find((candidate) => candidate.id === provenance.verification_id);
+				if (
+					!verification ||
+					verification.task_id !== receipt.task_id ||
+					verification.task_revision !== task.task_revision ||
+					verification.commit_hash !== receipt.git_sha
+				)
+					throw new Error(`Master handoff verification provenance mismatch: ${receipt.task_id}`);
+			} else {
+				if (receipt.evidence_refs.length > 0)
+					throw new Error(`pre-verification Master handoff cannot reference Evidence: ${receipt.task_id}`);
+				if (latestRun.workspace_commit_hash !== receipt.git_sha)
+					throw new Error(`Master handoff git_sha does not match terminal Run snapshot: ${receipt.task_id}`);
+			}
+			if (receipt.acceptance === "PASS") {
+				const acceptance = provenance.acceptance_id
+					? state.acceptances.find((candidate) => candidate.id === provenance.acceptance_id)
+					: undefined;
+				if (
+					!acceptance ||
+					acceptance.task_id !== receipt.task_id ||
+					acceptance.task_revision !== task.task_revision ||
+					acceptance.run_id !== provenance.run_id ||
+					acceptance.verification_id !== provenance.verification_id
+				)
+					throw new Error(`Master handoff PASS requires canonical Acceptance: ${receipt.task_id}`);
+			} else if (provenance.acceptance_id) {
+				throw new Error(`non-PASS Master handoff cannot bind Acceptance: ${receipt.task_id}`);
+			}
+			const binding: MasterHandoffBinding = {
+				task_id: receipt.task_id,
+				task_revision: task.task_revision,
+				run_id: provenance.run_id,
+				provenance_stage: provenanceStage,
+				git_sha: receipt.git_sha,
+				work_receipt_digest: createHash("sha256").update(JSON.stringify(result.work_receipt)).digest("hex"),
+				evidence_refs: [...receipt.evidence_refs],
+				verification_id: provenance.verification_id,
+				acceptance_id: provenance.acceptance_id,
+			};
+			const index = state.handoff_receipts.findIndex((candidate) => candidate.task_id === receipt.task_id);
+			if (index >= 0) state.handoff_receipts[index] = structuredClone(receipt);
+			else state.handoff_receipts.push(structuredClone(receipt));
+			state.handoff_bindings[receipt.task_id] = binding;
+		});
+		return structuredClone(receipt);
+	}
+
+	getHandoffReceipt(taskId: string): MasterHandoffReceipt | undefined {
+		const receipt = this.state.handoff_receipts.find((candidate) => candidate.task_id === taskId);
+		const task = this.state.tasks.find((candidate) => candidate.id === taskId);
+		const binding = this.state.handoff_bindings[taskId];
+		const latestRun = this.state.runs.filter((candidate) => candidate.task_id === taskId).at(-1);
+		return receipt &&
+			task?.state === receipt.status &&
+			binding?.task_revision === task.task_revision &&
+			binding.run_id === latestRun?.id
+			? structuredClone(receipt)
+			: undefined;
+	}
+
+	listHandoffReceipts(): MasterHandoffReceipt[] {
+		return this.state.handoff_receipts.map((receipt) => structuredClone(receipt));
 	}
 
 	addDecision(decision: DecisionRecord): void {

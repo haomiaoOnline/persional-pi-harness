@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
+import { validateMasterHandoffReceipt } from "./handoff.ts";
 import type {
 	ContextCacheStats,
 	ContextManifest,
@@ -248,6 +249,46 @@ export class ContextResolver {
 
 	clearCache(): void {
 		this.cache.clear();
+	}
+}
+
+/**
+ * Builds a new cross-Task context projection from receipt-only handoffs.
+ * It intentionally has no API for prior ResolvedContext or Worker transcript.
+ */
+export class FreshContextBuilder {
+	build(receipts: readonly unknown[], maxInputTokens: number): ResolvedContext {
+		if (!Number.isInteger(maxInputTokens) || maxInputTokens < 1)
+			throw new ContextBudgetExceededError("Fresh Context requires a positive Task context budget");
+		const seenTasks = new Set<string>();
+		const items: ResolvedContextItem[] = [];
+		let totalTokens = 0;
+		for (const value of receipts) {
+			const validation = validateMasterHandoffReceipt(value);
+			if (!validation.valid || !validation.value)
+				throw new ContextManifestError(`invalid Master handoff receipt: ${validation.errors.join("; ")}`);
+			const receipt = validation.value;
+			if (seenTasks.has(receipt.task_id))
+				throw new ContextManifestError(`duplicate Master handoff receipt for ${receipt.task_id}`);
+			seenTasks.add(receipt.task_id);
+			const content = JSON.stringify(receipt);
+			const tokens = tokenEstimate(content);
+			if (totalTokens + tokens > maxInputTokens)
+				throw new ContextBudgetExceededError("Fresh Context receipts exceed the Task context budget");
+			items.push({ digest: textDigest(content), content, token_estimate: tokens });
+			totalTokens += tokens;
+		}
+		const manifestDigest = createHash("sha256")
+			.update(JSON.stringify(items.map((item) => item.digest)))
+			.digest("hex");
+		return {
+			items,
+			text: items.map((item) => item.content).join("\n"),
+			total_tokens: totalTokens,
+			cache_hit: false,
+			omitted_optional: [],
+			manifest_digest: manifestDigest,
+		};
 	}
 }
 

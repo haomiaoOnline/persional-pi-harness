@@ -1,7 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { ArtifactStore } from "./artifacts.ts";
 import { authorizeCommand, type CommandApproval, CommandRiskClassifier } from "./command-risk.ts";
-import { type ContextResolver, evaluateContextReadiness } from "./context.ts";
+import { type ContextResolver, evaluateContextReadiness, FreshContextBuilder } from "./context.ts";
 import { EvidenceCollector } from "./evidence.ts";
+import { buildMasterHandoffReceipt, createArchivedHandoffFailure } from "./handoff.ts";
 import { LeaseManager } from "./lease.ts";
 import type { LifecycleHookManager, LifecycleHookRunResult } from "./lifecycle-hooks.ts";
 import { LoopBudgetController, LoopBudgetExhaustedError, LoopBudgetMissingError } from "./loop-budget.ts";
@@ -24,6 +26,7 @@ import { createModelIdentity, ensureWorkReceipt, validateResultContract, validat
 import { createTaskRecord, TaskStateMachine } from "./state-machine.ts";
 import { computeGraphEfficiencyMetrics, createRegressionCase, TraceRecorder } from "./trace.ts";
 import type {
+	AcceptanceRecord,
 	ArchitectureCommercialAssessment,
 	CommandEvidence,
 	DecisionRecord,
@@ -31,6 +34,7 @@ import type {
 	DispatchRecord,
 	EvidenceRecord,
 	ExecutionTrace,
+	MasterHandoffReceipt,
 	PermissionRequest,
 	PlanApproval,
 	PlanQualityChecklist,
@@ -98,6 +102,7 @@ export interface PipelineRequest {
 	requested_actions?: string[];
 	permission_request?: PermissionRequest;
 	context_resolver?: ContextResolver;
+	handoff_task_ids?: readonly string[];
 	command_runner?: CommandRunner;
 	command_risk_classifier?: CommandRiskClassifier;
 	command_approval?: CommandApproval;
@@ -125,6 +130,7 @@ export interface PipelineExecution {
 	decisions: DecisionRecord[];
 	resolved_context?: ResolvedContext;
 	trace: ExecutionTrace;
+	handoff: MasterHandoffReceipt;
 }
 
 export interface PersonalPiPipelineOptions {
@@ -133,6 +139,7 @@ export interface PersonalPiPipelineOptions {
 	evidence_collector?: EvidenceCollector;
 	verification_engine?: VerificationEngine;
 	acceptance_gate?: AcceptanceGate;
+	artifact_store?: ArtifactStore;
 }
 
 function dispatchMode(mode: DispatchDecision["mode"]): DispatchRecord["mode"] {
@@ -201,19 +208,13 @@ function normalizeResult(
 			requestedModel,
 		);
 	}
-	return {
-		task_id: request.task.id,
-		run_id: request.run_id ?? randomUUID(),
-		worker_id: workerId,
-		lease_epoch: request.protocol.lease_epoch,
-		status: "failure",
-		summary: "worker adapter returned malformed Result Contract",
-		changed_files: [],
-		artifacts: [],
-		evidence: [],
-		errors: validation.errors,
-		model_identity: createModelIdentity(requestedModel),
-	};
+	return failureResult(
+		request,
+		workerId,
+		new Error(validation.errors.join("; ")),
+		"worker adapter returned malformed Result Contract",
+		requestedModel,
+	);
 }
 
 function blockedCommandEvidence(
@@ -240,6 +241,7 @@ export class PersonalPiPipeline {
 	private readonly verificationEngine: VerificationEngine;
 	private readonly acceptanceGate: AcceptanceGate;
 	private readonly loopBudgetController: LoopBudgetController;
+	private readonly artifactStore: ArtifactStore;
 
 	constructor(options: PersonalPiPipelineOptions = {}) {
 		this.stateStore = options.state_store ?? new PersistentStateStore();
@@ -248,6 +250,72 @@ export class PersonalPiPipeline {
 		this.verificationEngine = options.verification_engine ?? new VerificationEngine();
 		this.acceptanceGate = options.acceptance_gate ?? new AcceptanceGate();
 		this.loopBudgetController = new LoopBudgetController(this.stateStore);
+		this.artifactStore = options.artifact_store ?? new ArtifactStore(this.stateStore.artifactStoreRootPath());
+	}
+
+	private persistMasterHandoff(input: {
+		task: TaskRecord;
+		result: ResultContract;
+		git_sha: string;
+		plan_assessment: ArchitectureCommercialAssessment;
+		evidence_refs?: readonly string[];
+		verification_status?: VerificationRecord["status"];
+		verification_reasons?: readonly string[];
+		verification_id?: string;
+		acceptance?: AcceptanceRecord;
+	}): MasterHandoffReceipt {
+		const normalizedResult = ensureWorkReceipt(input.result);
+		if (!normalizedResult.work_receipt) throw new Error("terminal Run is missing a Work Receipt");
+		const acceptance =
+			input.task.state === "DONE" && input.acceptance
+				? "PASS"
+				: input.task.state === "FAILED" || input.verification_status === "FAIL"
+					? "FAIL"
+					: "UNKNOWN";
+		const nextAction =
+			input.task.state === "DONE"
+				? "proceed_to_next_task"
+				: input.task.state === "BLOCKED"
+					? "resolve_blocker_or_request_human_review"
+					: input.task.state === "FAILED"
+						? "inspect_failure_artifacts_and_replan_or_reassign"
+						: "review_terminal_task_state_before_continuing";
+		const failure =
+			input.task.state === "DONE"
+				? undefined
+				: createArchivedHandoffFailure({
+						artifact_store: this.artifactStore,
+						task_id: input.task.id,
+						task_revision: input.task.task_revision,
+						raw_failure_detail: {
+							result_status: normalizedResult.status,
+							result_summary: normalizedResult.summary,
+							errors: normalizedResult.errors,
+							requested_context: normalizedResult.requested_context ?? [],
+							verification_status: input.verification_status ?? "UNKNOWN",
+							verification_reasons: [...(input.verification_reasons ?? [])],
+						},
+						classification: "terminal_worker_failure",
+					});
+		return this.stateStore.saveHandoffReceipt(
+			buildMasterHandoffReceipt({
+				task_id: input.task.id,
+				status: input.task.state as MasterHandoffReceipt["status"],
+				git_sha: input.git_sha,
+				acceptance,
+				evidence_refs: input.evidence_refs ?? [],
+				unresolved_risks: input.plan_assessment.open_risks,
+				next_action: nextAction,
+				work_receipt: normalizedResult.work_receipt,
+				failure,
+			}),
+			{
+				task_revision: input.task.task_revision,
+				run_id: normalizedResult.run_id,
+				verification_id: input.verification_id,
+				acceptance_id: input.acceptance?.id,
+			},
+		);
 	}
 
 	probeDispatchCapability(task: TaskContract, roleProfile?: RoleProfile): DispatchDecision {
@@ -422,6 +490,32 @@ export class PersonalPiPipeline {
 			);
 			throw new PipelineStageError("DOR", "context resolver is required for referenced context", task.id);
 		}
+		if (request.handoff_task_ids && request.handoff_task_ids.length > 0) {
+			try {
+				const handoffReceipts = request.handoff_task_ids.map((taskId) => {
+					const receipt = this.stateStore.getHandoffReceipt(taskId);
+					if (!receipt) throw new Error(`missing persisted Master handoff receipt for ${taskId}`);
+					return receipt;
+				});
+				const remainingTokens = request.task.context.budget.max_input_tokens - (resolvedContext?.total_tokens ?? 0);
+				const freshContext = new FreshContextBuilder().build(handoffReceipts, remainingTokens);
+				const items = [...(resolvedContext?.items ?? []), ...freshContext.items];
+				resolvedContext = {
+					items,
+					text: items.map((item) => item.content).join("\n"),
+					total_tokens: items.reduce((sum, item) => sum + item.token_estimate, 0),
+					cache_hit: false,
+					omitted_optional: [...(resolvedContext?.omitted_optional ?? [])],
+					manifest_digest: createHash("sha256")
+						.update(JSON.stringify(items.map((item) => item.digest)))
+						.digest("hex"),
+				};
+			} catch (error) {
+				const reason = error instanceof Error ? error.message : String(error);
+				task = this.stateStore.updateTask(new TaskStateMachine().transition(task, "BLOCKED", reason, at));
+				throw new PipelineStageError("DOR", reason, task.id);
+			}
+		}
 
 		task = this.stateStore.updateTask(
 			new TaskStateMachine().transition(task, "READY", "Definition of Ready passed", at),
@@ -474,6 +568,7 @@ export class PersonalPiPipeline {
 			worker_status: workerStatus,
 			model_identity: createModelIdentity(requestedModel),
 			started_at: at,
+			workspace_commit_hash: request.snapshot.commit_hash,
 		});
 		tracer.attachRun(run.id);
 		tracer.record("RUN", "Run created", at);
@@ -523,6 +618,12 @@ export class PersonalPiPipeline {
 				);
 				this.stateStore.saveResult(blockedResult, at);
 				task = this.stateStore.updateTask(new TaskStateMachine().transition(task, "BLOCKED", reason, at));
+				this.persistMasterHandoff({
+					task,
+					result: blockedResult,
+					git_sha: request.snapshot.commit_hash,
+					plan_assessment: planAssessment,
+				});
 				const decision = createDecisionRecord("loop_budget", "BLOCKED", reason, [task.id, run.id], at);
 				this.stateStore.addDecision(decision);
 				tracer.addDecision(decision);
@@ -563,6 +664,12 @@ export class PersonalPiPipeline {
 						const blockedResult = failureResult(workerRequest, request.worker.worker_id, error);
 						this.stateStore.saveResult(blockedResult, at);
 						task = this.stateStore.updateTask(new TaskStateMachine().transition(task, "BLOCKED", reason, at));
+						this.persistMasterHandoff({
+							task,
+							result: blockedResult,
+							git_sha: request.snapshot.commit_hash,
+							plan_assessment: planAssessment,
+						});
 						const decision = createDecisionRecord("loop_budget", "BLOCKED", reason, [task.id, run.id], at);
 						this.stateStore.addDecision(decision);
 						tracer.addDecision(decision);
@@ -688,20 +795,23 @@ export class PersonalPiPipeline {
 		tracer.addDecision(verificationDecision);
 		tracer.record("VERIFICATION", verification.status, at, { status: verification.status });
 
+		let acceptance: AcceptanceRecord | undefined;
 		if (verification.status === "PASS" && result.status === "success") {
 			try {
 				const acceptanceSnapshot =
 					request.workspace_snapshot_provider?.(result.artifacts) ??
 					request.current_snapshot ??
 					verificationSnapshot;
-				task = this.stateStore.acceptTask(
+				const accepted = this.stateStore.acceptTask(
 					task.id,
 					verification.id,
 					result.run_id,
 					acceptanceSnapshot,
 					at,
 					this.acceptanceGate,
-				).task;
+				);
+				task = accepted.task;
+				acceptance = accepted.acceptance;
 			} catch (error) {
 				if (!(error instanceof Error) || !error.message.startsWith("work_receipt_anomaly:")) throw error;
 				const reason = error.message;
@@ -741,6 +851,17 @@ export class PersonalPiPipeline {
 				}),
 			);
 		}
+		const handoff = this.persistMasterHandoff({
+			task,
+			result,
+			git_sha: verification.commit_hash,
+			plan_assessment: planAssessment,
+			evidence_refs: [evidence.id],
+			verification_status: verification.status,
+			verification_reasons: verification.reasons,
+			verification_id: verification.id,
+			acceptance,
+		});
 		this.leaseManager.release(lease);
 		if (
 			task.state !== "BLOCKED" ||
@@ -773,6 +894,7 @@ export class PersonalPiPipeline {
 			],
 			resolved_context: resolvedContext,
 			trace,
+			handoff,
 		};
 	}
 }

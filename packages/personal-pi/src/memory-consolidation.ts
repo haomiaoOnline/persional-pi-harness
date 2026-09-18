@@ -1,10 +1,19 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { validateMasterHandoffReceipt } from "./handoff.ts";
 import { validateResultContract, workReceiptErrors } from "./result.ts";
 import { validateTaskContract } from "./schema.ts";
 import { type ScheduleDefinition, TriggerGateway } from "./triggers.ts";
-import type { DecisionRecord, EvidenceRecord, JsonValue, ResultContract, RunRecord, TaskContract } from "./types.ts";
+import type {
+	DecisionRecord,
+	EvidenceRecord,
+	JsonValue,
+	MasterHandoffReceipt,
+	ResultContract,
+	RunRecord,
+	TaskContract,
+} from "./types.ts";
 
 export interface ColdEvidenceArchive {
 	archive(evidence: EvidenceRecord): string;
@@ -60,6 +69,7 @@ export interface ConsolidationInput {
 	run: RunRecord;
 	result: ResultContract;
 	evidence: EvidenceRecord;
+	receipt: MasterHandoffReceipt;
 	decisions: readonly DecisionRecord[];
 	at?: string;
 }
@@ -99,13 +109,13 @@ function tokenEstimate(value: string): number {
 }
 
 function contentKey(input: ConsolidationInput): string {
+	const { evidence_refs: _evidenceRefs, ...semanticReceipt } = input.receipt;
 	return createHash("sha256")
 		.update(
 			JSON.stringify({
 				task_id: input.task.id,
-				result_summary: input.result.summary,
+				receipt: semanticReceipt,
 				decisions: input.decisions,
-				receipt: input.result.work_receipt,
 			}),
 		)
 		.digest("hex");
@@ -183,6 +193,18 @@ function validateCompletedInput(input: ConsolidationInput): void {
 	const receiptErrors = workReceiptErrors(input.result.work_receipt);
 	if (receiptErrors.length > 0) throw new MemoryConsolidationError(receiptErrors.join("; "));
 	if (!validateResultContract(input.result).valid) throw new MemoryConsolidationError("Result Contract is invalid");
+	const handoff = validateMasterHandoffReceipt(input.receipt);
+	if (!handoff.valid || !handoff.value) throw new MemoryConsolidationError("Master handoff receipt is invalid");
+	if (
+		input.receipt.task_id !== input.task.id ||
+		input.receipt.status !== "DONE" ||
+		input.receipt.acceptance !== "PASS"
+	)
+		throw new MemoryConsolidationError("Master handoff receipt is not the accepted terminal Task receipt");
+	if (!input.receipt.evidence_refs.includes(input.evidence.id))
+		throw new MemoryConsolidationError("Master handoff receipt does not reference the archived Evidence");
+	if (JSON.stringify(input.receipt.work_receipt) !== JSON.stringify(input.result.work_receipt))
+		throw new MemoryConsolidationError("Master handoff Work Receipt does not match the completed Result");
 }
 
 export interface MemoryConsolidatorOptions {
@@ -317,7 +339,16 @@ export class MemoryConsolidator {
 		}
 
 		const archiveReference = this.archive.archive(input.evidence);
-		const summary = `${input.task.id}: ${input.result.summary}; effects=${input.result.work_receipt?.effects_count ?? 0}; state_changed=${input.result.work_receipt?.state_changed ?? false}`;
+		const summary = JSON.stringify({
+			task_id: input.receipt.task_id,
+			status: input.receipt.status,
+			git_sha: input.receipt.git_sha,
+			acceptance: input.receipt.acceptance,
+			evidence_refs: input.receipt.evidence_refs,
+			unresolved_risks: input.receipt.unresolved_risks,
+			next_action: input.receipt.next_action,
+			work_receipt: input.receipt.work_receipt,
+		});
 		const compactDecisions = input.decisions.map((decision) => `${decision.decision_type}:${decision.decision}`);
 		this.hotItems.push(summary, ...compactDecisions);
 		if (this.hotItems.length > this.maxHotEntries) this.hotItems = this.hotItems.slice(-this.maxHotEntries);

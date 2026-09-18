@@ -514,6 +514,43 @@ export interface WorkReceipt {
 	evidence_refs: string[];
 }
 
+export type MasterHandoffAcceptance = "PASS" | "FAIL" | "UNKNOWN";
+export type MasterHandoffStatus = Extract<TaskStatus, "DONE" | "FAILED" | "BLOCKED" | "CANCELLED" | "OBSOLETE">;
+
+export interface MasterHandoffFailure {
+	error_summary: string;
+	artifact_refs: string[];
+}
+
+/**
+ * Receipt-only cross-Task handoff boundary. Deliberately excludes Worker
+ * transcript, Result summary/errors, raw Evidence, and ResolvedContext.
+ */
+export interface MasterHandoffReceipt {
+	task_id: string;
+	status: MasterHandoffStatus;
+	git_sha: string;
+	acceptance: MasterHandoffAcceptance;
+	evidence_refs: string[];
+	unresolved_risks: string[];
+	next_action: string;
+	work_receipt: WorkReceipt;
+	failure?: MasterHandoffFailure;
+}
+
+/** Controller-only provenance. Never expose this through the Master receipt. */
+export interface MasterHandoffBinding {
+	task_id: string;
+	task_revision: number;
+	run_id: string;
+	provenance_stage: "pre_verification" | "verified";
+	git_sha: string;
+	work_receipt_digest: string;
+	evidence_refs: string[];
+	verification_id?: string;
+	acceptance_id?: string;
+}
+
 export interface ResultContract {
 	task_id: string;
 	run_id: string;
@@ -650,6 +687,8 @@ export type RunStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "TIMEOU
 export interface RunRecord {
 	id: string;
 	task_id: string;
+	/** Immutable Task revision captured when this Run was created. */
+	task_revision?: number;
 	attempt: number;
 	worker_id: string;
 	lease_epoch: number;
@@ -657,6 +696,8 @@ export interface RunRecord {
 	model_identity: ModelIdentity;
 	status: RunStatus;
 	started_at: string;
+	/** Controller-observed workspace commit at Run start; Worker cannot attest this. */
+	workspace_commit_hash?: string;
 	ended_at?: string;
 	result_id?: string;
 	failure_reason?: string;
@@ -707,6 +748,8 @@ export interface PersistentState {
 	projects: ProjectRecord[];
 	task_ledger: TaskLedgerBinding[];
 	acceptances: AcceptanceRecord[];
+	handoff_receipts: MasterHandoffReceipt[];
+	handoff_bindings: Record<string, MasterHandoffBinding>;
 	tasks: TaskRecord[];
 	graphs: TaskGraph[];
 	dispatches: DispatchRecord[];

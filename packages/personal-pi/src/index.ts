@@ -12,6 +12,7 @@ export * from "./evidence.ts";
 export * from "./external-gaps.ts";
 export * from "./graph.ts";
 export * from "./graph-intelligence.ts";
+export * from "./handoff.ts";
 export * from "./ingress.ts";
 export * from "./interactive-ingress.ts";
 export * from "./learned-routing.ts";

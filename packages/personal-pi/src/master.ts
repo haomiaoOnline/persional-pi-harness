@@ -1,6 +1,7 @@
+import { validateMasterHandoffReceipt } from "./handoff.ts";
 import { validateTaskContract } from "./schema.ts";
 import { createTaskRecord } from "./state-machine.ts";
-import type { TaskContract, TaskRecord } from "./types.ts";
+import type { MasterHandoffReceipt, TaskContract, TaskRecord } from "./types.ts";
 
 export class MasterBoundaryViolationError extends Error {
 	constructor(action: string) {
@@ -11,6 +12,7 @@ export class MasterBoundaryViolationError extends Error {
 
 export class MasterControlPlane {
 	private readonly tasks = new Map<string, TaskRecord>();
+	private readonly handoffs = new Map<string, MasterHandoffReceipt>();
 	private businessWriteAttempts = 0;
 
 	createTask(contract: TaskContract): TaskRecord {
@@ -35,6 +37,24 @@ export class MasterControlPlane {
 
 	listTasks(): TaskRecord[] {
 		return [...this.tasks.values()].map((task) => structuredClone(task));
+	}
+
+	receiveHandoff(value: unknown): MasterHandoffReceipt {
+		const validation = validateMasterHandoffReceipt(value);
+		if (!validation.valid || !validation.value)
+			throw new MasterBoundaryViolationError(`invalid receipt-only handoff: ${validation.errors.join("; ")}`);
+		const receipt = structuredClone(validation.value);
+		this.handoffs.set(receipt.task_id, receipt);
+		return structuredClone(receipt);
+	}
+
+	getHandoff(taskId: string): MasterHandoffReceipt | undefined {
+		const receipt = this.handoffs.get(taskId);
+		return receipt ? structuredClone(receipt) : undefined;
+	}
+
+	listHandoffs(): MasterHandoffReceipt[] {
+		return [...this.handoffs.values()].map((receipt) => structuredClone(receipt));
 	}
 
 	requestBusinessWrite(action: string): never {

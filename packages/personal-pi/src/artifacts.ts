@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ArtifactHandoffContract, ArtifactRecord, GraphEdge, JsonValue, ReadinessEvaluation } from "./types.ts";
 
 function canonicalize(value: JsonValue): string {
@@ -19,6 +21,12 @@ export type ArtifactValidator = (payload: JsonValue) => boolean;
 export class ArtifactStore {
 	private readonly records = new Map<string, ArtifactRecord>();
 	private readonly validators = new Map<string, ArtifactValidator>();
+	private readonly rootPath?: string;
+
+	constructor(rootPath?: string) {
+		this.rootPath = rootPath;
+		if (rootPath) mkdirSync(rootPath, { recursive: true });
+	}
 
 	registerSchema(type: string, schemaVersion: number, validator: ArtifactValidator): void {
 		this.validators.set(`${type}@${schemaVersion}`, validator);
@@ -40,11 +48,25 @@ export class ArtifactStore {
 			producer_task_revision: producerTaskRevision,
 		};
 		this.records.set(record.digest, record);
+		if (this.rootPath) {
+			const path = join(this.rootPath, `${record.digest}.json`);
+			if (!existsSync(path)) writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+		}
 		return structuredClone(record);
 	}
 
 	get(digest: string): ArtifactRecord | undefined {
-		const record = this.records.get(digest);
+		let record = this.records.get(digest);
+		if (!record && this.rootPath && /^[a-f0-9]{64}$/.test(digest)) {
+			const path = join(this.rootPath, `${digest}.json`);
+			if (existsSync(path)) {
+				const parsed = JSON.parse(readFileSync(path, "utf8")) as ArtifactRecord;
+				if (parsed.digest === digest && digestFor(parsed.payload) === digest) {
+					record = parsed;
+					this.records.set(digest, parsed);
+				}
+			}
+		}
 		return record ? structuredClone(record) : undefined;
 	}
 

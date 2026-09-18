@@ -6,6 +6,7 @@ import {
 	type DecisionRecord,
 	type EvidenceRecord,
 	FileColdEvidenceArchive,
+	type MasterHandoffReceipt,
 	MemoryColdEvidenceArchive,
 	MemoryConsolidator,
 	type ResultContract,
@@ -35,7 +36,7 @@ function completedInput() {
 		worker_id: run.worker_id,
 		lease_epoch: run.lease_epoch,
 		status: "success",
-		summary: "verified memory result",
+		summary: "TASK_A_PRIVATE_TRANSCRIPT_MARKER verified memory result",
 		changed_files: ["tmp/memory.txt"],
 		artifacts: ["tmp/memory.txt"],
 		evidence: ["worker_result"],
@@ -72,7 +73,17 @@ function completedInput() {
 			at: run.started_at,
 		},
 	];
-	return { task, run, result, evidence, decisions };
+	const receipt: MasterHandoffReceipt = {
+		task_id: task.id,
+		status: "DONE",
+		git_sha: "memory-git-sha",
+		acceptance: "PASS",
+		evidence_refs: [evidence.id],
+		unresolved_risks: [],
+		next_action: "proceed_to_next_task",
+		work_receipt: structuredClone(result.work_receipt as NonNullable<ResultContract["work_receipt"]>),
+	};
+	return { task, run, result, evidence, receipt, decisions };
 }
 
 afterEach(() => {
@@ -92,6 +103,9 @@ describe("T7.5 background memory consolidation", () => {
 		expect(record.consolidation_task_id).toContain("memory-consolidation");
 		expect(record.compact_decisions).toEqual(["verification:PASS"]);
 		expect(record.token_delta).toBeGreaterThan(0);
+		expect(record.summary).not.toContain("TASK_A_PRIVATE_TRANSCRIPT_MARKER");
+		expect(consolidator.hotPath().items.join("\n")).not.toContain("TASK_A_PRIVATE_TRANSCRIPT_MARKER");
+		expect(record.summary).toContain('"git_sha":"memory-git-sha"');
 		expect(archive.read(record.archived_evidence_refs[0] ?? "")).toEqual(input.evidence);
 	});
 
@@ -104,6 +118,7 @@ describe("T7.5 background memory consolidation", () => {
 		const duplicateEvidence = consolidator.consolidate({
 			...input,
 			evidence: { ...input.evidence, id: "evidence-memory-duplicate" },
+			receipt: { ...input.receipt, evidence_refs: ["evidence-memory-duplicate"] },
 		});
 
 		expect(first.status).toBe("CONSOLIDATED");
