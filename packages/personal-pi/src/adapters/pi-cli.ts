@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateToolResultEnvelope } from "../tool-gateway.ts";
 import type {
@@ -100,6 +100,20 @@ function absoluteWorkingDirectory(task: TaskContract): string {
 	return isAbsolute(task.execution.working_directory)
 		? resolve(task.execution.working_directory)
 		: resolve(process.cwd(), task.execution.working_directory);
+}
+
+function effectiveReadScopes(task: TaskContract): string[] {
+	const cwd = absoluteWorkingDirectory(task);
+	const permissionRoots = task.permissions.filesystem.read.map((scope) =>
+		isAbsolute(scope) ? resolve(scope) : resolve(cwd, scope),
+	);
+	return [...new Set(task.scope.files)].filter((scope) => {
+		const candidate = isAbsolute(scope) ? resolve(scope) : resolve(cwd, scope);
+		return permissionRoots.some((root) => {
+			const child = relative(root, candidate);
+			return child === "" || (child !== ".." && !child.startsWith(`..${sep}`) && !isAbsolute(child));
+		});
+	});
 }
 
 function extensionPath(explicitPath?: string | URL): string | undefined {
@@ -389,7 +403,7 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 			policy: {
 				working_directory: cwd,
 				allowed_tools: [...tools],
-				read_scopes: [...request.task.permissions.filesystem.read],
+				read_scopes: effectiveReadScopes(request.task),
 				write_scopes: [...request.task.permissions.filesystem.write],
 				shell_allowed: [...request.task.permissions.shell.allowed],
 				network: request.task.permissions.network === "allow",

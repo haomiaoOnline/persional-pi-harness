@@ -16,6 +16,8 @@ const DEFAULT_SUMMARY_LINES = 30;
 const DEFAULT_SUMMARY_CHARS = 4_000;
 const DEFAULT_PAGE_CHARS = 4_000;
 const MAX_PAGE_CHARS = 16_000;
+const SEARCH_RESULT_COUNT_LIMIT = 20;
+const SEARCH_RESULT_BYTE_LIMIT = 2_048;
 const CURSOR_PREFIX = "tool-output:";
 
 const ToolResultStatusSchema = Type.Union([
@@ -187,8 +189,23 @@ function searchDirectory(path: string): string {
 	return parts.length > 1 ? parts.slice(0, Math.min(2, parts.length - 1)).join("/") : ".";
 }
 
+function boundedSearchPreview(lines: readonly string[]): string[] {
+	const preview: string[] = [];
+	let bytes = 0;
+	for (const line of lines) {
+		if (preview.length >= SEARCH_RESULT_COUNT_LIMIT) break;
+		const separatorBytes = preview.length > 0 ? 1 : 0;
+		const lineBytes = Buffer.byteLength(line, "utf8") + separatorBytes;
+		if (bytes + lineBytes > SEARCH_RESULT_BYTE_LIMIT) break;
+		preview.push(line);
+		bytes += lineBytes;
+	}
+	return preview;
+}
+
 function summarizeSearch(stdout: string, stderr: string): Summary {
 	const lines = stripAnsi(stdout).split(/\r?\n/).filter(Boolean);
+	const totalBytes = Buffer.byteLength(stdout, "utf8");
 	const groups = new Map<string, number>();
 	for (const line of lines) {
 		const path = line.split(":", 1)[0] ?? line;
@@ -200,9 +217,13 @@ function summarizeSearch(stdout: string, stderr: string): Summary {
 		.slice(0, 12)
 		.map(([directory, count]) => `${directory}: ${count}`)
 		.join(", ");
-	const preview = lines.slice(0, 20);
+	const preview = boundedSearchPreview(lines);
+	const limitExceeded = lines.length > SEARCH_RESULT_COUNT_LIMIT || totalBytes > SEARCH_RESULT_BYTE_LIMIT;
 	const text = [
 		`matches=${lines.length}`,
+		limitExceeded
+			? `search limits exceeded: result_count_limit=${SEARCH_RESULT_COUNT_LIMIT}, total_byte_limit=${SEARCH_RESULT_BYTE_LIMIT}, observed_bytes=${totalBytes}; narrow the search scope and retry`
+			: "",
 		groupSummary ? `groups=${groupSummary}` : "",
 		preview.length > 0 ? `preview:\n${preview.join("\n")}` : "",
 	]
@@ -214,7 +235,7 @@ function summarizeSearch(stdout: string, stderr: string): Summary {
 		stdout: limited.text,
 		stderr: stderrLimited.text,
 		frames: relevantStackFrames(stderr),
-		truncated: limited.truncated || stderrLimited.truncated || lines.length > preview.length,
+		truncated: limitExceeded || limited.truncated || stderrLimited.truncated || lines.length > preview.length,
 	};
 }
 

@@ -378,6 +378,62 @@ describe("Pi native T4.2-C Tool Gateway boundary", () => {
 		});
 	});
 
+	test("constrains native read scopes to Task scope.files even when filesystem.read allows the whole workspace", async () => {
+		const directory = temporaryDirectory();
+		const base = makeV3Task("pi-native-read-allowlist");
+		const task = makeV3Task("pi-native-read-allowlist", {
+			scope: { files: ["src/allowed.ts"] },
+			permissions: {
+				...base.permissions,
+				filesystem: { read: ["."], write: base.permissions.filesystem.write },
+			},
+			execution: { ...base.execution, allowed_tools: ["read", "grep", "find", "ls"] },
+		});
+		let capturedPolicy: Record<string, unknown> | undefined;
+		const adapter = new PiAgentWorkerAdapter({
+			worker_id: "pi-native-read-allowlist",
+			run_process: async (options) => {
+				capturedPolicy = JSON.parse(options.env.PPH_PI_TOOL_POLICY ?? "{}") as Record<string, unknown>;
+				const observation = createCliObservation();
+				observation.exit_code = 0;
+				emitIdentityAndResult(options, observation);
+				return { observation };
+			},
+		});
+
+		const result = await adapter.execute(requestFor(task, join(directory, "artifacts")));
+		expect(result.status).toBe("success");
+		expect(capturedPolicy?.read_scopes).toEqual(["src/allowed.ts"]);
+	});
+
+	test("does not grant Task scope entries that are outside filesystem.read", async () => {
+		const directory = temporaryDirectory();
+		const base = makeV3Task("pi-native-read-intersection");
+		const task = makeV3Task("pi-native-read-intersection", {
+			scope: { files: ["src/allowed.ts", "outside.ts"] },
+			permissions: {
+				...base.permissions,
+				filesystem: { read: ["src"], write: base.permissions.filesystem.write },
+			},
+			execution: { ...base.execution, allowed_tools: ["read"] },
+		});
+		let capturedPolicy: Record<string, unknown> | undefined;
+		const adapter = new PiAgentWorkerAdapter({
+			worker_id: "pi-native-read-intersection",
+			run_process: async (options) => {
+				capturedPolicy = JSON.parse(options.env.PPH_PI_TOOL_POLICY ?? "{}") as Record<string, unknown>;
+				const observation = createCliObservation();
+				observation.exit_code = 0;
+				emitIdentityAndResult(options, observation);
+				return { observation };
+			},
+		});
+
+		const result = await adapter.execute(requestFor(task, join(directory, "artifacts")));
+		expect(result.status).toBe("success");
+		expect(capturedPolicy?.read_scopes).toEqual(["src/allowed.ts"]);
+	});
+
 	test("parent fails closed on raw tool output", async () => {
 		const directory = temporaryDirectory();
 		const task = makeV3Task("pi-native-raw", {

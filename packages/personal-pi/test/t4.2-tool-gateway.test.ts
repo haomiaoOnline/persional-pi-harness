@@ -199,6 +199,33 @@ describe("T4.2-C ToolGateway", () => {
 		}
 	});
 
+	test("bounds oversized search results and instructs the model to narrow scope while retaining artifact paging", () => {
+		const store = new ArtifactStore();
+		const gateway = new ToolGateway({ artifact_store: store });
+		const stdout = Array.from(
+			{ length: 1_000 },
+			(_, index) => `src/generated/file-${index}.ts:${index + 1}:match-${index}`,
+		).join("\n");
+		const envelope = gateway.wrap({
+			tool_name: "rg match src",
+			task_id: "search-bounded",
+			task_revision: 1,
+			exit_code: 0,
+			stdout,
+			stderr: "",
+			output_kind: "search",
+		});
+
+		expect(envelope.stdout_summary).toContain("matches=1000");
+		expect(envelope.stdout_summary).toContain("search limits exceeded");
+		expect(envelope.stdout_summary).toContain("narrow the search scope and retry");
+		expect(envelope.stdout_summary).toContain("file-0.ts");
+		expect(envelope.stdout_summary).not.toContain("file-999.ts");
+		expect(envelope.truncated).toBe(true);
+		expect(envelope.next_cursor).not.toBeNull();
+		expect(store.get(envelope.artifact_id)?.payload).toMatchObject({ stdout });
+	});
+
 	test("suppresses duplicate error bodies by normalized fingerprint", () => {
 		const gateway = new ToolGateway({ artifact_store: new ArtifactStore() });
 		const first = gateway.wrap({
