@@ -931,6 +931,19 @@ export interface EvidenceSummary {
 	evidence_ref: string;
 }
 
+export interface ContextCompactionReport {
+	facts: string[];
+	decisions: string[];
+	completed_tasks: string[];
+	open_tasks: string[];
+	open_risks: string[];
+	verified_evidence: string[];
+	failed_attempts: Array<{ error_fingerprint: string }>;
+	next_action: string;
+	git_sha: string;
+	artifact_refs: string[];
+}
+
 export interface ProjectRecord {
 	project_id: string;
 	repo_path: string;

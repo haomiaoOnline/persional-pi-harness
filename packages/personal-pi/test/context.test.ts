@@ -10,10 +10,13 @@ import {
 	ContextResolver,
 	ContextStore,
 	contextSourceLabel,
+	createEmptyPersistentState,
 	evaluateContextReadiness,
 	MissingContextReferenceError,
+	validateContextCompactionReport,
 	validateContextManifest,
 } from "../src/index.ts";
+import { makeV3Task } from "./v3-fixtures.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -158,22 +161,165 @@ describe("T6.2 context manifest and resolver", () => {
 		expect(() => resolver.resolve(manifest, { evaluation: true })).toThrow(MissingContextReferenceError);
 	});
 
-	test("does not expose raw evidence text in a ten-task compact summary", () => {
-		const summaries = Array.from({ length: 10 }, (_, index) => ({
-			task_id: `task-${index + 1}`,
-			status: "PASS" as const,
-			summary: "verification passed",
-			evidence_ref: `evidence-${index + 1}`,
-		}));
-		const report = new ContextCompactionPolicy().buildReport(summaries);
-		const uncompressedEvidence = summaries
-			.map((summary) => `${summary.task_id}: ${"raw evidence ".repeat(200)}${summary.evidence_ref}`)
-			.join("\n");
+	test("emits the exact structured schema without copying raw evidence across ten tasks", () => {
+		const state = createEmptyPersistentState();
+		for (let index = 0; index < 10; index += 1) {
+			const task = makeV3Task(`task-${index + 1}`);
+			state.tasks.push({ ...task, state: "DONE", audit_log: [] });
+			const evidenceId = `evidence-${index + 1}`;
+			state.evidence.push({
+				id: evidenceId,
+				task_id: task.id,
+				run_id: `run-${index + 1}`,
+				captured_at: "2026-09-19T00:00:00.000Z",
+				diff: { files: [], digest: "diff" },
+				commands: [],
+				stdout: "raw evidence ".repeat(200),
+				stderr: "",
+				artifacts: [`artifact-${index + 1}`],
+				evidence_types: ["worker_result"],
+				delivery_evidence_package: {
+					baseline_commit: "base",
+					actual_diff: { files: [], digest: "diff" },
+					task_revision: task.task_revision,
+					workspace_snapshot_ref: "snapshot",
+					commands_and_exit_codes: [],
+					test_output_summary: "bounded",
+					artifact_digest: "artifact-digest",
+					browser_or_container_verification: [],
+					unfinished_items: [],
+					provider_mode: "mock",
+				},
+			});
+			state.verifications.push({
+				id: `verification-${index + 1}`,
+				task_id: task.id,
+				evidence_id: evidenceId,
+				status: "PASS",
+				verification_confidence: "strong",
+				task_revision: task.task_revision,
+				commit_hash: "sha",
+				diff_digest: "diff",
+				artifact_digest: "artifact-digest",
+				checked_at: "2026-09-19T00:00:00.000Z",
+				checks: [],
+				reasons: [],
+			});
+		}
+		const report = new ContextCompactionPolicy().buildReport({
+			state,
+			next_action: "continue",
+			git_sha: "abc123",
+		});
+		const uncompressedEvidence = state.evidence.map((evidence) => evidence.stdout).join("\n");
 
-		expect(report).toContain("task-1: PASS — verification passed [evidence:evidence-1]");
-		expect(report.split("\n")).toHaveLength(10);
-		expect(report.length).toBeLessThan(uncompressedEvidence.length / 20);
-		expect(report).not.toContain("secret");
+		expect(Object.keys(report).sort()).toEqual(
+			[
+				"facts",
+				"decisions",
+				"completed_tasks",
+				"open_tasks",
+				"open_risks",
+				"verified_evidence",
+				"failed_attempts",
+				"next_action",
+				"git_sha",
+				"artifact_refs",
+			].sort(),
+		);
+		expect(validateContextCompactionReport(report).valid).toBe(true);
+		expect(report.facts).toEqual([]);
+		expect(report.completed_tasks).toHaveLength(10);
+		expect(report.verified_evidence).toHaveLength(10);
+		expect(JSON.stringify(report).length).toBeLessThan(uncompressedEvidence.length / 20);
+		expect(JSON.stringify(report)).not.toContain("raw evidence");
+	});
+
+	test("keeps only the latest decision and never promotes uncertain evidence into facts", () => {
+		const state = createEmptyPersistentState();
+		const task = makeV3Task("task-a");
+		state.tasks.push({ ...task, state: "BLOCKED", audit_log: [] });
+		state.runs.push({
+			id: "run-current",
+			task_id: task.id,
+			task_revision: task.task_revision,
+			attempt: 1,
+			worker_id: "worker",
+			lease_epoch: 1,
+			worker_status: { worker_capability: "available", execution_mode: "normal", delivery_status: "normal" },
+			model_identity: {
+				requested_model: "model",
+				platform_accepted_model: "model",
+				observed_runtime_model: "model",
+			},
+			status: "FAILED",
+			started_at: "2026-09-18T09:00:00.000Z",
+			ended_at: "2026-09-18T12:00:00.000Z",
+			workspace_commit_hash: "current-sha",
+		});
+		state.decisions.push(
+			{
+				id: "old",
+				decision_type: "migration_plan",
+				decision: "use-old-plan",
+				reason: "initial assumption",
+				inputs: ["task-a"],
+				at: "2026-09-18T10:00:00.000Z",
+			},
+			{
+				id: "new",
+				decision_type: "migration_plan",
+				decision: "use-new-plan",
+				reason: "verified correction",
+				inputs: ["task-a"],
+				at: "2026-09-18T11:00:00.000Z",
+			},
+		);
+		state.handoff_receipts.push({
+			task_id: "task-a",
+			status: "BLOCKED",
+			git_sha: "current-sha",
+			acceptance: "UNKNOWN",
+			evidence_refs: [],
+			unresolved_risks: ["migration safety remains uncertain"],
+			next_action: "reverify",
+			work_receipt: {
+				work_attempted: true,
+				effects_count: 0,
+				artifacts_created: [],
+				state_changed: false,
+				no_op: true,
+				no_op_reason: "blocked pending verification",
+				evidence_refs: [],
+			},
+			failure: {
+				error_summary: "worker_failure; error_fingerprint=deadbeef",
+				artifact_refs: ["failure-artifact"],
+			},
+		});
+		state.handoff_bindings["task-a"] = {
+			task_id: "task-a",
+			task_revision: task.task_revision,
+			run_id: "run-current",
+			provenance_stage: "pre_verification",
+			git_sha: "current-sha",
+			work_receipt_digest: "receipt",
+			evidence_refs: [],
+		};
+		const report = new ContextCompactionPolicy().buildReport({
+			state,
+			task_ids: ["task-a"],
+			anchor_task_id: "task-a",
+		});
+
+		expect(report.decisions).toEqual(["task-a:migration_plan:use-new-plan"]);
+		expect(report.decisions.join(" ")).not.toContain("use-old-plan");
+		expect(report.facts).toEqual([]);
+		expect(report.open_risks).toEqual(["migration safety remains uncertain"]);
+		expect(report.failed_attempts).toEqual([{ error_fingerprint: "deadbeef" }]);
+		expect(JSON.stringify(report.failed_attempts)).not.toContain("worker_failure");
+		expect(report.verified_evidence).toEqual([]);
+		expect(report.artifact_refs).toEqual(["failure-artifact"]);
 	});
 });
 

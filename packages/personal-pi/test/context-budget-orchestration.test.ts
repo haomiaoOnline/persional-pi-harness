@@ -37,7 +37,7 @@ function taskFor(id: string, overrides: Partial<TaskContract> = {}): TaskContrac
 			evidence_required: ["worker_result"],
 			strength: "strong",
 		},
-		context: { required: [], optional: [], excluded: [], budget: { max_input_tokens: 100 } },
+		context: { required: [], optional: [], excluded: [], budget: { max_input_tokens: 200 } },
 		loop_budget: boundedLoopBudget({
 			max_attempts: 3,
 			max_model_calls: 3,
@@ -80,7 +80,7 @@ function successResult(request: WorkerProtocolRequest, workerId: string): Result
 class RebuildingWorker implements WorkerAdapter {
 	readonly worker_id = "context-rebuilding-worker";
 	readonly requested_model = "fake-model";
-	readonly context_limit = 100;
+	readonly context_limit = 200;
 	calls = 0;
 	providerLimitTriggered = false;
 	readonly seenContexts: string[] = [];
@@ -89,8 +89,8 @@ class RebuildingWorker implements WorkerAdapter {
 		this.calls += 1;
 		this.seenContexts.push(request.resolved_context?.text ?? "");
 		if (this.calls === 1) {
-			controls?.observeContextUsage?.({ layer: "run", metrics: metrics(60) });
-			controls?.observeContextUsage?.({ layer: "run", metrics: metrics(75) });
+			controls?.observeContextUsage?.({ layer: "run", metrics: metrics(120) });
+			controls?.observeContextUsage?.({ layer: "run", metrics: metrics(150) });
 			this.providerLimitTriggered = true;
 			throw new Error("provider context-limit");
 		}
@@ -110,7 +110,7 @@ describe("T6.3-A context budget orchestration", () => {
 				required: [required.digest],
 				optional: [optional.digest],
 				excluded: [],
-				budget: { max_input_tokens: 100 },
+				budget: { max_input_tokens: 200 },
 			},
 		});
 		const store = new PersistentStateStore();
@@ -132,7 +132,8 @@ describe("T6.3-A context budget orchestration", () => {
 		expect(worker.seenContexts[0]).toContain("OPTIONAL_CONTEXT_MARKER");
 		expect(worker.seenContexts[1]).toContain("REQUIRED_CONTEXT_MARKER");
 		expect(worker.seenContexts[1]).not.toContain("OPTIONAL_CONTEXT_MARKER");
-		expect(worker.seenContexts[1]).toContain("context rebuild");
+		expect(worker.seenContexts[1]).toContain('"open_tasks":["context-rebuild-long-flow"]');
+		expect(worker.seenContexts[1]).toContain('"next_action":"continue same Task with Fresh Context"');
 
 		const state = store.read();
 		const runs = state.runs.filter((run) => run.task_id === task.id);

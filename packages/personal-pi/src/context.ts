@@ -6,12 +6,15 @@ import { Value } from "typebox/value";
 import { validateMasterHandoffReceipt } from "./handoff.ts";
 import type {
 	ContextCacheStats,
+	ContextCompactionReport,
 	ContextManifest,
 	ContextReference,
-	EvidenceSummary,
+	DecisionRecord,
+	PersistentState,
 	ReadinessEvaluation,
 	ResolvedContext,
 	ResolvedContextItem,
+	ToolResultEnvelope,
 	ValidationResult,
 } from "./types.ts";
 
@@ -306,14 +309,176 @@ export function evaluateContextReadiness(
 	}
 }
 
+export const ContextCompactionReportSchema = Type.Object(
+	{
+		facts: Type.Array(Type.String()),
+		decisions: Type.Array(Type.String()),
+		completed_tasks: Type.Array(Type.String()),
+		open_tasks: Type.Array(Type.String()),
+		open_risks: Type.Array(Type.String()),
+		verified_evidence: Type.Array(Type.String()),
+		failed_attempts: Type.Array(
+			Type.Object({ error_fingerprint: Type.String({ minLength: 1 }) }, { additionalProperties: false }),
+		),
+		next_action: Type.String(),
+		git_sha: Type.String(),
+		artifact_refs: Type.Array(Type.String()),
+	},
+	{ additionalProperties: false },
+);
+
+export interface ContextCompactionBuildInput {
+	state: PersistentState;
+	task_ids?: readonly string[];
+	anchor_task_id?: string;
+	tool_results?: readonly ToolResultEnvelope[];
+	next_action?: string;
+	git_sha?: string;
+	artifact_refs?: readonly string[];
+}
+
+function unique(values: readonly string[]): string[] {
+	return [...new Set(values.filter((value) => value.trim().length > 0))];
+}
+
+function resolveDecisionTaskId(record: DecisionRecord, state: PersistentState): string | undefined {
+	for (const input of record.inputs) {
+		if (state.tasks.some((task) => task.id === input)) return input;
+		const run = state.runs.find((candidate) => candidate.id === input);
+		if (run) return run.task_id;
+		const verification = state.verifications.find((candidate) => candidate.id === input);
+		if (verification) return verification.task_id;
+		const evidence = state.evidence.find((candidate) => candidate.id === input);
+		if (evidence) return evidence.task_id;
+	}
+	return undefined;
+}
+
+function latestDecisions(records: readonly DecisionRecord[], state: PersistentState, taskIds: Set<string>): string[] {
+	const latest = new Map<string, { record: DecisionRecord; task_id: string }>();
+	for (const record of records) {
+		const taskId = resolveDecisionTaskId(record, state);
+		if (!taskId || !taskIds.has(taskId)) continue;
+		const key = `${taskId}\0${record.decision_type}`;
+		const current = latest.get(key);
+		if (
+			!current ||
+			record.at > current.record.at ||
+			(record.at === current.record.at && record.id.localeCompare(current.record.id) > 0)
+		)
+			latest.set(key, { record, task_id: taskId });
+	}
+	return [...latest.values()]
+		.sort(
+			(left, right) =>
+				left.task_id.localeCompare(right.task_id) ||
+				left.record.decision_type.localeCompare(right.record.decision_type),
+		)
+		.map((entry) => `${entry.task_id}:${entry.record.decision_type}:${entry.record.decision}`);
+}
+
+function validReceipt(state: PersistentState, taskId: string) {
+	const receipt = state.handoff_receipts.find((candidate) => candidate.task_id === taskId);
+	const task = state.tasks.find((candidate) => candidate.id === taskId);
+	const binding = state.handoff_bindings[taskId];
+	const latestRun = state.runs.filter((candidate) => candidate.task_id === taskId).at(-1);
+	return receipt &&
+		task?.state === receipt.status &&
+		binding?.task_revision === task.task_revision &&
+		binding.run_id === latestRun?.id
+		? receipt
+		: undefined;
+}
+
+function receiptErrorFingerprint(errorSummary: string | undefined): string | undefined {
+	const match = errorSummary?.match(/\berror_fingerprint=([A-Za-z0-9_-]+)/);
+	return match?.[1];
+}
+
+export function validateContextCompactionReport(value: unknown): ValidationResult<ContextCompactionReport> {
+	if (!Value.Check(ContextCompactionReportSchema, value))
+		return {
+			valid: false,
+			errors: [...Value.Errors(ContextCompactionReportSchema, value)].map((error) => {
+				const path = "path" in error && typeof error.path === "string" ? error.path : "/";
+				return `${path || "/"}: ${error.message}`;
+			}),
+		};
+	return { valid: true, value: value as ContextCompactionReport, errors: [] };
+}
+
 export class ContextCompactionPolicy {
-	buildReport(summaries: readonly EvidenceSummary[]): string {
-		return summaries
-			.map(
-				(summary) =>
-					`${summary.task_id}: ${summary.status} — ${summary.summary} [evidence:${summary.evidence_ref}]`,
-			)
-			.join("\n");
+	buildReport(input: ContextCompactionBuildInput): ContextCompactionReport {
+		const state = input.state;
+		const taskIds = new Set(input.task_ids ?? state.tasks.map((task) => task.id));
+		const tasks = state.tasks.filter((task) => taskIds.has(task.id));
+		const receipts = tasks.map((task) => validReceipt(state, task.id)).filter((receipt) => receipt !== undefined);
+		const anchorTaskId = input.anchor_task_id ?? (taskIds.size === 1 ? [...taskIds][0] : undefined);
+		const anchorReceipt = anchorTaskId ? validReceipt(state, anchorTaskId) : undefined;
+		const anchorRun = anchorTaskId ? state.runs.filter((run) => run.task_id === anchorTaskId).at(-1) : undefined;
+		const currentRevisionByTask = new Map(tasks.map((task) => [task.id, task.task_revision]));
+		const passingEvidenceIds = unique(
+			state.verifications
+				.filter(
+					(verification) =>
+						taskIds.has(verification.task_id) &&
+						verification.status === "PASS" &&
+						verification.task_revision === currentRevisionByTask.get(verification.task_id) &&
+						verification.evidence_id !== undefined &&
+						state.evidence.some(
+							(evidence) =>
+								evidence.id === verification.evidence_id && evidence.task_id === verification.task_id,
+						),
+				)
+				.map((verification) => verification.evidence_id as string),
+		).sort();
+		const currentEvidence = state.evidence.filter(
+			(evidence) =>
+				taskIds.has(evidence.task_id) &&
+				evidence.delivery_evidence_package?.task_revision === currentRevisionByTask.get(evidence.task_id),
+		);
+		const fingerprints = unique([
+			...(input.tool_results ?? [])
+				.map((toolResult) => toolResult.error_fingerprint)
+				.filter((fingerprint): fingerprint is string => fingerprint !== null),
+			...currentEvidence.flatMap((evidence) =>
+				(evidence.tool_results ?? [])
+					.map((toolResult) => toolResult.error_fingerprint)
+					.filter((fingerprint): fingerprint is string => fingerprint !== null),
+			),
+			...receipts
+				.map((receipt) => receiptErrorFingerprint(receipt.failure?.error_summary))
+				.filter((fingerprint): fingerprint is string => fingerprint !== undefined),
+		]).sort();
+		const report: ContextCompactionReport = {
+			facts: [],
+			decisions: latestDecisions(state.decisions, state, taskIds),
+			completed_tasks: tasks
+				.filter((task) => task.state === "DONE")
+				.map((task) => task.id)
+				.sort(),
+			open_tasks: tasks
+				.filter((task) => !["DONE", "CANCELLED", "OBSOLETE"].includes(task.state))
+				.map((task) => task.id)
+				.sort(),
+			open_risks: unique(receipts.flatMap((receipt) => receipt.unresolved_risks)).sort(),
+			verified_evidence: passingEvidenceIds,
+			failed_attempts: fingerprints.map((fingerprint) => ({ error_fingerprint: fingerprint })),
+			next_action: input.next_action ?? anchorReceipt?.next_action ?? "",
+			git_sha: input.git_sha ?? anchorReceipt?.git_sha ?? anchorRun?.workspace_commit_hash ?? "",
+			artifact_refs: unique([
+				...(input.artifact_refs ?? []),
+				...(input.tool_results ?? []).map((toolResult) => toolResult.artifact_id),
+				...currentEvidence.flatMap((evidence) => [
+					...evidence.artifacts,
+					...(evidence.tool_results ?? []).map((toolResult) => toolResult.artifact_id),
+				]),
+				...receipts.flatMap((receipt) => receipt.failure?.artifact_refs ?? []),
+			]).sort(),
+		};
+		const validation = validateContextCompactionReport(report);
+		if (!validation.valid) throw new Error(`invalid context compaction report: ${validation.errors.join("; ")}`);
+		return structuredClone(report);
 	}
 }
 

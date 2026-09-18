@@ -47,7 +47,6 @@ import type {
 	DispatchDecision,
 	DispatchRecord,
 	EvidenceRecord,
-	EvidenceSummary,
 	ExecutionTrace,
 	Lease,
 	MasterHandoffReceipt,
@@ -758,25 +757,19 @@ export class PersonalPiPipeline {
 						task.id,
 						task.task_revision,
 					);
-					const summaries: EvidenceSummary[] = [
-						{
-							task_id: task.id,
-							status: "UNKNOWN",
-							summary: `context rebuild: ${error.message}`,
-							evidence_ref: budgetArtifact.digest,
-						},
-						...workerToolResults.map((toolResult) => ({
-							task_id: task.id,
-							status: "UNKNOWN" as const,
-							summary: [toolResult.stdout_summary, toolResult.stderr_summary].filter(Boolean).join(" | "),
-							evidence_ref: toolResult.artifact_id,
-						})),
-					];
-					const report = new ContextCompactionPolicy().buildReport(summaries);
+					const report = new ContextCompactionPolicy().buildReport({
+						state: this.stateStore.read(),
+						task_ids: [task.id],
+						anchor_task_id: task.id,
+						tool_results: workerToolResults,
+						next_action: "continue same Task with Fresh Context",
+						git_sha: request.snapshot.commit_hash,
+						artifact_refs: [budgetArtifact.digest],
+					});
 					const reportArtifact = this.artifactStore.put(
 						"context_compaction_report",
 						1,
-						{ report, source_refs: summaries.map((summary) => summary.evidence_ref) },
+						JSON.parse(JSON.stringify(report)),
 						task.id,
 						task.task_revision,
 					);
@@ -811,7 +804,15 @@ export class PersonalPiPipeline {
 							reasons: ["loop budget exhausted: no room for Fresh Context rebuild state"],
 						});
 					}
-					const reportContent = report.slice(0, remaining * 4);
+					const reportContent = JSON.stringify(report);
+					if (Math.max(1, Math.ceil(reportContent.length / 4)) > remaining) {
+						throw new LoopBudgetExhaustedError({
+							allowed: false,
+							projected: this.loopBudgetController.usage(task.id),
+							exhausted: ["max_input_tokens"],
+							reasons: ["loop budget exhausted: structured Fresh Context report exceeds remaining budget"],
+						});
+					}
 					freshItems.push({
 						digest: reportArtifact.digest,
 						content: reportContent,
