@@ -18,7 +18,7 @@ import {
 	ReferenceArchitecturePlaybook,
 } from "./planning.ts";
 import { createProtocolEnvelope } from "./protocol.ts";
-import { evaluateDefinitionOfReady } from "./readiness.ts";
+import { type DefinitionOfReadyInput, evaluateDefinitionOfReady } from "./readiness.ts";
 import type { VerificationRecipeRegistry } from "./recipes.ts";
 import { ensureWorkReceipt, validateResultContract } from "./result.ts";
 import { createTaskRecord, TaskStateMachine } from "./state-machine.ts";
@@ -105,6 +105,7 @@ export interface PipelineRequest {
 	snapshot: WorkspaceSnapshot;
 	current_snapshot?: WorkspaceSnapshot;
 	existing_task?: TaskRecord;
+	definition_of_ready?: DefinitionOfReadyInput;
 	at?: string;
 }
 
@@ -229,6 +230,15 @@ export class PersonalPiPipeline {
 		this.loopBudgetController = new LoopBudgetController(this.stateStore);
 	}
 
+	probeDispatchCapability(task: TaskContract, roleProfile?: RoleProfile): DispatchDecision {
+		const assessment = crossCheckAssessment(
+			assessTask(task.objective, task.scope.files),
+			task.objective,
+			task.scope.files,
+		);
+		return createDispatchDecision(task, assessment, roleProfile);
+	}
+
 	async execute(request: PipelineRequest): Promise<PipelineExecution> {
 		const at = request.at ?? new Date().toISOString();
 		const tracer = new TraceRecorder(request.task.id, undefined, at);
@@ -349,7 +359,16 @@ export class PersonalPiPipeline {
 			task = this.stateStore.createTask(request.task);
 		}
 		tracer.record("TASK", "Task Contract persisted", at);
-		const definitionOfReady = evaluateDefinitionOfReady(request.task, true);
+		const definitionOfReadyInput = request.definition_of_ready ?? {
+			dependencies_ready: request.task.dependencies.length === 0,
+			artifact_edges: [],
+		};
+		const definitionOfReady = evaluateDefinitionOfReady(
+			request.task,
+			definitionOfReadyInput.dependencies_ready,
+			definitionOfReadyInput.artifact_edges,
+			definitionOfReadyInput.artifact_store,
+		);
 		if (!definitionOfReady.ready) {
 			task = this.stateStore.updateTask(
 				new TaskStateMachine().transition(task, "BLOCKED", definitionOfReady.reasons.join("; "), at),

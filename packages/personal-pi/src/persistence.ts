@@ -125,6 +125,10 @@ export class PersistentStateStore {
 		return this.read();
 	}
 
+	probeWriteCapability(): void {
+		this.transact(() => {});
+	}
+
 	upsertWorkerInstance(instance: WorkerInstanceRecord): void {
 		this.transact((state) => {
 			state.worker_instances[instance.worker_instance_id] = structuredClone(instance);

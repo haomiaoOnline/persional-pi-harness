@@ -12,6 +12,7 @@ export * from "./evidence.ts";
 export * from "./external-gaps.ts";
 export * from "./graph.ts";
 export * from "./graph-intelligence.ts";
+export * from "./ingress.ts";
 export * from "./learned-routing.ts";
 export * from "./lease.ts";
 export * from "./lifecycle-hooks.ts";

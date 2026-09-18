@@ -94,6 +94,11 @@ export class LoopBudgetController {
 		this.store = store;
 	}
 
+	probeAvailability(task: Pick<TaskContract, "id" | "loop_budget">): void {
+		if (!task.loop_budget) throw new LoopBudgetMissingError(task.id);
+		evaluateLoopBudget(task, emptyLoopUsage());
+	}
+
 	beforeRun(task: Pick<TaskContract, "id" | "loop_budget">): LoopUsage {
 		return this.record(task, { attempts: 1 });
 	}
