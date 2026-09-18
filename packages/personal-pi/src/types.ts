@@ -805,6 +805,8 @@ export interface PersistentState {
 	projects: ProjectRecord[];
 	task_ledger: TaskLedgerBinding[];
 	acceptances: AcceptanceRecord[];
+	human_approvals: HumanApprovalRecord[];
+	delivery_actions: DeliveryActionRecord[];
 	handoff_receipts: MasterHandoffReceipt[];
 	handoff_bindings: Record<string, MasterHandoffBinding>;
 	tasks: TaskRecord[];
@@ -940,6 +942,66 @@ export interface AcceptanceRecord {
 	provider_mode?: ProviderMode;
 	accepted_at: string;
 }
+
+export type HumanApprovalAction = "commit" | "push" | "publish";
+
+export interface HumanApprovalRecord {
+	id: string;
+	task_id: string;
+	task_revision: number;
+	action: HumanApprovalAction;
+	action_digest: string;
+	expires_at: string;
+	approved_at: string;
+	approved_by: string;
+}
+
+interface DeliveryActionRecordBase {
+	id: string;
+	task_id: string;
+	task_revision: number;
+	approval_id: string;
+	action_digest: string;
+	acceptance_id: string;
+	evidence_id: string;
+	delivery_evidence_package_digest: string;
+	attempted_at: string;
+	detail?: string;
+}
+
+export type DeliveryActionRecord =
+	| (DeliveryActionRecordBase & {
+			action: "commit";
+			status: "COMMITTED";
+			repo_path: string;
+			scope_files: string[];
+			commit_sha: string;
+			parent_sha: string;
+	  })
+	| (DeliveryActionRecordBase & {
+			action: "commit";
+			status: "FAILED" | "BLOCKED";
+			repo_path: string;
+			scope_files: string[];
+			commit_sha?: string;
+			parent_sha: string;
+	  })
+	| (DeliveryActionRecordBase & {
+			action: "push";
+			status: "PUSHED" | "FAILED" | "BLOCKED";
+			repo_path: string;
+			commit_sha: string;
+			remote: string;
+			refspec: string;
+	  })
+	| (DeliveryActionRecordBase & {
+			action: "publish";
+			status: "PUBLISHED" | "FAILED" | "BLOCKED";
+			commit_sha: string;
+			package_name: string;
+			version: string;
+			registry: string;
+	  });
 
 export interface DispatchRecord {
 	id: string;

@@ -75,6 +75,12 @@ const DEFAULT_RULES: readonly CommandRiskRule[] = [
 		match: { pattern: "^(npm|pnpm)\\s+publish(?:\\s|$)" },
 		reason: "publishes a package",
 	},
+	{
+		id: "risky-git-bulk-add",
+		risk: "risky",
+		match: { pattern: "^git\\s+add\\s+(?:-A(?:\\s|$)|--all(?:\\s|$)|(?:--\\s+)?\\.(?:\\s|$))" },
+		reason: "bulk staging can include files outside the Task Contract scope",
+	},
 	{ id: "risky-git-write", risk: "risky", match: { prefix: "git commit" }, reason: "changes repository history" },
 	{ id: "risky-git-push", risk: "risky", match: { prefix: "git push" }, reason: "writes to a remote repository" },
 	{

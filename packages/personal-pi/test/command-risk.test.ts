@@ -18,6 +18,9 @@ describe("T10.4 command risk classification", () => {
 		const classifier = new CommandRiskClassifier();
 		expect(classifier.classify("git status").risk).toBe("safe");
 		expect(classifier.classify("git push origin feature").risk).toBe("risky");
+		for (const command of ["git add .", "git add -A", "git add --all", "git add -- ."]) {
+			expect(classifier.classify(command)).toMatchObject({ risk: "risky", rule_id: "risky-git-bulk-add" });
+		}
 		expect(classifier.classify("rm -rf tmp").risk).toBe("danger");
 	});
 

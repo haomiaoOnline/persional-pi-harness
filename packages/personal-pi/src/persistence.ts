@@ -3,6 +3,11 @@ import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { deliveryEvidencePackageDigest, validateDeliveryEvidencePackage } from "./evidence.ts";
 import { validateMasterHandoffReceipt } from "./handoff.ts";
+import {
+	assertHumanApprovalAuthorizes,
+	validateDeliveryActionRecord,
+	validateHumanApprovalRecord,
+} from "./human-approval.ts";
 import { validateModelIdentity, validateResultContract, validateWorkerStatus } from "./result.ts";
 import { validateRoleProfile } from "./roles.ts";
 import { validateTaskContract } from "./schema.ts";
@@ -13,9 +18,12 @@ import type {
 	AcceptanceRecord,
 	ControlPlaneReconstruction,
 	DecisionRecord,
+	DeliveryActionRecord,
 	DispatchRecord,
 	EvidenceRecord,
 	ExecutionTrace,
+	HumanApprovalAction,
+	HumanApprovalRecord,
 	LoopUsage,
 	MasterHandoffBinding,
 	MasterHandoffReceipt,
@@ -88,6 +96,104 @@ function assertCanonicalEvidenceHistoryInvariant(previous: PersistentState, cand
 			if (JSON.stringify(current) !== JSON.stringify(existing))
 				throw new Error(`canonical ${collection} record is immutable: ${existing.id}`);
 		}
+	}
+}
+
+function assertImmutableDeliveryHistoryInvariant(previous: PersistentState, candidate: PersistentState): void {
+	for (const collection of ["human_approvals", "delivery_actions"] as const) {
+		const candidateEntries = candidate[collection];
+		const ids = new Set<string>();
+		for (const entry of candidateEntries) {
+			if (ids.has(entry.id)) throw new Error(`duplicate ${collection} id: ${entry.id}`);
+			ids.add(entry.id);
+		}
+		for (const existing of previous[collection]) {
+			const current = candidateEntries.find((entry) => entry.id === existing.id);
+			if (!current) throw new Error(`${collection} record cannot be deleted: ${existing.id}`);
+			if (JSON.stringify(current) !== JSON.stringify(existing))
+				throw new Error(`${collection} record is immutable: ${existing.id}`);
+		}
+		for (const added of candidateEntries.filter(
+			(entry) => !previous[collection].some((existing) => existing.id === entry.id),
+		)) {
+			const task = candidate.tasks.find((candidateTask) => candidateTask.id === added.task_id);
+			if (!task) throw new Error(`${collection} record references unknown task: ${added.task_id}`);
+			if (task.task_revision !== added.task_revision)
+				throw new Error(`${collection} record task revision is stale: ${added.task_id}@${added.task_revision}`);
+		}
+	}
+}
+
+function assertDeliveryAuthorizationStateInvariant(state: PersistentState): void {
+	const approvalIds = new Set<string>();
+	for (const approval of state.human_approvals) {
+		validateHumanApprovalRecord(approval);
+		if (approvalIds.has(approval.id)) throw new Error(`duplicate human approval id: ${approval.id}`);
+		approvalIds.add(approval.id);
+		if (!state.tasks.some((task) => task.id === approval.task_id))
+			throw new Error(`human approval ${approval.id} references unknown task ${approval.task_id}`);
+	}
+
+	const actionIds = new Set<string>();
+	const usedApprovalIds = new Set<string>();
+	for (const action of state.delivery_actions) {
+		validateDeliveryActionRecord(action);
+		if (actionIds.has(action.id)) throw new Error(`duplicate delivery action id: ${action.id}`);
+		actionIds.add(action.id);
+		const task = state.tasks.find((candidate) => candidate.id === action.task_id);
+		if (!task) throw new Error(`delivery action ${action.id} references unknown task ${action.task_id}`);
+		if (action.action === "commit" && task.task_revision === action.task_revision) {
+			const taskScope = [...task.scope.files].sort();
+			const recordedScope = [...action.scope_files].sort();
+			if (JSON.stringify(recordedScope) !== JSON.stringify(taskScope))
+				throw new Error(`delivery action ${action.id} commit scope does not match TaskContract.scope.files`);
+		}
+		const approval = state.human_approvals.find((candidate) => candidate.id === action.approval_id);
+		if (!approval) throw new Error(`delivery action ${action.id} references unknown approval ${action.approval_id}`);
+		if (usedApprovalIds.has(approval.id))
+			throw new Error(`human approval reused by multiple delivery actions: ${approval.id}`);
+		usedApprovalIds.add(approval.id);
+		try {
+			assertHumanApprovalAuthorizes(approval, {
+				task_id: action.task_id,
+				task_revision: action.task_revision,
+				action: action.action,
+				action_digest: action.action_digest,
+				now: action.attempted_at,
+			});
+		} catch (error) {
+			throw new Error(
+				`delivery action ${action.id} does not match its human approval binding: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+
+		const acceptance = state.acceptances.find((candidate) => candidate.id === action.acceptance_id);
+		if (
+			!acceptance ||
+			acceptance.task_id !== action.task_id ||
+			acceptance.task_revision !== action.task_revision ||
+			acceptance.evidence_id !== action.evidence_id
+		)
+			throw new Error(`delivery action ${action.id} has invalid Acceptance binding`);
+		const evidence = state.evidence.find((candidate) => candidate.id === action.evidence_id);
+		if (!evidence || evidence.task_id !== action.task_id || evidence.run_id !== acceptance.run_id)
+			throw new Error(`delivery action ${action.id} has invalid Evidence binding`);
+		const packageValidation = validateDeliveryEvidencePackage(evidence.delivery_evidence_package);
+		if (!packageValidation.valid || !packageValidation.value)
+			throw new Error(`delivery action ${action.id} is missing standardized Evidence package binding`);
+		const packageDigest = deliveryEvidencePackageDigest(packageValidation.value);
+		if (action.delivery_evidence_package_digest !== packageDigest)
+			throw new Error(`delivery action ${action.id} delivery Evidence package digest mismatch`);
+		const verification = state.verifications.find((candidate) => candidate.id === acceptance.verification_id);
+		if (
+			!verification ||
+			verification.task_id !== action.task_id ||
+			verification.task_revision !== action.task_revision ||
+			verification.evidence_id !== evidence.id ||
+			verification.delivery_evidence_package_digest !== packageDigest ||
+			verification.status !== "PASS"
+		)
+			throw new Error(`delivery action ${action.id} is not backed by canonical Verification PASS`);
 	}
 }
 
@@ -259,6 +365,7 @@ export class PersistentStateStore {
 			if (this.filePath && existsSync(this.filePath)) this.state = loadPersistentState(this.filePath);
 		}
 		assertWorkerRuntimeInvariant(this.state);
+		assertDeliveryAuthorizationStateInvariant(this.state);
 	}
 
 	read(): PersistentState {
@@ -275,6 +382,8 @@ export class PersistentStateStore {
 		assertWorkerRuntimeInvariant(candidate);
 		assertDoneAcceptanceInvariant(this.state, candidate);
 		assertCanonicalEvidenceHistoryInvariant(this.state, candidate);
+		assertImmutableDeliveryHistoryInvariant(this.state, candidate);
+		assertDeliveryAuthorizationStateInvariant(candidate);
 		if (this.filePath) writeAtomically(this.filePath, candidate);
 		this.state = candidate;
 		return this.read();
@@ -427,6 +536,66 @@ export class PersistentStateStore {
 			state.tasks[taskIndex] = structuredClone(accepted);
 		});
 		return { task: structuredClone(accepted), acceptance: structuredClone(acceptance) };
+	}
+
+	saveHumanApproval(approval: HumanApprovalRecord, now = new Date().toISOString()): HumanApprovalRecord {
+		assertHumanApprovalAuthorizes(approval, {
+			task_id: approval.task_id,
+			task_revision: approval.task_revision,
+			action: approval.action,
+			action_digest: approval.action_digest,
+			now,
+		});
+		const task = this.state.tasks.find((candidate) => candidate.id === approval.task_id);
+		if (!task) throw new Error(`unknown task for human approval: ${approval.task_id}`);
+		if (task.task_revision !== approval.task_revision)
+			throw new Error(`human approval task revision is stale: ${approval.task_id}@${approval.task_revision}`);
+		if (this.state.human_approvals.some((candidate) => candidate.id === approval.id))
+			throw new Error(`human approval already exists: ${approval.id}`);
+		this.transact((state) => state.human_approvals.push(structuredClone(approval)));
+		return structuredClone(approval);
+	}
+
+	getHumanApproval(approvalId: string): HumanApprovalRecord | undefined {
+		const approval = this.state.human_approvals.find((candidate) => candidate.id === approvalId);
+		return approval ? structuredClone(approval) : undefined;
+	}
+
+	listHumanApprovals(taskId?: string, action?: HumanApprovalAction): HumanApprovalRecord[] {
+		return this.state.human_approvals
+			.filter(
+				(approval) =>
+					(taskId === undefined || approval.task_id === taskId) &&
+					(action === undefined || approval.action === action),
+			)
+			.map((approval) => structuredClone(approval));
+	}
+
+	saveDeliveryAction(action: DeliveryActionRecord): DeliveryActionRecord {
+		validateDeliveryActionRecord(action);
+		const task = this.state.tasks.find((candidate) => candidate.id === action.task_id);
+		if (!task) throw new Error(`unknown task for delivery action: ${action.task_id}`);
+		if (task.task_revision !== action.task_revision)
+			throw new Error(`delivery action task revision is stale: ${action.task_id}@${action.task_revision}`);
+		if (this.state.delivery_actions.some((candidate) => candidate.id === action.id))
+			throw new Error(`delivery action already exists: ${action.id}`);
+		this.transact((state) => state.delivery_actions.push(structuredClone(action)));
+		return structuredClone(action);
+	}
+
+	getDeliveryAction(actionId: string): DeliveryActionRecord | undefined {
+		const action = this.state.delivery_actions.find((candidate) => candidate.id === actionId);
+		return action ? structuredClone(action) : undefined;
+	}
+
+	listDeliveryActions(taskId?: string, action?: HumanApprovalAction): DeliveryActionRecord[] {
+		return this.state.delivery_actions
+			.filter(
+				(record) =>
+					(taskId === undefined || record.task_id === taskId) &&
+					(action === undefined || record.action === action),
+			)
+			.map((record) => structuredClone(record));
 	}
 
 	createRun(
@@ -814,6 +983,8 @@ export class PersistentStateStore {
 		};
 		candidate.snapshot_payloads = knownPayloads;
 		assertWorkerRuntimeInvariant(candidate);
+		assertImmutableDeliveryHistoryInvariant(this.state, candidate);
+		assertDeliveryAuthorizationStateInvariant(candidate);
 		if (this.filePath) writeAtomically(this.filePath, candidate);
 		this.state = candidate;
 		return this.read();
