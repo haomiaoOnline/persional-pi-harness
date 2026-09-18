@@ -7,6 +7,7 @@ import { processImage } from "../../utils/image-process.ts";
 import { detectSupportedImageMimeTypeFromFile } from "../../utils/mime.ts";
 import type { ExtensionContext, ToolDefinition } from "../extensions/types.ts";
 import { resolveReadPathAsync } from "./path-utils.ts";
+import { persistBoundedRawResult, type RawResultBackingDetails } from "./raw-result-backing.ts";
 import { readRenderers } from "./renderers/read.ts";
 import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, type TruncationResult, truncateHead } from "./truncate.ts";
@@ -24,7 +25,7 @@ export const readToolSystemPromptContribution = {
 
 export type ReadToolInput = Static<typeof readSchema>;
 
-export interface ReadToolDetails {
+export interface ReadToolDetails extends Partial<RawResultBackingDetails> {
 	truncation?: TruncationResult;
 }
 
@@ -148,12 +149,18 @@ export function createReadToolDefinition(
 								}
 								// Apply truncation, respecting both line and byte limits.
 								const truncation = truncateHead(selectedContent);
+								const hasLimitNotice =
+									userLimitedLines !== undefined && startLine + userLimitedLines < allLines.length;
+								const rawBacking =
+									truncation.truncated || hasLimitNotice
+										? persistBoundedRawResult(selectedContent, "pi-read-result")
+										: undefined;
 								let outputText: string;
 								if (truncation.firstLineExceedsLimit) {
 									// First line alone exceeds the byte limit. Point the model at a bash fallback.
 									const firstLineSize = formatSize(Buffer.byteLength(allLines[startLine], "utf-8"));
 									outputText = `[Line ${startLineDisplay} is ${firstLineSize}, exceeds ${formatSize(DEFAULT_MAX_BYTES)} limit. Use bash: sed -n '${startLineDisplay}p' ${path} | head -c ${DEFAULT_MAX_BYTES}]`;
-									details = { truncation };
+									details = { ...rawBacking, truncation };
 								} else if (truncation.truncated) {
 									// Truncation occurred. Build an actionable continuation notice.
 									const endLineDisplay = startLineDisplay + truncation.outputLines - 1;
@@ -164,8 +171,8 @@ export function createReadToolDefinition(
 									} else {
 										outputText += `\n\n[Showing lines ${startLineDisplay}-${endLineDisplay} of ${totalFileLines} (${formatSize(DEFAULT_MAX_BYTES)} limit). Use offset=${nextOffset} to continue.]`;
 									}
-									details = { truncation };
-								} else if (userLimitedLines !== undefined && startLine + userLimitedLines < allLines.length) {
+									details = { ...rawBacking, truncation };
+								} else if (hasLimitNotice && userLimitedLines !== undefined) {
 									// User-specified limit stopped early, but the file still has more content.
 									const remaining = allLines.length - (startLine + userLimitedLines);
 									const nextOffset = startLine + userLimitedLines + 1;
@@ -174,6 +181,7 @@ export function createReadToolDefinition(
 									// No truncation and no remaining user-limited content.
 									outputText = truncation.content;
 								}
+								if (rawBacking) details ??= rawBacking;
 								content = [{ type: "text", text: outputText }];
 							}
 

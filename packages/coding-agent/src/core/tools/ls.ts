@@ -4,6 +4,7 @@ import nodePath from "path";
 import { type Static, Type } from "typebox";
 import type { ExtensionContext, ToolDefinition } from "../extensions/types.ts";
 import { pathExists, resolveToCwd } from "./path-utils.ts";
+import { persistBoundedRawResult, type RawResultBackingDetails } from "./raw-result-backing.ts";
 import { lsRenderers } from "./renderers/ls.ts";
 import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 import { DEFAULT_MAX_BYTES, formatSize, type TruncationResult, truncateHead } from "./truncate.ts";
@@ -22,7 +23,7 @@ export type LsToolInput = Static<typeof lsSchema>;
 
 const DEFAULT_LIMIT = 500;
 
-export interface LsToolDetails {
+export interface LsToolDetails extends Partial<RawResultBackingDetails> {
 	truncation?: TruncationResult;
 	entryLimitReached?: number;
 }
@@ -139,8 +140,12 @@ export function createLsToolDefinition(
 						const rawOutput = results.join("\n");
 						// Apply byte truncation. There is no separate line limit because entry count is already capped.
 						const truncation = truncateHead(rawOutput, { maxLines: Number.MAX_SAFE_INTEGER });
+						const rawBacking =
+							entryLimitReached || truncation.truncated
+								? persistBoundedRawResult(rawOutput, "pi-ls-result")
+								: undefined;
 						let output = truncation.content;
-						const details: LsToolDetails = {};
+						const details: LsToolDetails = { ...rawBacking };
 						// Build actionable notices for truncation and entry limits.
 						const notices: string[] = [];
 						if (entryLimitReached) {

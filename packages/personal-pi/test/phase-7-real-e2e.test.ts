@@ -88,19 +88,20 @@ function commandEvidence(action: string, target: string, command: string): Comma
 }
 
 function taskFor(id: string, action: string, target: string): TaskContract {
+	const verificationCommand = `node --test verifier:${action}`;
 	return makeV3Task(id, {
 		title: `Run ${action} in a real local Worker process`,
 		objective: `Execute ${action} and verify the resulting artifact`,
 		scope: { files: [target] },
 		permissions: {
 			filesystem: { read: [target], write: [target] },
-			shell: { allowed: [`verify:${action}`] },
+			shell: { allowed: [verificationCommand] },
 			network: "deny",
 			credentials: "deny",
 		},
 		verification: {
 			strategy: "automated",
-			commands: [`verify:${action}`],
+			commands: [verificationCommand],
 			checks: ["independent verifier exits zero"],
 			evidence_required: ["independent_command"],
 			strength: "strong",
@@ -128,7 +129,7 @@ describe("T7.1 real local E2E", () => {
 		for (const [id, action] of cases) {
 			const target = join(directory, `${id}.out`);
 			const task = taskFor(id, action, target);
-			const command = `verify:${action}`;
+			const command = task.verification.commands[0] ?? "node --test verifier";
 			const execution = await pipeline.execute({
 				...planFor(task),
 				requirement: requirementFor(`verified ${action} artifact`),

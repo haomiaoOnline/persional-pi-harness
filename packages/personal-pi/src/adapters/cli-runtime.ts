@@ -8,6 +8,7 @@ import type {
 	ModelIdentity,
 	ResultContract,
 	TaskContract,
+	ToolResultEnvelope,
 	WorkerExecutionControls,
 	WorkerExecutionInput,
 	WorkerExecutionOutput,
@@ -55,6 +56,7 @@ export interface CliObservation {
 	model_calls: number;
 	tool_calls: number;
 	tools: ToolObservation[];
+	tool_results: ToolResultEnvelope[];
 	mutated_paths: string[];
 	pending_mutations: Map<string, string>;
 	provider?: string;
@@ -147,6 +149,7 @@ export function createCliObservation(): CliObservation {
 		model_calls: 0,
 		tool_calls: 0,
 		tools: [],
+		tool_results: [],
 		mutated_paths: [],
 		pending_mutations: new Map(),
 		timed_out: false,

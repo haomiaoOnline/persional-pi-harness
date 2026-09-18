@@ -41,7 +41,6 @@ export interface VerificationRequest {
 	evidence: EvidenceRecord;
 	snapshot: WorkspaceSnapshot;
 	currentSnapshot?: WorkspaceSnapshot;
-	commandRunner?: CommandRunner;
 	recipeRegistry?: VerificationRecipeRegistry;
 	workerStatus?: ResultStatus;
 	result?: SanitizedVerifierResult;
@@ -59,6 +58,7 @@ export interface VerifierInput {
 	evidence: {
 		diff: EvidenceRecord["diff"];
 		commands: EvidenceRecord["commands"];
+		tool_results?: EvidenceRecord["tool_results"];
 		test_result?: string;
 		build_result?: string;
 		artifacts: string[];
@@ -80,6 +80,7 @@ export function buildVerifierInput(request: VerificationRequest): VerifierInput 
 		evidence: {
 			diff: structuredClone(request.evidence.diff),
 			commands: structuredClone(request.evidence.commands),
+			tool_results: request.evidence.tool_results ? structuredClone(request.evidence.tool_results) : undefined,
 			test_result: request.evidence.test_result,
 			build_result: request.evidence.build_result,
 			artifacts: [...request.evidence.artifacts],
@@ -183,17 +184,7 @@ export class VerificationEngine {
 
 		const commandResults = new Map(request.evidence.commands.map((command) => [command.command, command]));
 		for (const command of request.task.verification.commands) {
-			let result = commandResults.get(command);
-			if (!result && request.commandRunner) {
-				try {
-					result = await request.commandRunner(command);
-				} catch (error) {
-					status = "UNKNOWN";
-					reasons.push(
-						`verification environment error: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
-			}
+			const result = commandResults.get(command);
 			if (!result) {
 				status = "UNKNOWN";
 				reasons.push(`missing command evidence: ${command}`);

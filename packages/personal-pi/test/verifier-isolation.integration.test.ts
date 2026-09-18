@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
 	buildVerifierInput,
+	type CommandEvidence,
 	captureWorkspaceSnapshot,
 	EvidenceCollector,
 	sanitizeResultForVerification,
@@ -8,11 +9,12 @@ import {
 } from "../src/index.ts";
 import { makeV3Task } from "./v3-fixtures.ts";
 
-function evidence(taskId: string) {
+function evidence(taskId: string, commands: CommandEvidence[] = []) {
 	return new EvidenceCollector().collect({
 		task_id: taskId,
 		run_id: "run-isolation",
 		changed_files: [],
+		commands,
 		stdout: "worker claimed success",
 		evidence_types: ["worker_result"],
 	});
@@ -71,14 +73,15 @@ describe("T4.2-A verifier context isolation", () => {
 		delete (stripped as { summary?: string }).summary;
 		const base = {
 			task,
-			evidence: evidence(task.id),
+			evidence: evidence(task.id, [
+				{
+					command: "deterministic-failing-check",
+					exit_code: 1,
+					stdout: "",
+					stderr: "assertion failed",
+				},
+			]),
 			snapshot: captureWorkspaceSnapshot("metamorphic", [], []),
-			commandRunner: () => ({
-				command: "deterministic-failing-check",
-				exit_code: 1,
-				stdout: "",
-				stderr: "assertion failed",
-			}),
 		};
 		const withExplanation = await new VerificationEngine().verify({ ...base, result: workerResult });
 		const withoutExplanation = await new VerificationEngine().verify({ ...base, result: stripped });

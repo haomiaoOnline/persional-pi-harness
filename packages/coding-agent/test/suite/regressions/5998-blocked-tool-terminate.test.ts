@@ -50,4 +50,45 @@ describe("#5998 blocked tool termination", () => {
 			harness.session.messages.find((message) => message.role === "toolResult" && message.isError),
 		).toBeDefined();
 	});
+
+	it("fails closed when tool_result shaping throws without exposing the native result", async () => {
+		const echoTool: AgentTool = {
+			name: "echo",
+			label: "Echo",
+			description: "Echo raw text back",
+			parameters: Type.Object({ text: Type.String() }),
+			execute: async () => ({
+				content: [{ type: "text", text: "RAW_NATIVE_RESULT_MUST_NOT_ESCAPE" }],
+				details: { raw: true },
+			}),
+		};
+		const harness = await createHarness({
+			tools: [echoTool],
+			extensionFactories: [
+				(pi) => {
+					pi.on("tool_result", async () => {
+						throw new Error("gateway archive failed");
+					});
+				},
+			],
+		});
+		harnesses.push(harness);
+		harness.setResponses([
+			fauxAssistantMessage([fauxToolCall("echo", { text: "hello" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage("should not run after gateway failure"),
+		]);
+
+		await harness.session.prompt("hi");
+
+		expect(harness.getPendingResponseCount()).toBe(1);
+		const toolResult = harness.session.messages.find((message) => message.role === "toolResult");
+		expect(toolResult?.role === "toolResult" ? toolResult.isError : false).toBe(true);
+		expect(toolResult?.role === "toolResult" ? JSON.stringify(toolResult.content) : "").toContain(
+			"Tool result processing failed closed",
+		);
+		expect(toolResult?.role === "toolResult" ? JSON.stringify(toolResult.content) : "").not.toContain(
+			"RAW_NATIVE_RESULT_MUST_NOT_ESCAPE",
+		);
+		expect(harness.eventsOfType("tool_execution_end")[0]?.result).toHaveProperty("terminate", true);
+	});
 });

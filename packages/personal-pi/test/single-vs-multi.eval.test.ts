@@ -87,19 +87,20 @@ async function verifyArtifact(action: string, target: string, command: string): 
 }
 
 function taskFor(id: string, action: string, target: string): TaskContract {
+	const verificationCommand = `node --test verifier:${action}`;
 	return makeV3Task(id, {
 		title: `Benchmark ${action}`,
 		objective: `Execute ${action} and independently verify the artifact`,
 		scope: { files: [target] },
 		permissions: {
 			filesystem: { read: [target], write: [target] },
-			shell: { allowed: [`verify:${action}`] },
+			shell: { allowed: [verificationCommand] },
 			network: "deny",
 			credentials: "deny",
 		},
 		verification: {
 			strategy: "automated",
-			commands: [`verify:${action}`],
+			commands: [verificationCommand],
 			checks: ["independent verifier exits zero"],
 			evidence_required: ["independent_command"],
 			strength: "strong",

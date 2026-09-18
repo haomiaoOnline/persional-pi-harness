@@ -2,12 +2,14 @@ import { randomUUID } from "node:crypto";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { digestFor } from "./artifacts.ts";
+import { validateToolResultEnvelope } from "./tool-gateway.ts";
 import type {
 	CommandEvidence,
 	DeliveryEvidencePackage,
 	EvidenceRecord,
 	JsonValue,
 	ProviderMode,
+	ToolResultEnvelope,
 	ValidationResult,
 	WorkspaceSnapshot,
 } from "./types.ts";
@@ -112,6 +114,7 @@ export interface EvidenceInput {
 	run_id: string;
 	changed_files?: string[];
 	commands?: CommandEvidence[];
+	tool_results?: ToolResultEnvelope[];
 	stdout?: string;
 	stderr?: string;
 	test_result?: string;
@@ -125,6 +128,10 @@ export interface EvidenceInput {
 export class EvidenceCollector {
 	collect(input: EvidenceInput): EvidenceRecord {
 		const changedFiles = [...(input.changed_files ?? [])];
+		for (const toolResult of input.tool_results ?? []) {
+			const validation = validateToolResultEnvelope(toolResult);
+			if (!validation.valid) throw new Error(`invalid tool result envelope: ${validation.errors.join("; ")}`);
+		}
 		if (input.delivery_evidence_package) {
 			const validation = validateDeliveryEvidencePackage(input.delivery_evidence_package);
 			if (!validation.valid) throw new Error(`invalid delivery evidence package: ${validation.errors.join("; ")}`);
@@ -136,6 +143,7 @@ export class EvidenceCollector {
 			captured_at: input.captured_at ?? new Date().toISOString(),
 			diff: { files: changedFiles, digest: digestFor(changedFiles) },
 			commands: (input.commands ?? []).map((command) => ({ ...command })),
+			...(input.tool_results ? { tool_results: structuredClone(input.tool_results) } : {}),
 			stdout: input.stdout ?? "",
 			stderr: input.stderr ?? "",
 			test_result: input.test_result,

@@ -2,9 +2,11 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { validateToolResultEnvelope } from "../tool-gateway.ts";
 import type {
 	ResultContract,
 	TaskContract,
+	ToolResultEnvelope,
 	WorkerExecutionControls,
 	WorkerExecutionInput,
 	WorkerExecutionOutput,
@@ -211,7 +213,7 @@ function observeTool(
 	event: Record<string, unknown>,
 	observation: CliObservation,
 	controls?: WorkerExecutionControls,
-): void {
+): string | undefined {
 	if (event.type === "tool_execution_start") {
 		controls?.beforeToolCall();
 		const args = asRecord(event.args);
@@ -224,8 +226,39 @@ function observeTool(
 		observation.tool_calls += 1;
 		if (tool.path && (tool.name === "write" || tool.name === "edit") && tool.tool_call_id)
 			observation.pending_mutations.set(tool.tool_call_id, tool.path);
+		return undefined;
 	}
 	if (event.type === "tool_execution_end") {
+		const result = asRecord(event.result);
+		const content = result?.content;
+		if (!Array.isArray(content) || content.length !== 1)
+			return "Pi tool result did not contain exactly one bounded envelope";
+		const block = asRecord(content[0]);
+		if (block?.type !== "text" || typeof block.text !== "string")
+			return "Pi tool result content was not a bounded text envelope";
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(block.text);
+		} catch {
+			return "Pi tool result content was raw or malformed JSON";
+		}
+		const validation = validateToolResultEnvelope(parsed);
+		if (!validation.valid || !validation.value)
+			return `Pi tool result envelope was invalid: ${validation.errors.join("; ")}`;
+		const details = result?.details;
+		if (
+			details !== undefined &&
+			(!details ||
+				typeof details !== "object" ||
+				Array.isArray(details) ||
+				Object.keys(details as Record<string, unknown>).length > 0)
+		)
+			return "Pi tool result details were not scrubbed";
+		const envelope = validation.value;
+		const eventIsError = event.isError === true;
+		if (eventIsError === (envelope.status === "success"))
+			return "Pi tool result error flag did not match its bounded envelope status";
+		observation.tool_results.push(structuredClone(envelope));
 		const id = typeof event.toolCallId === "string" ? event.toolCallId : undefined;
 		const succeeded = event.isError === false;
 		const path = id ? observation.pending_mutations.get(id) : undefined;
@@ -234,7 +267,9 @@ function observeTool(
 		if (tool) tool.succeeded = succeeded;
 		if (succeeded && path && (event.toolName === "write" || event.toolName === "edit"))
 			observation.mutated_paths.push(path);
+		return undefined;
 	}
+	return undefined;
 }
 
 export class PiAgentWorkerAdapter implements WorkerAdapter {
@@ -251,6 +286,7 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 	private readonly pi_config_dir: string;
 	private readonly run_process: NonNullable<PiAgentWorkerAdapterOptions["run_process"]>;
 	private last_observation?: ExternalWorkerObservation;
+	private last_tool_results: ToolResultEnvelope[] = [];
 
 	constructor(options: PiAgentWorkerAdapterOptions = {}) {
 		this.worker_id = options.worker_id ?? "pi-agent-deepseek-v4-flash";
@@ -270,12 +306,17 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 		return this.last_observation ? structuredClone(this.last_observation) : undefined;
 	}
 
+	getToolResults(): ToolResultEnvelope[] {
+		return structuredClone(this.last_tool_results);
+	}
+
 	getModelIdentity() {
 		return trustedModelIdentity(this.last_observation, this.requested_model);
 	}
 
 	async execute(request: WorkerProtocolRequest, controls?: WorkerExecutionControls): Promise<ResultContract> {
 		this.last_observation = undefined;
+		this.last_tool_results = [];
 		const tools = effectiveTools(request.task);
 		const denial = policyDenial(request, tools);
 		const delegate = new PiWorker(
@@ -306,6 +347,17 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 			return failureOutput(
 				"Pi Worker permission gate is unavailable",
 				["permission_gate_missing"],
+				safeEvidence(this.backend, observation),
+				observation,
+			);
+		}
+		if (tools.length > 0 && !request.tool_artifact_root) {
+			const observation = createCliObservation();
+			observation.protocol_error = "durable tool artifact root unavailable";
+			this.last_observation = externalObservation(this.backend, this.requested_model, observation, "failure", 0);
+			return failureOutput(
+				"Pi Worker durable Tool Gateway artifact root is unavailable",
+				["tool_artifact_root_missing"],
 				safeEvidence(this.backend, observation),
 				observation,
 			);
@@ -341,6 +393,9 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 				write_scopes: [...request.task.permissions.filesystem.write],
 				shell_allowed: [...request.task.permissions.shell.allowed],
 				network: request.task.permissions.network === "allow",
+				artifact_store_root: request.tool_artifact_root ?? "",
+				task_id: request.task.id,
+				task_revision: request.task.task_revision,
 			},
 		});
 		const started = Date.now();
@@ -371,12 +426,18 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 					observation.budget_violation = budgetViolation;
 					return { terminate: true, reason: budgetViolation };
 				}
-				if (record.type === "tool_execution_start" || record.type === "tool_execution_end")
-					observeTool(record, observation, controls);
+				if (record.type === "tool_execution_start" || record.type === "tool_execution_end") {
+					const violation = observeTool(record, observation, controls);
+					if (violation) {
+						observation.protocol_error = violation;
+						return { terminate: true, reason: violation };
+					}
+				}
 				return undefined;
 			},
 		});
 		const observation = processResult.observation;
+		this.last_tool_results = structuredClone(observation.tool_results);
 		const elapsed = Date.now() - started;
 		const evidence = usageFromObservation(observation);
 		let output: WorkerExecutionOutput;

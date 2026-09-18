@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
 import { access as fsAccess } from "node:fs/promises";
-import type { AgentTool } from "@earendil-works/pi-agent-core";
+import { type AgentTool, AgentToolExecutionError } from "@earendil-works/pi-agent-core";
 import { spawn } from "child_process";
 import { type Static, Type } from "typebox";
 import { waitForChildProcess } from "../../utils/child-process.ts";
@@ -14,6 +14,7 @@ import {
 } from "../../utils/shell.ts";
 import type { ExtensionContext, ToolDefinition } from "../extensions/types.ts";
 import { OutputAccumulator } from "./output-accumulator.ts";
+import { BoundedRawResultWriter } from "./raw-result-backing.ts";
 import { BASH_UPDATE_THROTTLE_MS, createShellRenderers } from "./renderers/bash.ts";
 import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, type TruncationResult } from "./truncate.ts";
@@ -49,6 +50,27 @@ export type BashToolInput = Static<typeof bashSchema>;
 export interface BashToolDetails {
 	truncation?: TruncationResult;
 	fullOutputPath?: string;
+	stdoutFullOutputPath?: string;
+	stdoutBytes?: number;
+	stderrFullOutputPath?: string;
+	stderrBytes?: number;
+	streamSeparation?: "exact" | "combined_as_stdout";
+	outcome?: BashToolOutcome;
+}
+
+export type BashToolOutcome =
+	| { kind: "exit"; exit_code: number | null }
+	| { kind: "timeout"; exit_code: number | null; timeout_seconds: number }
+	| { kind: "abort"; exit_code: number | null };
+
+class ShellTerminationError extends Error {
+	readonly outcome: Exclude<BashToolOutcome, { kind: "exit" }>;
+
+	constructor(message: string, outcome: Exclude<BashToolOutcome, { kind: "exit" }>) {
+		super(message);
+		this.name = "ShellTerminationError";
+		this.outcome = outcome;
+	}
 }
 
 /**
@@ -68,6 +90,8 @@ export interface BashOperations {
 		cwd: string,
 		options: {
 			onData: (data: Buffer) => void;
+			onStdout?: (data: Buffer) => void;
+			onStderr?: (data: Buffer) => void;
 			signal?: AbortSignal;
 			timeout?: number;
 			env?: NodeJS.ProcessEnv;
@@ -78,10 +102,10 @@ export interface BashOperations {
 /** Shared process execution used by the built-in shell tools. */
 export function createLocalShellOperations(shellName: string, resolveShellConfig: () => ShellConfig): BashOperations {
 	return {
-		exec: async (command, cwd, { onData, signal, timeout, env }) => {
+		exec: async (command, cwd, { onData, onStdout, onStderr, signal, timeout, env }) => {
 			const timeoutMs = resolveTimeoutMs(timeout);
 			if (signal?.aborted) {
-				throw new Error("aborted");
+				throw new ShellTerminationError("aborted", { kind: "abort", exit_code: null });
 			}
 			const shellConfig = resolveShellConfig();
 			try {
@@ -118,8 +142,14 @@ export function createLocalShellOperations(shellName: string, resolveShellConfig
 					}, timeoutMs);
 				}
 				// Stream stdout and stderr.
-				child.stdout?.on("data", onData);
-				child.stderr?.on("data", onData);
+				child.stdout?.on("data", (data: Buffer) => {
+					onStdout?.(data);
+					onData(data);
+				});
+				child.stderr?.on("data", (data: Buffer) => {
+					onStderr?.(data);
+					onData(data);
+				});
 				// Handle abort signal by killing the entire process tree.
 				if (signal) {
 					if (signal.aborted) onAbort();
@@ -129,10 +159,14 @@ export function createLocalShellOperations(shellName: string, resolveShellConfig
 				// on inherited stdio handles held by detached descendants.
 				const exitCode = await waitForChildProcess(child);
 				if (signal?.aborted) {
-					throw new Error("aborted");
+					throw new ShellTerminationError("aborted", { kind: "abort", exit_code: exitCode });
 				}
 				if (timedOut) {
-					throw new Error(`timeout:${timeout}`);
+					throw new ShellTerminationError(`timeout:${timeout}`, {
+						kind: "timeout",
+						exit_code: exitCode,
+						timeout_seconds: timeout ?? 0,
+					});
 				}
 				return { exitCode };
 			} finally {
@@ -252,7 +286,12 @@ export function createShellToolDefinition(
 				ctx,
 			);
 			const output = new OutputAccumulator({ tempFilePrefix: config.tempFilePrefix });
+			const stdoutRaw = new BoundedRawResultWriter(`${config.tempFilePrefix}-stdout`);
+			const stderrRaw = new BoundedRawResultWriter(`${config.tempFilePrefix}-stderr`);
 			let acceptingOutput = true;
+			let separatedStreamObserved = false;
+			let rawCaptureError: Error | undefined;
+			let rawStreamsFinished = false;
 			let updateTimer: NodeJS.Timeout | undefined;
 			let updateDirty = false;
 			let lastUpdateAt = 0;
@@ -300,7 +339,58 @@ export function createShellToolDefinition(
 			const handleData = (data: Buffer) => {
 				if (!acceptingOutput) return;
 				output.append(data);
+				if (!separatedStreamObserved && !rawCaptureError) {
+					try {
+						stdoutRaw.append(data);
+					} catch (error) {
+						rawCaptureError = error instanceof Error ? error : new Error(String(error));
+					}
+				}
 				scheduleOutputUpdate();
+			};
+			const handleStdout = (data: Buffer) => {
+				separatedStreamObserved = true;
+				if (rawCaptureError) return;
+				try {
+					stdoutRaw.append(data);
+				} catch (error) {
+					rawCaptureError = error instanceof Error ? error : new Error(String(error));
+				}
+			};
+			const handleStderr = (data: Buffer) => {
+				separatedStreamObserved = true;
+				if (rawCaptureError) return;
+				try {
+					stderrRaw.append(data);
+				} catch (error) {
+					rawCaptureError = error instanceof Error ? error : new Error(String(error));
+				}
+			};
+			const finishRawStreams = (persist: boolean) => {
+				if (rawCaptureError) throw rawCaptureError;
+				const stdout = persist && stdoutRaw.byteLength > 0 ? stdoutRaw.finish() : undefined;
+				const stderr = persist && stderrRaw.byteLength > 0 ? stderrRaw.finish() : undefined;
+				if (!stdout) stdoutRaw.discard();
+				if (!stderr) stderrRaw.discard();
+				rawStreamsFinished = true;
+				return {
+					...(stdout ? { stdoutFullOutputPath: stdout.fullOutputPath } : {}),
+					stdoutBytes: stdoutRaw.byteLength,
+					...(stderr ? { stderrFullOutputPath: stderr.fullOutputPath } : {}),
+					stderrBytes: stderrRaw.byteLength,
+					streamSeparation: separatedStreamObserved ? ("exact" as const) : ("combined_as_stdout" as const),
+				};
+			};
+			const detailsWithOutcome = (
+				details: BashToolDetails | undefined,
+				outcome: BashToolOutcome,
+			): BashToolDetails => {
+				const persistRawStreams =
+					details?.truncation?.truncated === true ||
+					outcome.kind !== "exit" ||
+					outcome.exit_code !== 0 ||
+					stderrRaw.byteLength > 0;
+				return { ...details, ...finishRawStreams(persistRawStreams), outcome };
 			};
 
 			const finishOutput = async () => {
@@ -340,6 +430,8 @@ export function createShellToolDefinition(
 				try {
 					const result = await ops.exec(spawnContext.command, spawnContext.cwd, {
 						onData: handleData,
+						onStdout: handleStdout,
+						onStderr: handleStderr,
 						signal,
 						timeout,
 						env: spawnContext.env,
@@ -347,13 +439,39 @@ export function createShellToolDefinition(
 					exitCode = result.exitCode;
 				} catch (err) {
 					const snapshot = await finishOutput();
-					const { text } = formatOutput(snapshot, "");
+					const { text, details } = formatOutput(snapshot, "");
+					if (err instanceof ShellTerminationError && err.outcome.kind === "abort") {
+						const message = appendStatus(text, "Command aborted");
+						throw new AgentToolExecutionError(message, {
+							content: [{ type: "text", text: message }],
+							details: detailsWithOutcome(details, err.outcome),
+						});
+					}
+					if (err instanceof ShellTerminationError && err.outcome.kind === "timeout") {
+						const message = appendStatus(text, `Command timed out after ${err.outcome.timeout_seconds} seconds`);
+						throw new AgentToolExecutionError(message, {
+							content: [{ type: "text", text: message }],
+							details: detailsWithOutcome(details, err.outcome),
+						});
+					}
 					if (err instanceof Error && err.message === "aborted") {
-						throw new Error(appendStatus(text, "Command aborted"));
+						const message = appendStatus(text, "Command aborted");
+						throw new AgentToolExecutionError(message, {
+							content: [{ type: "text", text: message }],
+							details: detailsWithOutcome(details, { kind: "abort", exit_code: null }),
+						});
 					}
 					if (err instanceof Error && err.message.startsWith("timeout:")) {
-						const timeoutSecs = err.message.split(":")[1];
-						throw new Error(appendStatus(text, `Command timed out after ${timeoutSecs} seconds`));
+						const timeoutSecs = Number(err.message.split(":")[1]);
+						const message = appendStatus(text, `Command timed out after ${timeoutSecs} seconds`);
+						throw new AgentToolExecutionError(message, {
+							content: [{ type: "text", text: message }],
+							details: detailsWithOutcome(details, {
+								kind: "timeout",
+								exit_code: null,
+								timeout_seconds: timeoutSecs,
+							}),
+						});
 					}
 					throw err;
 				}
@@ -361,11 +479,22 @@ export function createShellToolDefinition(
 				const snapshot = await finishOutput();
 				const { text: outputText, details } = formatOutput(snapshot);
 				if (exitCode !== 0 && exitCode !== null) {
-					throw new Error(appendStatus(outputText, `Command exited with code ${exitCode}`));
+					const message = appendStatus(outputText, `Command exited with code ${exitCode}`);
+					throw new AgentToolExecutionError(message, {
+						content: [{ type: "text", text: message }],
+						details: detailsWithOutcome(details, { kind: "exit", exit_code: exitCode }),
+					});
 				}
-				return { content: [{ type: "text", text: outputText }], details };
+				return {
+					content: [{ type: "text", text: outputText }],
+					details: detailsWithOutcome(details, { kind: "exit", exit_code: exitCode }),
+				};
 			} finally {
 				clearUpdateTimer();
+				if (!rawStreamsFinished) {
+					stdoutRaw.discard();
+					stderrRaw.discard();
+				}
 			}
 		},
 		...createShellRenderers(config.prompt),

@@ -6,6 +6,7 @@ import { type Static, Type } from "typebox";
 import { ensureTool } from "../../utils/tools-manager.ts";
 import type { ExtensionContext, ToolDefinition } from "../extensions/types.ts";
 import { pathExists, resolveToCwd } from "./path-utils.ts";
+import { persistBoundedRawResult, type RawResultBackingDetails } from "./raw-result-backing.ts";
 import { findRenderers } from "./renderers/find.ts";
 import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 import { DEFAULT_MAX_BYTES, formatSize, type TruncationResult, truncateHead } from "./truncate.ts";
@@ -40,7 +41,7 @@ export type FindToolInput = Static<typeof findSchema>;
 
 const DEFAULT_LIMIT = 1000;
 
-export interface FindToolDetails {
+export interface FindToolDetails extends Partial<RawResultBackingDetails> {
 	truncation?: TruncationResult;
 	resultLimitReached?: number;
 }
@@ -145,8 +146,12 @@ export function createFindToolDefinition(
 							const resultLimitReached = relativized.length >= effectiveLimit;
 							const rawOutput = relativized.join("\n");
 							const truncation = truncateHead(rawOutput, { maxLines: Number.MAX_SAFE_INTEGER });
+							const rawBacking =
+								resultLimitReached || truncation.truncated
+									? persistBoundedRawResult(rawOutput, "pi-find-result")
+									: undefined;
 							let resultOutput = truncation.content;
-							const details: FindToolDetails = {};
+							const details: FindToolDetails = { ...rawBacking };
 							const notices: string[] = [];
 							if (resultLimitReached) {
 								notices.push(`${effectiveLimit} results limit reached`);
@@ -275,8 +280,12 @@ export function createFindToolDefinition(
 							const resultLimitReached = relativized.length >= effectiveLimit;
 							const rawOutput = relativized.join("\n");
 							const truncation = truncateHead(rawOutput, { maxLines: Number.MAX_SAFE_INTEGER });
+							const rawBacking =
+								resultLimitReached || truncation.truncated
+									? persistBoundedRawResult(rawOutput, "pi-find-result")
+									: undefined;
 							let resultOutput = truncation.content;
-							const details: FindToolDetails = {};
+							const details: FindToolDetails = { ...rawBacking };
 							const notices: string[] = [];
 							if (resultLimitReached) {
 								notices.push(

@@ -593,6 +593,8 @@ export interface WorkerProtocolRequest {
 	run_id?: string;
 	resolved_context?: ResolvedContext;
 	permission_request?: PermissionRequest;
+	/** Controller-owned raw tool artifact root. Never include this path in PromptPayload. */
+	tool_artifact_root?: string;
 }
 
 export interface WorkerExecutionInput {
@@ -637,6 +639,31 @@ export interface CommandEvidence {
 	stderr: string;
 }
 
+export type ToolResultStatus = "success" | "failure" | "error" | "blocked";
+
+export type ToolOutputKind = "compile" | "test" | "stack" | "search" | "large_file" | "generic";
+
+export interface ToolResultEnvelope {
+	exit_code: number;
+	status: ToolResultStatus;
+	duration: number;
+	stdout_summary: string;
+	stderr_summary: string;
+	error_fingerprint: string | null;
+	relevant_stack_frames: string[];
+	artifact_id: string;
+	truncated: boolean;
+	next_cursor: string | null;
+}
+
+export interface ToolArtifactPage {
+	artifact_id: string;
+	content: string;
+	next_cursor: string | null;
+	truncated: boolean;
+	sensitive_info: "none" | "possible";
+}
+
 export type ProviderMode = "mock" | "local" | "real";
 
 export interface DeliveryEvidencePackage {
@@ -668,6 +695,8 @@ export interface EvidenceRecord {
 		digest: string;
 	};
 	commands: CommandEvidence[];
+	/** Bounded model-facing tool results. Raw output lives only in Artifact Store. */
+	tool_results?: ToolResultEnvelope[];
 	stdout: string;
 	stderr: string;
 	test_result?: string;

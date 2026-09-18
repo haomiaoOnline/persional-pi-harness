@@ -875,6 +875,7 @@ export class ExtensionRunner {
 						error: message,
 						stack,
 					});
+					throw err;
 				}
 			}
 		}
@@ -963,6 +964,7 @@ export class ExtensionRunner {
 						error: message,
 						stack,
 					});
+					throw err;
 				}
 			}
 		}

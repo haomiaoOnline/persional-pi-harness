@@ -1,5 +1,9 @@
-import { describe, expect, test } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, test } from "vitest";
 import {
+	ArtifactStore,
 	CommandRiskClassifier,
 	captureWorkspaceSnapshot,
 	LifecycleHookManager,
@@ -8,6 +12,19 @@ import {
 	type TaskContract,
 } from "../src/index.ts";
 import { AVAILABLE_WORKER_STATUS, makeV3Task, planFor, requirementFor } from "./v3-fixtures.ts";
+
+const temporaryDirectories: string[] = [];
+
+afterEach(() => {
+	while (temporaryDirectories.length > 0)
+		rmSync(temporaryDirectories.pop() as string, { recursive: true, force: true });
+});
+
+function fileBackedPipeline(): PersonalPiPipeline {
+	const root = mkdtempSync(join(tmpdir(), "personal-pi-controls-"));
+	temporaryDirectories.push(root);
+	return new PersonalPiPipeline({ artifact_store: new ArtifactStore(root) });
+}
 
 function legalNoOpReceipt() {
 	return {
@@ -44,7 +61,7 @@ describe("v3.1 pipeline control integration", () => {
 		const task = controlTask("pipeline-controls-pass", "node --test");
 		const calls: string[] = [];
 		const snapshot = captureWorkspaceSnapshot("controls-pass", [], []);
-		const execution = await new PersonalPiPipeline().execute({
+		const execution = await fileBackedPipeline().execute({
 			...planFor(task),
 			requirement: requirementFor("verified control path"),
 			task,
@@ -108,7 +125,7 @@ describe("v3.1 pipeline control integration", () => {
 	test("does not execute an unapproved risky verification command", async () => {
 		const task = controlTask("pipeline-controls-approval", "npm publish");
 		let calls = 0;
-		const execution = await new PersonalPiPipeline().execute({
+		const execution = await fileBackedPipeline().execute({
 			...planFor(task),
 			requirement: requirementFor("blocked risky control path"),
 			task,
@@ -136,7 +153,7 @@ describe("v3.1 pipeline control integration", () => {
 	test("turns a deterministic pre-tool rejection into failed command evidence without running it", async () => {
 		const task = controlTask("pipeline-controls-hook", "node --test");
 		let calls = 0;
-		const execution = await new PersonalPiPipeline().execute({
+		const execution = await fileBackedPipeline().execute({
 			...planFor(task),
 			requirement: requirementFor("blocked hook control path"),
 			task,
@@ -175,7 +192,7 @@ describe("v3.1 pipeline control integration", () => {
 		const task = controlTask("pipeline-controls-missing-checker", "node --test");
 		const changedFile = "tmp/pipeline-controls-missing-checker.txt";
 		const snapshot = captureWorkspaceSnapshot("controls-missing-checker", [changedFile], [changedFile]);
-		const execution = await new PersonalPiPipeline().execute({
+		const execution = await fileBackedPipeline().execute({
 			...planFor(task),
 			requirement: requirementFor("checker warning control path"),
 			task,

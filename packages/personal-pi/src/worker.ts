@@ -9,6 +9,7 @@ import { authorizeWorkerExecution, filterSensitiveContext, type PermissionDecisi
 import type {
 	ModelIdentity,
 	ResultContract,
+	ToolResultEnvelope,
 	WorkerExecutionControls,
 	WorkerExecutionInput,
 	WorkerExecutionOutput,
@@ -20,6 +21,7 @@ export interface WorkerAdapter {
 	readonly worker_id: string;
 	readonly requested_model?: string;
 	getModelIdentity?(): ModelIdentity;
+	getToolResults?(): ToolResultEnvelope[];
 	execute(request: WorkerProtocolRequest, controls?: WorkerExecutionControls): Promise<ResultContract>;
 }
 

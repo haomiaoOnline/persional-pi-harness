@@ -22,6 +22,7 @@ import type {
 	PrepareNextTurnContext,
 	StreamFn,
 } from "./types.ts";
+import { AgentToolExecutionError } from "./types.ts";
 
 export type AgentEventSink = (event: AgentEvent) => Promise<void> | void;
 
@@ -450,11 +451,14 @@ async function executeToolCallsSequential(
 		const preparation = await prepareToolCall(currentContext, assistantMessage, toolCall, config, signal);
 		let finalized: FinalizedToolCallOutcome;
 		if (preparation.kind === "immediate") {
-			finalized = {
-				toolCall,
-				result: preparation.result,
-				isError: preparation.isError,
-			};
+			finalized = await finalizeExecutedToolCall(
+				currentContext,
+				assistantMessage,
+				{ toolCall, args: preparation.args },
+				preparation,
+				config,
+				signal,
+			);
 		} else {
 			const executed = await executePreparedToolCall(preparation, signal, emit);
 			finalized = await finalizeExecutedToolCall(
@@ -504,11 +508,14 @@ async function executeToolCallsParallel(
 
 		const preparation = await prepareToolCall(currentContext, assistantMessage, toolCall, config, signal);
 		if (preparation.kind === "immediate") {
-			const finalized = {
-				toolCall,
-				result: preparation.result,
-				isError: preparation.isError,
-			} satisfies FinalizedToolCallOutcome;
+			const finalized = await finalizeExecutedToolCall(
+				currentContext,
+				assistantMessage,
+				{ toolCall, args: preparation.args },
+				preparation,
+				config,
+				signal,
+			);
 			await emitToolExecutionEnd(finalized, emit);
 			finalizedCalls.push(finalized);
 			if (signal?.aborted) {
@@ -519,11 +526,14 @@ async function executeToolCallsParallel(
 
 		finalizedCalls.push(async () => {
 			if (signal?.aborted) {
-				const finalized = {
-					toolCall,
-					result: createErrorToolResult("Operation aborted"),
-					isError: true,
-				} satisfies FinalizedToolCallOutcome;
+				const finalized = await finalizeExecutedToolCall(
+					currentContext,
+					assistantMessage,
+					preparation,
+					{ result: createErrorToolResult("Operation aborted"), isError: true },
+					config,
+					signal,
+				);
 				await emitToolExecutionEnd(finalized, emit);
 				return finalized;
 			}
@@ -569,6 +579,7 @@ type PreparedToolCall = {
 
 type ImmediateToolCallOutcome = {
 	kind: "immediate";
+	args: unknown;
 	result: AgentToolResult<any>;
 	isError: boolean;
 };
@@ -615,6 +626,7 @@ async function prepareToolCall(
 	if (!tool) {
 		return {
 			kind: "immediate",
+			args: toolCall.arguments,
 			result: createErrorToolResult(`Tool ${toolCall.name} not found`),
 			isError: true,
 		};
@@ -636,6 +648,7 @@ async function prepareToolCall(
 			if (signal?.aborted) {
 				return {
 					kind: "immediate",
+					args: validatedArgs,
 					result: createErrorToolResult("Operation aborted"),
 					isError: true,
 				};
@@ -647,6 +660,7 @@ async function prepareToolCall(
 				}
 				return {
 					kind: "immediate",
+					args: validatedArgs,
 					result,
 					isError: true,
 				};
@@ -655,6 +669,7 @@ async function prepareToolCall(
 		if (signal?.aborted) {
 			return {
 				kind: "immediate",
+				args: validatedArgs,
 				result: createErrorToolResult("Operation aborted"),
 				isError: true,
 			};
@@ -668,6 +683,7 @@ async function prepareToolCall(
 	} catch (error) {
 		return {
 			kind: "immediate",
+			args: toolCall.arguments,
 			result: createErrorToolResult(error instanceof Error ? error.message : String(error)),
 			isError: true,
 		};
@@ -709,7 +725,10 @@ async function executePreparedToolCall(
 		acceptingUpdates = false;
 		await Promise.all(updateEvents);
 		return {
-			result: createErrorToolResult(error instanceof Error ? error.message : String(error)),
+			result:
+				error instanceof AgentToolExecutionError
+					? error.result
+					: createErrorToolResult(error instanceof Error ? error.message : String(error)),
 			isError: true,
 		};
 	} finally {
@@ -720,7 +739,7 @@ async function executePreparedToolCall(
 async function finalizeExecutedToolCall(
 	currentContext: AgentContext,
 	assistantMessage: AssistantMessage,
-	prepared: PreparedToolCall,
+	prepared: Pick<PreparedToolCall, "toolCall" | "args">,
 	executed: ExecutedToolCallOutcome,
 	config: AgentLoopConfig,
 	signal: AbortSignal | undefined,

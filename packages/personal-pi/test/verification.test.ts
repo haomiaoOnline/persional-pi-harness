@@ -3,6 +3,7 @@ import {
 	AcceptanceGate,
 	AcceptanceGateError,
 	buildVerifierInput,
+	type CommandEvidence,
 	canUnlockDownstream,
 	captureWorkspaceSnapshot,
 	createDeliveryEvidencePackage,
@@ -76,6 +77,12 @@ function evidence(
 	types = ["stdout", "test_result"],
 	changedFiles: string[] = ["src/index.ts"],
 	providerMode: "mock" | "local" | "real" = "mock",
+	commands: CommandEvidence[] = task.verification.commands.map((command) => ({
+		command,
+		exit_code: 0,
+		stdout: "pass",
+		stderr: "",
+	})),
 ) {
 	const snapshot = captureWorkspaceSnapshot("commit-1", changedFiles, []);
 	return new EvidenceCollector().collect({
@@ -85,14 +92,14 @@ function evidence(
 		stdout: "ok",
 		stderr: "",
 		test_result: "14 passed",
-		commands: [],
+		commands,
 		evidence_types: types,
 		delivery_evidence_package: createDeliveryEvidencePackage({
 			baseline_commit: "baseline-1",
 			task_revision: task.task_revision,
 			snapshot,
 			changed_files: changedFiles,
-			commands: [],
+			commands,
 			test_output_summary: "14 passed",
 			provider_mode: providerMode,
 		}),
@@ -194,7 +201,6 @@ describe("T4.2 Verification Engine", () => {
 			task,
 			evidence: evidence(task),
 			snapshot: captureWorkspaceSnapshot("commit-1", ["src/index.ts"], []),
-			commandRunner: (command) => ({ command, exit_code: 0, stdout: "pass", stderr: "" }),
 			workerStatus: "success",
 		});
 		expect(record.status).toBe("PASS");
@@ -205,9 +211,10 @@ describe("T4.2 Verification Engine", () => {
 		const task = makeTask();
 		const record = await new VerificationEngine().verify({
 			task,
-			evidence: evidence(task, ["stdout", "test_result"], []),
+			evidence: evidence(task, ["stdout", "test_result"], [], "mock", [
+				{ command: "npm test", exit_code: 1, stdout: "", stderr: "assertion failed" },
+			]),
 			snapshot: captureWorkspaceSnapshot("commit-1", [], []),
-			commandRunner: (command) => ({ command, exit_code: 1, stdout: "", stderr: "assertion failed" }),
 			workerStatus: "success",
 		});
 		expect(record.status).toBe("FAIL");
@@ -239,10 +246,11 @@ describe("T4.2 Verification Engine", () => {
 		expect(JSON.stringify(verifierInput)).not.toContain("hidden scratchpad");
 		const record = await new VerificationEngine().verify({
 			task,
-			evidence: evidence(task, ["stdout", "test_result"], []),
+			evidence: evidence(task, ["stdout", "test_result"], [], "mock", [
+				{ command: "npm test", exit_code: 1, stdout: "", stderr: "actual failure" },
+			]),
 			snapshot: captureWorkspaceSnapshot("commit-1", [], []),
 			result: workerResult,
-			commandRunner: (command) => ({ command, exit_code: 1, stdout: "", stderr: "actual failure" }),
 		});
 		expect(record.status).toBe("FAIL");
 	});
@@ -265,15 +273,13 @@ describe("T4.2 Verification Engine", () => {
 			status: "UNKNOWN",
 			evidence_id: legacyEvidence.id,
 		});
-		const brokenEnvironment = await new VerificationEngine().verify({
+		const missingPersistedCommand = await new VerificationEngine().verify({
 			task,
-			evidence: evidence(task, ["stdout", "test_result"], []),
+			evidence: evidence(task, ["stdout", "test_result"], [], "mock", []),
 			snapshot: captureWorkspaceSnapshot("commit-1", [], []),
-			commandRunner: () => {
-				throw new Error("runner unavailable");
-			},
 		});
-		expect(brokenEnvironment.status).toBe("UNKNOWN");
+		expect(missingPersistedCommand.status).toBe("UNKNOWN");
+		expect(missingPersistedCommand.reasons.join(" ")).toContain("missing command evidence: npm test");
 	});
 
 	test("does not unlock a high-risk downstream task with weak verification", async () => {
@@ -282,7 +288,6 @@ describe("T4.2 Verification Engine", () => {
 			task,
 			evidence: evidence(task, ["stdout", "test_result"], []),
 			snapshot: captureWorkspaceSnapshot("commit-1", [], []),
-			commandRunner: (command) => ({ command, exit_code: 0, stdout: "pass", stderr: "" }),
 		});
 		expect(record.status).toBe("PASS");
 		expect(record.verification_confidence).toBe("weak");
@@ -304,7 +309,6 @@ describe("T4.3–T4.4 Acceptance Gate and revision binding", () => {
 			task,
 			evidence: canonicalEvidence,
 			snapshot,
-			commandRunner: (command) => ({ command, exit_code: 0, stdout: "pass", stderr: "" }),
 		});
 		const accepted = new AcceptanceGate().markDone(
 			record,
@@ -329,7 +333,6 @@ describe("T4.3–T4.4 Acceptance Gate and revision binding", () => {
 			task,
 			evidence: canonicalEvidence,
 			snapshot,
-			commandRunner: (command) => ({ command, exit_code: 0, stdout: "pass", stderr: "" }),
 		});
 		expect(() =>
 			new AcceptanceGate().markDone(
@@ -374,7 +377,6 @@ describe("T4.3–T4.4 Acceptance Gate and revision binding", () => {
 			task,
 			evidence: canonicalEvidence,
 			snapshot,
-			commandRunner: (command) => ({ command, exit_code: 0, stdout: "pass", stderr: "" }),
 		});
 		const anomaly = acceptedResult(task, false);
 		expect(() => new AcceptanceGate().markDone(record, verification, snapshot, anomaly, canonicalEvidence)).toThrow(

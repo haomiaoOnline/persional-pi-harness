@@ -24,6 +24,7 @@ import { type DefinitionOfReadyInput, evaluateDefinitionOfReady } from "./readin
 import type { VerificationRecipeRegistry } from "./recipes.ts";
 import { createModelIdentity, ensureWorkReceipt, validateResultContract, validateWorkerStatus } from "./result.ts";
 import { createTaskRecord, TaskStateMachine } from "./state-machine.ts";
+import { ToolGateway } from "./tool-gateway.ts";
 import { computeGraphEfficiencyMetrics, createRegressionCase, TraceRecorder } from "./trace.ts";
 import type {
 	AcceptanceRecord,
@@ -49,6 +50,7 @@ import type {
 	TaskAssessment,
 	TaskContract,
 	TaskRecord,
+	ToolResultEnvelope,
 	VerificationRecord,
 	WorkerExecutionControls,
 	WorkerProtocolRequest,
@@ -145,6 +147,7 @@ export interface PersonalPiPipelineOptions {
 	verification_engine?: VerificationEngine;
 	acceptance_gate?: AcceptanceGate;
 	artifact_store?: ArtifactStore;
+	tool_gateway?: ToolGateway;
 }
 
 function dispatchMode(mode: DispatchDecision["mode"]): DispatchRecord["mode"] {
@@ -222,17 +225,8 @@ function normalizeResult(
 	);
 }
 
-function blockedCommandEvidence(
-	command: string,
-	action: "ask_user" | "block",
-	reasons: readonly string[],
-): CommandEvidence {
-	return {
-		command,
-		exit_code: action === "block" ? 126 : 125,
-		stdout: "",
-		stderr: `${action}: ${reasons.join("; ")}`,
-	};
+function blockedCommandReason(action: "ask_user" | "block", reasons: readonly string[]): string {
+	return `${action}: ${reasons.join("; ")}`;
 }
 
 function recordLifecycleResult(evidence: string[], result: LifecycleHookRunResult): void {
@@ -247,6 +241,7 @@ export class PersonalPiPipeline {
 	private readonly acceptanceGate: AcceptanceGate;
 	private readonly loopBudgetController: LoopBudgetController;
 	private readonly artifactStore: ArtifactStore;
+	private readonly toolGateway: ToolGateway;
 
 	constructor(options: PersonalPiPipelineOptions = {}) {
 		this.stateStore = options.state_store ?? new PersistentStateStore();
@@ -256,6 +251,7 @@ export class PersonalPiPipeline {
 		this.acceptanceGate = options.acceptance_gate ?? new AcceptanceGate();
 		this.loopBudgetController = new LoopBudgetController(this.stateStore);
 		this.artifactStore = options.artifact_store ?? new ArtifactStore(this.stateStore.artifactStoreRootPath());
+		this.toolGateway = options.tool_gateway ?? new ToolGateway({ artifact_store: this.artifactStore });
 	}
 
 	private persistMasterHandoff(input: {
@@ -347,6 +343,17 @@ export class PersonalPiPipeline {
 			request.requirement.acceptance.length === 0
 		) {
 			throw new PipelineStageError("REQUIREMENT", "Requirement Contract is incomplete");
+		}
+		if (
+			request.command_runner &&
+			request.task.verification.commands.length > 0 &&
+			!this.toolGateway.hasDurableArchive()
+		) {
+			throw new PipelineStageError(
+				"EVIDENCE",
+				"ToolGateway raw archive is not durable; verification command execution is blocked",
+				request.task.id,
+			);
 		}
 		tracer.record("REQUIREMENT", "Requirement Contract accepted", at);
 		if (request.lifecycle_hooks) {
@@ -597,8 +604,10 @@ export class PersonalPiPipeline {
 			permission_request: request.permission_request,
 			run_id: run.id,
 			resolved_context: resolvedContext,
+			tool_artifact_root: this.artifactStore.storageRootPath(),
 		};
 		let result: ResultContract;
+		let workerToolResults: ToolResultEnvelope[] = [];
 		try {
 			this.loopBudgetController.beforeModelCall(request.task);
 			const controls: WorkerExecutionControls = {
@@ -606,6 +615,7 @@ export class PersonalPiPipeline {
 				beforeToolCall: () => this.loopBudgetController.beforeToolCall(request.task),
 			};
 			const workerResult = await request.worker.execute(workerRequest, controls);
+			workerToolResults = request.worker.getToolResults?.() ?? [];
 			const trustedResult = {
 				...workerResult,
 				model_identity: request.worker.getModelIdentity?.() ?? createModelIdentity(requestedModel),
@@ -657,8 +667,10 @@ export class PersonalPiPipeline {
 		});
 
 		const verifierCommands: CommandEvidence[] = [];
-		const commandRiskClassifier =
-			request.command_risk_classifier ?? (request.lifecycle_hooks ? new CommandRiskClassifier() : undefined);
+		const verifierToolResults: ToolResultEnvelope[] = workerToolResults.map((toolResult) =>
+			structuredClone(toolResult),
+		);
+		const commandRiskClassifier = request.command_risk_classifier ?? new CommandRiskClassifier();
 		if (request.command_runner) {
 			for (const command of request.task.verification.commands) {
 				try {
@@ -701,6 +713,7 @@ export class PersonalPiPipeline {
 				if (authorization)
 					lifecycleEvidence.push(`command-risk:${authorization.classification.risk}:${authorization.action}`);
 				let commandEvidence: CommandEvidence | undefined;
+				let toolEnvelope: ToolResultEnvelope | undefined;
 				let toolExecuted = false;
 				if (request.lifecycle_hooks) {
 					const preTool = await request.lifecycle_hooks.run("pre_tool_use", {
@@ -714,17 +727,42 @@ export class PersonalPiPipeline {
 						},
 					});
 					recordLifecycleResult(lifecycleEvidence, preTool);
-					if (!preTool.allowed) commandEvidence = blockedCommandEvidence(command, "block", preTool.failures);
-				}
-				if (!commandEvidence && authorization && authorization.action !== "auto_run")
-					commandEvidence = blockedCommandEvidence(command, authorization.action, authorization.reasons);
-				if (!commandEvidence) {
-					try {
-						commandEvidence = await request.command_runner(command);
-						toolExecuted = commandEvidence !== undefined;
-					} catch {
-						// 缺失的命令证据由 Verifier 记为 UNKNOWN；不把环境异常伪装成通过。
+					if (!preTool.allowed) {
+						const blocked = this.toolGateway.createBlockedCommand({
+							command,
+							task_id: task.id,
+							task_revision: task.task_revision,
+							reason: blockedCommandReason("block", preTool.failures),
+							exit_code: 126,
+							captured_at: at,
+						});
+						toolEnvelope = blocked.envelope;
+						commandEvidence = blocked.command_evidence;
 					}
+				}
+				if (!commandEvidence && authorization && authorization.action !== "auto_run") {
+					const blocked = this.toolGateway.createBlockedCommand({
+						command,
+						task_id: task.id,
+						task_revision: task.task_revision,
+						reason: blockedCommandReason(authorization.action, authorization.reasons),
+						exit_code: authorization.action === "block" ? 126 : 125,
+						captured_at: at,
+					});
+					toolEnvelope = blocked.envelope;
+					commandEvidence = blocked.command_evidence;
+				}
+				if (!commandEvidence) {
+					const gatewayExecution = await this.toolGateway.executeCommand({
+						command,
+						task_id: task.id,
+						task_revision: task.task_revision,
+						runner: request.command_runner,
+						captured_at: at,
+					});
+					toolEnvelope = gatewayExecution.envelope;
+					commandEvidence = gatewayExecution.command_evidence;
+					toolExecuted = commandEvidence !== undefined;
 				}
 				if (commandEvidence && toolExecuted && request.lifecycle_hooks) {
 					const postTool = await request.lifecycle_hooks.run("post_tool_use", {
@@ -746,8 +784,15 @@ export class PersonalPiPipeline {
 							exit_code: commandEvidence.exit_code === 0 ? 126 : commandEvidence.exit_code,
 							stderr: [commandEvidence.stderr, ...postTool.failures].filter(Boolean).join("; "),
 						};
+						if (toolEnvelope)
+							toolEnvelope = this.toolGateway.markBlocked(
+								toolEnvelope,
+								commandEvidence.stderr,
+								commandEvidence.exit_code,
+							);
 					}
 				}
+				if (toolEnvelope) verifierToolResults.push(toolEnvelope);
 				if (commandEvidence) verifierCommands.push(commandEvidence);
 			}
 		}
@@ -757,6 +802,7 @@ export class PersonalPiPipeline {
 			...new Set([
 				...result.evidence,
 				...lifecycleEvidence,
+				...(verifierToolResults.length > 0 ? ["tool_result_envelope"] : []),
 				...(verifierCommands.some((command) => command.exit_code === 0) ? ["independent_command"] : []),
 			]),
 		];
@@ -792,9 +838,10 @@ export class PersonalPiPipeline {
 			run_id: run.id,
 			changed_files: result.changed_files,
 			commands: verifierCommands,
+			tool_results: verifierToolResults,
 			stdout: result.summary,
 			stderr: result.errors.join("; "),
-			artifacts: result.artifacts,
+			artifacts: [...result.artifacts, ...verifierToolResults.map((toolResult) => toolResult.artifact_id)],
 			evidence_types: evidenceTypes,
 			captured_at: at,
 			delivery_evidence_package: deliveryEvidencePackage,
@@ -810,7 +857,6 @@ export class PersonalPiPipeline {
 			evidence,
 			snapshot: verificationSnapshot,
 			currentSnapshot: request.current_snapshot ?? verificationSnapshot,
-			commandRunner: undefined,
 			recipeRegistry: request.recipe_registry,
 			workerStatus: result.status,
 			result: sanitizeResultForVerification(result),

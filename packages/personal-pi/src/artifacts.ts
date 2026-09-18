@@ -28,6 +28,14 @@ export class ArtifactStore {
 		if (rootPath) mkdirSync(rootPath, { recursive: true });
 	}
 
+	storageRootPath(): string | undefined {
+		return this.rootPath;
+	}
+
+	isDurable(): boolean {
+		return typeof this.rootPath === "string" && this.rootPath.length > 0;
+	}
+
 	registerSchema(type: string, schemaVersion: number, validator: ArtifactValidator): void {
 		this.validators.set(`${type}@${schemaVersion}`, validator);
 	}

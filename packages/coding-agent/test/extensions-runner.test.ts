@@ -804,6 +804,32 @@ describe("ExtensionRunner", () => {
 	});
 
 	describe("tool_result chaining", () => {
+		it("rejects when a tool_result handler throws so callers can fail closed", async () => {
+			const extCode = `
+				export default function(pi) {
+					pi.on("tool_result", async () => {
+						throw new Error("tool result shaping failed");
+					});
+				}
+			`;
+			fs.writeFileSync(path.join(extensionsDir, "tool-result-throws.ts"), extCode);
+
+			const result = await discoverAndLoadExtensions([], tempDir, tempDir);
+			const runner = new ExtensionRunner(result.extensions, result.runtime, tempDir, sessionManager, modelRegistry);
+
+			await expect(
+				runner.emitToolResult({
+					type: "tool_result",
+					toolName: "my_tool",
+					toolCallId: "call-throws",
+					input: {},
+					content: [{ type: "text", text: "RAW_SHOULD_NOT_FALL_THROUGH" }],
+					details: { raw: true },
+					isError: false,
+				}),
+			).rejects.toThrow("tool result shaping failed");
+		});
+
 		it("chains content modifications across handlers", async () => {
 			const extCode1 = `
 				export default function(pi) {

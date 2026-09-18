@@ -8,6 +8,7 @@ import { validateRoleProfile } from "./roles.ts";
 import { validateTaskContract } from "./schema.ts";
 import { clonePersistentState, createEmptyPersistentState, loadPersistentState } from "./state-file.ts";
 import { createTaskRecord, TaskStateMachine } from "./state-machine.ts";
+import { validateToolResultEnvelope } from "./tool-gateway.ts";
 import type {
 	AcceptanceRecord,
 	ControlPlaneReconstruction,
@@ -121,6 +122,15 @@ function assertWorkerRuntimeInvariant(state: PersistentState): void {
 			run.model_identity.requested_model !== result.model_identity.requested_model
 		)
 			throw new Error(`Result ${result.run_id} identity does not match its persisted Run`);
+	}
+	for (const evidence of state.evidence) {
+		for (const toolResult of evidence.tool_results ?? []) {
+			const validation = validateToolResultEnvelope(toolResult);
+			if (!validation.valid)
+				throw new Error(
+					`Evidence ${evidence.id} has invalid tool result envelope: ${validation.errors.join("; ")}`,
+				);
+		}
 	}
 	for (const verification of state.verifications) {
 		if (!verification.evidence_id) continue;
@@ -497,6 +507,11 @@ export class PersistentStateStore {
 	}
 
 	saveEvidence(evidence: EvidenceRecord): void {
+		for (const toolResult of evidence.tool_results ?? []) {
+			const validation = validateToolResultEnvelope(toolResult);
+			if (!validation.valid)
+				throw new Error(`cannot persist invalid tool result envelope: ${validation.errors.join("; ")}`);
+		}
 		if (evidence.delivery_evidence_package) {
 			const validation = validateDeliveryEvidencePackage(evidence.delivery_evidence_package);
 			if (!validation.valid)

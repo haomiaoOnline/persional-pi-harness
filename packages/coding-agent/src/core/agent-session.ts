@@ -90,6 +90,7 @@ import {
 	type ToolExecutionStartEvent,
 	type ToolExecutionUpdateEvent,
 	type ToolInfo,
+	type ToolResultEventResult,
 	type TreePreparation,
 	type TurnEndEvent,
 	type TurnStartEvent,
@@ -510,18 +511,28 @@ export class AgentSession {
 
 		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
 			const runner = this._extensionRunner;
-			const hookResult = runner.hasHandlers("tool_result")
-				? await runner.emitToolResult({
-						type: "tool_result",
-						toolName: toolCall.name,
-						toolCallId: toolCall.id,
-						input: args as Record<string, unknown>,
-						content: result.content,
-						details: result.details,
-						isError,
-						usage: result.usage,
-					})
-				: undefined;
+			let hookResult: ToolResultEventResult | undefined;
+			try {
+				hookResult = runner.hasHandlers("tool_result")
+					? await runner.emitToolResult({
+							type: "tool_result",
+							toolName: toolCall.name,
+							toolCallId: toolCall.id,
+							input: args as Record<string, unknown>,
+							content: result.content,
+							details: result.details,
+							isError,
+							usage: result.usage,
+						})
+					: undefined;
+			} catch {
+				return {
+					content: [{ type: "text", text: "Tool result processing failed closed" }],
+					details: {},
+					isError: true,
+					terminate: true,
+				};
+			}
 
 			const content = hookResult?.content ?? result.content ?? [];
 			// Runs after the extension hook so images injected or replaced by extensions are normalized too.

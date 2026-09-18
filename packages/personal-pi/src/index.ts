@@ -50,6 +50,7 @@ export * from "./stable-cli-readonly.ts";
 export * from "./state-file.ts";
 export * from "./state-machine.ts";
 export * from "./task-ledger.ts";
+export * from "./tool-gateway.ts";
 export * from "./trace.ts";
 export * from "./triggers.ts";
 export * from "./types.ts";

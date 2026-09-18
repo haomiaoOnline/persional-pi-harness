@@ -38,7 +38,9 @@ afterEach(() => {
 
 describe("T1.1-B loop budget runtime integration", () => {
 	test("bounds Worker -> Verifier FAIL -> Repair -> Worker across Runs", async () => {
-		const store = new PersistentStateStore();
+		const directory = mkdtempSync(join(tmpdir(), "personal-pi-repair-loop-"));
+		temporaryDirectories.push(directory);
+		const store = new PersistentStateStore(join(directory, "state.json"));
 		const task = makeV3Task("repair-loop", {
 			verification: {
 				strategy: "automated",

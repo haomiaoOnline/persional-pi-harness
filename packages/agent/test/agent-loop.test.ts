@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { agentLoop, agentLoopContinue } from "../src/agent-loop.ts";
 import { setDefaultStreamFn } from "../src/index.ts";
 import type { AgentContext, AgentEvent, AgentLoopConfig, AgentMessage, AgentTool } from "../src/types.ts";
+import { AgentToolExecutionError } from "../src/types.ts";
 
 // Mock stream for testing - mimics MockAssistantStream
 class MockAssistantStream extends EventStream<AssistantMessageEvent, AssistantMessage> {
@@ -1256,6 +1257,7 @@ describe("agentLoop with AgentMessage", () => {
 	it("should stop after a blocked tool call when beforeToolCall sets terminate=true", async () => {
 		const toolSchema = Type.Object({ value: Type.String() });
 		let executed = false;
+		let afterToolCallCount = 0;
 		const tool: AgentTool<typeof toolSchema, { value: string }> = {
 			name: "echo",
 			label: "Echo",
@@ -1278,6 +1280,12 @@ describe("agentLoop with AgentMessage", () => {
 			model: createModel(),
 			convertToLlm: identityConverter,
 			beforeToolCall: async () => ({ block: true, reason: "Blocked by policy", terminate: true }),
+			afterToolCall: async ({ result, isError }) => {
+				afterToolCallCount += 1;
+				expect(isError).toBe(true);
+				expect(result.content).toContainEqual({ type: "text", text: "Blocked by policy" });
+				return { content: [{ type: "text", text: "bounded blocked result" }] };
+			},
 		};
 
 		let llmCalls = 0;
@@ -1304,12 +1312,70 @@ describe("agentLoop with AgentMessage", () => {
 		const messages = await stream.result();
 		const toolResult = messages.find((message) => message.role === "toolResult");
 		expect(executed).toBe(false);
+		expect(afterToolCallCount).toBe(1);
 		expect(llmCalls).toBe(1);
 		expect(toolResult?.role === "toolResult" ? toolResult.isError : false).toBe(true);
 		expect(toolResult?.role === "toolResult" ? toolResult.content : []).toContainEqual({
 			type: "text",
-			text: "Blocked by policy",
+			text: "bounded blocked result",
 		});
+	});
+
+	it("should preserve structured tool failure results through afterToolCall and tool_execution_end", async () => {
+		const toolSchema = Type.Object({ value: Type.String() });
+		const preservedDetails = { fullOutputPath: "/tmp/preserved-tool-output.log", marker: "structured" };
+		const tool: AgentTool<typeof toolSchema, typeof preservedDetails> = {
+			name: "echo",
+			label: "Echo",
+			description: "Echo tool",
+			parameters: toolSchema,
+			async execute() {
+				throw new AgentToolExecutionError("structured failure", {
+					content: [{ type: "text", text: "bounded failure content" }],
+					details: preservedDetails,
+				});
+			},
+		};
+		const context: AgentContext = { systemPrompt: "", messages: [], tools: [tool] };
+		let afterToolCallCount = 0;
+		const config: AgentLoopConfig = {
+			model: createModel(),
+			convertToLlm: identityConverter,
+			afterToolCall: async ({ result, isError }) => {
+				afterToolCallCount += 1;
+				expect(isError).toBe(true);
+				expect(result.details).toEqual(preservedDetails);
+				expect(result.content).toContainEqual({ type: "text", text: "bounded failure content" });
+				return undefined;
+			},
+		};
+
+		let llmCalls = 0;
+		const stream = agentLoop([createUserMessage("run failing tool")], context, config, undefined, () => {
+			llmCalls += 1;
+			const mockStream = new MockAssistantStream();
+			queueMicrotask(() => {
+				const message =
+					llmCalls === 1
+						? createAssistantMessage(
+								[{ type: "toolCall", id: "tool-structured-error", name: "echo", arguments: { value: "x" } }],
+								"toolUse",
+							)
+						: createAssistantMessage([{ type: "text", text: "done" }]);
+				mockStream.push({ type: "done", reason: llmCalls === 1 ? "toolUse" : "stop", message });
+			});
+			return mockStream;
+		});
+		const events: AgentEvent[] = [];
+		for await (const event of stream) events.push(event);
+
+		const toolEnd = events.find((event) => event.type === "tool_execution_end");
+		expect(afterToolCallCount).toBe(1);
+		expect(toolEnd?.type === "tool_execution_end" ? toolEnd.isError : false).toBe(true);
+		expect(toolEnd?.type === "tool_execution_end" ? toolEnd.result.details : undefined).toEqual(preservedDetails);
+		const messages = await stream.result();
+		const toolResult = messages.find((message) => message.role === "toolResult");
+		expect(toolResult?.role === "toolResult" ? toolResult.details : undefined).toEqual(preservedDetails);
 	});
 
 	it("should continue after a mixed batch with one terminating blocked call", async () => {

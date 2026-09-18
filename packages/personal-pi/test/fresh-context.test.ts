@@ -235,7 +235,9 @@ describe("T3.5 Fresh Context / receipt-only handoff", () => {
 	});
 
 	test("cannot downgrade verified failure provenance or rebind an old Run to a newer task revision", async () => {
-		const store = new PersistentStateStore();
+		const directory = mkdtempSync(join(tmpdir(), "personal-pi-verified-failure-"));
+		temporaryDirectories.push(directory);
+		const store = new PersistentStateStore(join(directory, "state.json"));
 		const verifiedFailureTask = task("task-verified-failure");
 		verifiedFailureTask.verification.commands = ["verify-fails"];
 		verifiedFailureTask.verification.evidence_required = [];

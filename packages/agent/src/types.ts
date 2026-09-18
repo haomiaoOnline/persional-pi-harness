@@ -114,9 +114,9 @@ export interface AfterToolCallContext {
 	toolCall: AgentToolCall;
 	/** Validated tool arguments for the target tool schema. */
 	args: unknown;
-	/** The executed tool result before any `afterToolCall` overrides are applied. */
+	/** The tool outcome before any `afterToolCall` overrides are applied, including pre-execution blocks/errors. */
 	result: AgentToolResult<any>;
-	/** Whether the executed tool result is currently treated as an error. */
+	/** Whether the tool outcome is currently treated as an error. */
 	isError: boolean;
 	/** Current agent context at the time the tool call is finalized. */
 	context: AgentContext;
@@ -373,6 +373,23 @@ export interface AgentToolResult<T> {
 	 * Early termination only happens when every finalized tool result in the batch sets this to true.
 	 */
 	terminate?: boolean;
+}
+
+/**
+ * Tool failure that intentionally carries a structured result to the agent loop.
+ *
+ * Use this when a tool must fail (`isError=true`) without discarding durable
+ * result metadata such as a backing output artifact path. Ordinary thrown
+ * errors continue to be converted into a minimal text-only error result.
+ */
+export class AgentToolExecutionError<T = any> extends Error {
+	readonly result: AgentToolResult<T>;
+
+	constructor(message: string, result: AgentToolResult<T>) {
+		super(message);
+		this.name = "AgentToolExecutionError";
+		this.result = result;
+	}
 }
 
 /**
