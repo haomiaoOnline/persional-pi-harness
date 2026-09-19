@@ -9,6 +9,7 @@ import type {
 	EvidenceRecord,
 	JsonValue,
 	ProviderMode,
+	SourceProvenance,
 	ToolResultEnvelope,
 	ValidationResult,
 	WorkspaceSnapshot,
@@ -74,6 +75,80 @@ export function deliveryEvidencePackageDigest(value: DeliveryEvidencePackage): s
 	return digestFor(value as unknown as JsonValue);
 }
 
+const SOURCE_TYPES = new Set<SourceProvenance["source_type"]>([
+	"official",
+	"filing",
+	"media",
+	"third_party",
+	"derived",
+]);
+
+function isJsonValue(value: unknown): value is JsonValue {
+	if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+		return true;
+	if (Array.isArray(value)) return value.every(isJsonValue);
+	if (typeof value !== "object") return false;
+	return Object.values(value).every(isJsonValue);
+}
+
+export function validateSourceProvenance(value: unknown): ValidationResult<SourceProvenance> {
+	if (!value || typeof value !== "object" || Array.isArray(value))
+		return { valid: false, errors: ["/: must be an object"] };
+	const candidate = value as Record<string, unknown>;
+	const allowed = new Set([
+		"source_ref",
+		"source_type",
+		"published_at",
+		"observed_at",
+		"metric",
+		"value",
+		"unit",
+		"period",
+		"population_scope",
+		"formula_ref",
+		"input_evidence_refs",
+		"confidence",
+	]);
+	const errors: string[] = [];
+	for (const key of Object.keys(candidate)) if (!allowed.has(key)) errors.push(`/${key}: unsupported field`);
+	for (const field of ["source_ref", "observed_at", "metric"] as const) {
+		if (typeof candidate[field] !== "string" || candidate[field].trim().length === 0)
+			errors.push(`/${field}: required`);
+	}
+	if (
+		typeof candidate.source_type !== "string" ||
+		!SOURCE_TYPES.has(candidate.source_type as SourceProvenance["source_type"])
+	)
+		errors.push("/source_type: invalid source type");
+	if (!isJsonValue(candidate.value)) errors.push("/value: must be JSON-compatible");
+	if (
+		typeof candidate.confidence !== "number" ||
+		!Number.isFinite(candidate.confidence) ||
+		candidate.confidence < 0 ||
+		candidate.confidence > 1
+	)
+		errors.push("/confidence: must be between 0 and 1");
+	for (const field of ["published_at", "unit", "period", "population_scope", "formula_ref"] as const) {
+		if (candidate[field] !== undefined && typeof candidate[field] !== "string")
+			errors.push(`/${field}: must be a string`);
+	}
+	if (
+		candidate.input_evidence_refs !== undefined &&
+		(!Array.isArray(candidate.input_evidence_refs) ||
+			candidate.input_evidence_refs.some((item) => typeof item !== "string" || !item.trim()))
+	)
+		errors.push("/input_evidence_refs: must be non-empty strings");
+	if (
+		candidate.source_type === "derived" &&
+		!(typeof candidate.formula_ref === "string" && candidate.formula_ref.trim()) &&
+		!(Array.isArray(candidate.input_evidence_refs) && candidate.input_evidence_refs.length > 0)
+	)
+		errors.push("/formula_ref: derived provenance requires formula_ref or input_evidence_refs");
+	return errors.length === 0
+		? { valid: true, value: structuredClone(value as SourceProvenance), errors: [] }
+		: { valid: false, errors };
+}
+
 export function createDeliveryEvidencePackage(input: {
 	baseline_commit: string;
 	task_revision: number;
@@ -121,6 +196,7 @@ export interface EvidenceInput {
 	build_result?: string;
 	artifacts?: string[];
 	evidence_types?: string[];
+	source_provenance?: SourceProvenance[];
 	captured_at?: string;
 	delivery_evidence_package?: DeliveryEvidencePackage;
 }
@@ -136,6 +212,10 @@ export class EvidenceCollector {
 			const validation = validateDeliveryEvidencePackage(input.delivery_evidence_package);
 			if (!validation.valid) throw new Error(`invalid delivery evidence package: ${validation.errors.join("; ")}`);
 		}
+		for (const provenance of input.source_provenance ?? []) {
+			const validation = validateSourceProvenance(provenance);
+			if (!validation.valid) throw new Error(`invalid source provenance: ${validation.errors.join("; ")}`);
+		}
 		return {
 			id: randomUUID(),
 			task_id: input.task_id,
@@ -150,6 +230,7 @@ export class EvidenceCollector {
 			build_result: input.build_result,
 			artifacts: [...(input.artifacts ?? [])],
 			evidence_types: [...new Set(input.evidence_types ?? [])],
+			...(input.source_provenance ? { source_provenance: structuredClone(input.source_provenance) } : {}),
 			...(input.delivery_evidence_package
 				? { delivery_evidence_package: structuredClone(input.delivery_evidence_package) }
 				: {}),
