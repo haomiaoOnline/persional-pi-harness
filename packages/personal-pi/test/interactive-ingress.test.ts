@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { SessionManager } from "../../coding-agent/src/core/session-manager.ts";
 import { routeInteractiveSubmission } from "../../coding-agent/src/modes/interactive/interactive-ingress.ts";
 import { createPersonalPiInteractiveIngressFactory, PersistentStateStore } from "../src/index.ts";
 
@@ -31,15 +32,20 @@ function writeFakePiCli(directory: string): string {
 	writeFileSync(
 		scriptPath,
 		`import { writeFileSync } from "node:fs";
-const markerPath = process.argv[2];
-const args = process.argv.slice(3);
-writeFileSync(markerPath, JSON.stringify(args));
-const result = JSON.stringify({
-  status: "success",
-  summary: "deterministic child worker completed",
-  changed_files: [],
-  artifacts: [],
-  evidence: ["fake-child-process"],
+	const markerPath = process.argv[2];
+	const args = process.argv.slice(3);
+	writeFileSync(markerPath, JSON.stringify(args));
+	const prompt = args.at(-1) ?? "";
+	const contractMarker = "CONTRACT_PAYLOAD_JSON:\\n";
+	const contractIndex = prompt.lastIndexOf(contractMarker);
+	const payload = contractIndex >= 0 ? JSON.parse(prompt.slice(contractIndex + contractMarker.length)) : {};
+	const taskId = String(payload.id ?? "unknown-task");
+	const result = JSON.stringify({
+	  status: "success",
+	  summary: "TRANSCRIPT_ONLY_MARKER:" + taskId,
+	  changed_files: [],
+	  artifacts: [],
+	  evidence: ["fake-child-process"],
   errors: [],
   work_receipt: {
     work_attempted: true,
@@ -83,12 +89,15 @@ describe("T7.0 bundled interactive Personal PI composition", () => {
 		const markerPath = join(workerFixtureDirectory, "worker-argv.json");
 		const fakeCli = writeFakePiCli(workerFixtureDirectory);
 		const permissionGateUrl = new URL("../src/adapters/pi-permission-gate.ts", import.meta.url);
+		const session = SessionManager.inMemory(cwd);
 		const handler = createPersonalPiInteractiveIngressFactory({
 			state_path: statePath,
 			task_id_factory: () => "interactive-task-1",
 			permission_gate_path: permissionGateUrl,
 			provider_mode: "mock",
+			execution_surface: { pph_commit: "pph-commit-fixture", bundle_sha256: "bundle-sha-fixture" },
 		})({
+			recordExecutionSurface: (metadata) => session.appendCustomEntry("personal-pi.execution-surface", metadata),
 			getWorkerRoute: () => ({
 				cwd,
 				command: process.execPath,
@@ -128,6 +137,89 @@ describe("T7.0 bundled interactive Personal PI composition", () => {
 		expect(state.runs).toHaveLength(1);
 		expect(state.runs[0]?.task_id).toBe("interactive-task-1");
 		expect(state.loop_usage["interactive-task-1"]?.attempts).toBe(1);
+		const surfaceEntry = session
+			.getEntries()
+			.find((entry) => entry.type === "custom" && entry.customType === "personal-pi.execution-surface");
+		expect(surfaceEntry?.type === "custom" ? surfaceEntry.data : undefined).toEqual({
+			entrypoint: "interactive",
+			pph_commit: "pph-commit-fixture",
+			bundle_sha256: "bundle-sha-fixture",
+			ingress_bound: true,
+			pipeline_bound: true,
+			scheduler_enabled: true,
+			scheduler_kind: "direct",
+		});
+		expect(JSON.stringify(session.buildSessionContext().messages)).not.toContain("pph-commit-fixture");
+	});
+
+	test("fans explicit multi-entity research out through WorkerPool and fans in through receipt-only context", async () => {
+		const cwd = temporaryDirectory();
+		initializeGitRepository(cwd);
+		const fixtureDirectory = temporaryDirectory();
+		const statePath = join(fixtureDirectory, "state.json");
+		const markerPath = join(fixtureDirectory, "worker-argv.json");
+		const fakeCli = writeFakePiCli(fixtureDirectory);
+		const permissionGateUrl = new URL("../src/adapters/pi-permission-gate.ts", import.meta.url);
+		const session = SessionManager.inMemory(cwd);
+		const handler = createPersonalPiInteractiveIngressFactory({
+			state_path: statePath,
+			task_id_factory: () => "multi-research",
+			permission_gate_path: permissionGateUrl,
+			provider_mode: "mock",
+			max_parallel_workers: 2,
+			execution_surface: { pph_commit: "pph-v3.5", bundle_sha256: "bundle-v3.5" },
+		})({
+			recordExecutionSurface: (metadata) => session.appendCustomEntry("personal-pi.execution-surface", metadata),
+			getWorkerRoute: () => ({
+				cwd,
+				command: process.execPath,
+				command_args_prefix: [fakeCli, markerPath],
+				provider: "fake-provider",
+				model: "fake-model",
+				thinking: "low",
+				active_tools: ["read"],
+				worker_status: { worker_capability: "available", execution_mode: "normal", delivery_status: "normal" },
+			}),
+		});
+
+		await handler({ text: "分别调研以下厂商并汇总同一组指标：\n1. OpenAI\n2. Anthropic" });
+
+		const state = new PersistentStateStore(statePath).read();
+		const leafTasks = state.tasks.filter((task) => task.id.startsWith("multi-research:unit-"));
+		expect(leafTasks).toHaveLength(2);
+		expect(leafTasks.every((task) => task.state === "DONE")).toBe(true);
+		expect(state.tasks.find((task) => task.id === "multi-research:fan-in")?.state).toBe("DONE");
+		expect(state.graphs).toHaveLength(1);
+		expect(state.graphs[0]?.nodes.map((node) => node.task_id)).toEqual(
+			expect.arrayContaining(["multi-research", "multi-research:unit-1", "multi-research:unit-2"]),
+		);
+		const leafDispatches = state.dispatches.filter((dispatch) => dispatch.task_id.startsWith("multi-research:unit-"));
+		expect(leafDispatches).toHaveLength(2);
+		for (const dispatch of leafDispatches) {
+			expect(dispatch.requested_mode).toBe("parallel");
+			expect(dispatch.effective_mode).toBe("parallel");
+			expect(dispatch.effective_worker_count).toBeGreaterThanOrEqual(2);
+			expect(dispatch.overlap_proof_ref).toMatch(/^[a-f0-9]{64}$/);
+		}
+		const fanInArgs = JSON.parse(readFileSync(markerPath, "utf8")) as string[];
+		const fanInPrompt = fanInArgs.at(-1) ?? "";
+		for (const leaf of leafTasks) {
+			expect(fanInPrompt).not.toContain(`TRANSCRIPT_ONLY_MARKER:${leaf.id}`);
+			expect(fanInPrompt).toContain(leaf.id);
+		}
+		const fanInTrace = state.traces.find((trace) => trace.task_id === "multi-research:fan-in");
+		expect(fanInTrace).toBeTruthy();
+		const surface = session
+			.getEntries()
+			.find((entry) => entry.type === "custom" && entry.customType === "personal-pi.execution-surface");
+		expect(surface?.type === "custom" ? surface.data : undefined).toMatchObject({
+			entrypoint: "interactive",
+			ingress_bound: true,
+			pipeline_bound: true,
+			scheduler_enabled: true,
+			scheduler_kind: "worker_pool",
+		});
+		expect(JSON.stringify(session.buildSessionContext().messages)).not.toContain("pph-v3.5");
 	});
 
 	test("persists degraded dispatch and fails closed before raw fallback when the worker is unavailable", async () => {
