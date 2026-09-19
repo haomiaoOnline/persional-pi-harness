@@ -5,6 +5,7 @@ import type {
 	DependencyComplexity,
 	DispatchDecision,
 	Parallelism,
+	ParallelPlanHint,
 	PlanApproval,
 	PlanQualityChecklist,
 	PlanQualityGateResult,
@@ -130,6 +131,48 @@ export interface AssessmentSuggestion {
 	parallelism?: Parallelism;
 	verification?: TaskAssessment["verification"];
 	confidence?: number;
+	parallel_plan_hint?: ParallelPlanHint;
+}
+
+function normalizedWorkUnitLabel(value: string): string {
+	return value.replace(/^\s*(?:[-*•]|\d+[.)、]|[（(]\d+[）)])\s*/, "").trim();
+}
+
+function explicitFilePaths(value: string): string[] {
+	return value.match(/(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+\.[A-Za-z0-9]+/g) ?? [];
+}
+
+function hasDeterministicWriteConflict(description: string, candidates: readonly string[]): boolean {
+	const writeIntent = /\b(?:edit|write|modify|update|change)\b|(?:修改|编辑|写入|更新)/i;
+	if (writeIntent.test(description) && /(?:同一|相同)(?:个)?文件/.test(description)) return true;
+	const writePaths = candidates.flatMap((candidate) =>
+		writeIntent.test(candidate) ? explicitFilePaths(candidate) : [],
+	);
+	return new Set(writePaths).size < writePaths.length;
+}
+
+export function deriveParallelPlanHint(description: string): ParallelPlanHint | undefined {
+	if (!/(?:分别|逐个|每个|并行|独立|research|analy[sz]e|compare|调研|研究|比较)/i.test(description)) return undefined;
+	const candidates = description
+		.split(/\r?\n/)
+		.map(normalizedWorkUnitLabel)
+		.filter((line, index, lines) => {
+			if (!line || line.length > 160) return false;
+			const original = description.split(/\r?\n/)[index] ?? "";
+			if (!/^\s*(?:[-*•]|\d+[.)、]|[（(]\d+[）)])\s*\S/.test(original)) return false;
+			return lines.indexOf(line) === index;
+		});
+	if (candidates.length < 2) return undefined;
+	if (hasDeterministicWriteConflict(description, candidates)) return undefined;
+	return {
+		independent_units: candidates.map((objective, index) => ({
+			key: `unit-${index + 1}`,
+			objective,
+			source_scope: [],
+		})),
+		shared_context_refs: [],
+		fan_in_required: true,
+	};
 }
 
 function minimumRisk(signals: readonly string[]): RiskLevel {
@@ -161,8 +204,12 @@ export function assessTask(
 	const dependency =
 		suggestion.dependency ??
 		(/\b(depends|dependency|integration|integrate|migration|依赖|集成|迁移)\b/i.test(input) ? "complex" : "simple");
+	const parallelPlanHint = suggestion.parallel_plan_hint ?? deriveParallelPlanHint(description);
 	const parallelism =
-		suggestion.parallelism ?? (files.length > 1 && dependency === "simple" ? "eligible" : "ineligible");
+		suggestion.parallelism ??
+		(dependency === "simple" && (files.length > 1 || (parallelPlanHint?.independent_units.length ?? 0) > 1)
+			? "eligible"
+			: "ineligible");
 	const verification = suggestion.verification ?? (risk === "high" ? "strong" : "strong");
 	const confidence = suggestion.confidence ?? (uncertainty === "high" ? 0.55 : 0.9);
 	const contextBudget = Math.max(2_000, 2_000 + files.length * 500 + Math.ceil(description.length / 4));
@@ -177,6 +224,7 @@ export function assessTask(
 		context_budget: contextBudget,
 		confidence,
 		capability_tags: extractCapabilityTags(description, files),
+		...(parallelPlanHint ? { parallel_plan_hint: structuredClone(parallelPlanHint) } : {}),
 	};
 }
 

@@ -156,6 +156,37 @@ describe("T2.2 assessment and T2.3 dispatch", () => {
 		expect(assessment.capability_tags).toEqual(expect.arrayContaining(["browsing", "tool_use", "math", "coding"]));
 	});
 
+	test("recognizes explicit multi-entity research units without relying on file count", () => {
+		const assessment = assessTask(
+			"分别调研以下厂商并比较同一组指标：\n1. OpenAI\n2. Anthropic\n3. Google\n4. DeepSeek",
+			["."],
+		);
+		expect(assessment.parallelism).toBe("eligible");
+		expect(assessment.parallel_plan_hint?.independent_units.map((unit) => unit.objective)).toEqual([
+			"OpenAI",
+			"Anthropic",
+			"Google",
+			"DeepSeek",
+		]);
+		expect(assessment.parallel_plan_hint?.fan_in_required).toBe(true);
+	});
+
+	test("does not mark write-conflicting work as parallel solely from multiple files", () => {
+		const assessment = assessTask("Integrate dependent changes into the same output", ["src/a.ts", "src/b.ts"], {
+			dependency: "complex",
+		});
+		expect(assessment.parallelism).toBe("ineligible");
+	});
+
+	test("does not parallelize explicit units that both modify the same file", () => {
+		const assessment = assessTask(
+			"分别修改以下目标并汇总，但两个目标都要改同一文件：\n1. 修改 src/shared.ts 中的 parser\n2. 修改 src/shared.ts 中的 formatter",
+			["src/shared.ts"],
+		);
+		expect(assessment.parallel_plan_hint).toBeUndefined();
+		expect(assessment.parallelism).toBe("ineligible");
+	});
+
 	test("chooses dispatch mode, tier, and a role-bounded candidate", () => {
 		const task = makeTask();
 		const assessment = assessTask("Implement a complex API integration", [
