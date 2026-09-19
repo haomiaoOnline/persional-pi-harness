@@ -154,6 +154,13 @@ export interface WorkerExecutionControls {
 	beforeToolCall(): LoopUsage;
 	observeContextUsage?(observation: ContextBudgetObservation): ContextBudgetWatermark;
 	observePromptViewAudit?(audit: PromptViewAudit): void;
+	observeBackpressure?(observation: {
+		scope: "domain" | "provider";
+		source: string;
+		action: "ALLOW" | "QUEUE";
+		wait_ms: number;
+		reason: string;
+	}): void;
 }
 
 export type ContextBudgetLayer = "tool_output" | "prompt" | "run" | "task";
@@ -364,6 +371,7 @@ export type Uncertainty = "low" | "medium" | "high";
 export type DependencyComplexity = "simple" | "complex";
 export type Parallelism = "eligible" | "ineligible";
 export type DispatchMode = "SINGLE_WORKER" | "DECOMPOSE" | "PARALLEL" | "BATCH";
+export type DispatchExecutorKind = "direct_worker" | "worker_pool" | "batch_executor" | "decomposer";
 
 export interface Preclassification {
 	path: RiskPath;
@@ -391,6 +399,20 @@ export interface TaskAssessment {
 	context_budget: number;
 	confidence: number;
 	capability_tags: string[];
+	parallel_plan_hint?: ParallelPlanHint;
+}
+
+export interface ParallelWorkUnit {
+	key: string;
+	objective: string;
+	source_scope: string[];
+	output_schema_ref?: string;
+}
+
+export interface ParallelPlanHint {
+	independent_units: ParallelWorkUnit[];
+	shared_context_refs: string[];
+	fan_in_required: boolean;
 }
 
 export interface DispatchDecision {
@@ -710,6 +732,16 @@ export interface ToolArtifactPage {
 
 export type ProviderMode = "mock" | "local" | "real";
 
+export interface ExecutionSurfaceAttestation {
+	entrypoint: "interactive" | "stable_cli" | "api" | "other";
+	pph_commit: string;
+	bundle_sha256: string;
+	ingress_bound: boolean;
+	pipeline_bound: boolean;
+	scheduler_enabled: boolean;
+	scheduler_kind: "direct" | "worker_pool";
+}
+
 export interface DeliveryEvidencePackage {
 	baseline_commit: string;
 	actual_diff: {
@@ -727,6 +759,23 @@ export interface DeliveryEvidencePackage {
 	browser_or_container_verification: string[];
 	unfinished_items: string[];
 	provider_mode: ProviderMode;
+}
+
+export type SourceProvenanceType = "official" | "filing" | "media" | "third_party" | "derived";
+
+export interface SourceProvenance {
+	source_ref: string;
+	source_type: SourceProvenanceType;
+	published_at?: string;
+	observed_at: string;
+	metric: string;
+	value: JsonValue;
+	unit?: string;
+	period?: string;
+	population_scope?: string;
+	formula_ref?: string;
+	input_evidence_refs?: string[];
+	confidence: number;
 }
 
 export interface EvidenceRecord {
@@ -747,6 +796,7 @@ export interface EvidenceRecord {
 	build_result?: string;
 	artifacts: string[];
 	evidence_types: string[];
+	source_provenance?: SourceProvenance[];
 	/** Optional only for loading/replaying pre-v3.4 legacy Evidence. New verification requires it. */
 	delivery_evidence_package?: DeliveryEvidencePackage;
 }
@@ -1066,7 +1116,13 @@ export interface DispatchRecord {
 	task_id: string;
 	worker_id: string;
 	lease_epoch?: number;
-	mode: ExecutionMode;
+	requested_mode: ExecutionMode;
+	effective_mode: ExecutionMode;
+	executor_kind: DispatchExecutorKind;
+	planned_worker_count: number;
+	effective_worker_count: number;
+	degrade_reason?: string;
+	overlap_proof_ref?: string;
 	worker_status: WorkerStatus;
 	requested_model: string;
 	created_at: string;

@@ -47,6 +47,7 @@ import type {
 	DispatchDecision,
 	DispatchRecord,
 	EvidenceRecord,
+	ExecutionMode,
 	ExecutionTrace,
 	Lease,
 	MasterHandoffReceipt,
@@ -135,6 +136,15 @@ export interface PipelineRequest {
 	workspace_snapshot_provider?: (artifacts: readonly string[]) => WorkspaceSnapshot;
 	existing_task?: TaskRecord;
 	definition_of_ready?: DefinitionOfReadyInput;
+	dispatch_execution?: {
+		requested_mode: ExecutionMode;
+		effective_mode: ExecutionMode;
+		executor_kind: DispatchRecord["executor_kind"];
+		planned_worker_count: number;
+		effective_worker_count: number;
+		degrade_reason?: string;
+		overlap_proof_ref?: string;
+	};
 	at?: string;
 }
 
@@ -148,6 +158,7 @@ export interface PipelineExecution {
 	preclassification: Preclassification;
 	assessment: TaskAssessment;
 	dispatch: DispatchDecision;
+	dispatch_record: DispatchRecord;
 	decisions: DecisionRecord[];
 	resolved_context?: ResolvedContext;
 	trace: ExecutionTrace;
@@ -164,11 +175,30 @@ export interface PersonalPiPipelineOptions {
 	tool_gateway?: ToolGateway;
 }
 
-function dispatchMode(mode: DispatchDecision["mode"]): DispatchRecord["mode"] {
+function dispatchMode(mode: DispatchDecision["mode"]): ExecutionMode {
 	if (mode === "DECOMPOSE") return "decompose";
 	if (mode === "PARALLEL") return "parallel";
 	if (mode === "BATCH") return "batch";
 	return "single";
+}
+
+function directDispatchExecution(
+	dispatch: DispatchDecision,
+	assessment: TaskAssessment,
+): NonNullable<PipelineRequest["dispatch_execution"]> {
+	const requestedMode = dispatchMode(dispatch.mode);
+	const plannedWorkerCount =
+		requestedMode === "parallel" ? Math.max(2, assessment.parallel_plan_hint?.independent_units.length ?? 0) : 1;
+	return {
+		requested_mode: requestedMode,
+		effective_mode: "single",
+		executor_kind: "direct_worker",
+		planned_worker_count: plannedWorkerCount,
+		effective_worker_count: 1,
+		...(requestedMode !== "single"
+			? { degrade_reason: "single-task Pipeline requires an outer DispatchExecutor for non-single execution" }
+			: {}),
+	};
 }
 
 function failureResult(
@@ -428,14 +458,15 @@ export class PersonalPiPipeline {
 		);
 		tracer.record("ASSESSMENT", `${assessment.risk}/${assessment.workload}`, at);
 		const dispatch = createDispatchDecision(request.task, assessment, request.role_profile);
+		const dispatchExecution = request.dispatch_execution ?? directDispatchExecution(dispatch, assessment);
 		tracer.record("DISPATCH", dispatch.mode, at, {
 			worker_tier: dispatch.worker_tier,
 			reasoning_depth: dispatch.reasoning_depth,
-			graph_width: 1,
-			graph_depth: 1,
-			active_workers: workerStatus.worker_capability === "available" ? 1 : 0,
-			handoff_count: 0,
-			replan_count: 0,
+			requested_mode: dispatchExecution.requested_mode,
+			effective_mode: dispatchExecution.effective_mode,
+			executor_kind: dispatchExecution.executor_kind,
+			planned_worker_count: dispatchExecution.planned_worker_count,
+			effective_worker_count: dispatchExecution.effective_worker_count,
 		});
 		const decisions = [
 			createDecisionRecord(
@@ -551,7 +582,12 @@ export class PersonalPiPipeline {
 				id: randomUUID(),
 				task_id: task.id,
 				worker_id: request.worker.worker_id,
-				mode: dispatchMode(dispatch.mode),
+				requested_mode: dispatchExecution.requested_mode,
+				effective_mode: "single",
+				executor_kind: dispatchExecution.executor_kind,
+				planned_worker_count: dispatchExecution.planned_worker_count,
+				effective_worker_count: 0,
+				degrade_reason: dispatchExecution.degrade_reason ?? "worker capability unavailable",
 				worker_status: structuredClone(workerStatus),
 				requested_model: requestedModel,
 				created_at: at,
@@ -569,11 +605,16 @@ export class PersonalPiPipeline {
 			new TaskStateMachine().transition(task, "RUNNING", "dispatch policy accepted", at),
 		);
 		tracer.record("DOR", "Definition of Ready passed", at);
-		tracer.record("WORKER", request.worker.worker_id, at);
+		tracer.record("WORKER", request.worker.worker_id, at, {
+			graph_width: 1,
+			graph_depth: 1,
+			active_workers: 1,
+		});
 		let run!: RunRecord;
 		let lease!: Lease;
 		let workerRequest!: WorkerProtocolRequest;
 		let result!: ResultContract;
+		let dispatchRecord!: DispatchRecord;
 		let workerToolResults: ToolResultEnvelope[] = [];
 		let suppressOptionalContext = false;
 		const workerContextLimit =
@@ -616,16 +657,23 @@ export class PersonalPiPipeline {
 			});
 			tracer.attachRun(run.id);
 			tracer.record("RUN", "Run created", at);
-			this.stateStore.addDispatch({
+			dispatchRecord = {
 				id: randomUUID(),
 				task_id: task.id,
 				worker_id: request.worker.worker_id,
 				lease_epoch: lease.lease_epoch,
-				mode: dispatchMode(dispatch.mode),
+				requested_mode: dispatchExecution.requested_mode,
+				effective_mode: dispatchExecution.effective_mode,
+				executor_kind: dispatchExecution.executor_kind,
+				planned_worker_count: dispatchExecution.planned_worker_count,
+				effective_worker_count: dispatchExecution.effective_worker_count,
+				degrade_reason: dispatchExecution.degrade_reason,
+				overlap_proof_ref: dispatchExecution.overlap_proof_ref,
 				worker_status: structuredClone(workerStatus),
 				requested_model: requestedModel,
 				created_at: at,
-			});
+			};
+			this.stateStore.addDispatch(dispatchRecord);
 
 			const previousBudget = this.stateStore.getContextBudgetState(task.id);
 			let contextBudget = createContextBudgetState({
@@ -671,6 +719,15 @@ export class PersonalPiPipeline {
 					beforeModelCall: () => this.loopBudgetController.beforeModelCall(request.task),
 					beforeToolCall: () => this.loopBudgetController.beforeToolCall(request.task),
 					observePromptViewAudit: (audit) => tracer.addPromptViewAudit(audit),
+					observeBackpressure: (observation) => {
+						if (observation.action !== "QUEUE" && observation.wait_ms <= 0) return;
+						tracer.record("WORKER", `backpressure:${observation.scope}:${observation.source}`, at, {
+							backpressure_scope: observation.scope,
+							backpressure_source: observation.source,
+							backpressure_wait_ms: observation.wait_ms,
+							backpressure_action: observation.action,
+						});
+					},
 					observeContextUsage: (observation) => {
 						if (!contextBudgetMetricsAreValid(observation.metrics)) {
 							throw new ContextRebuildRequiredError(
@@ -1179,6 +1236,8 @@ export class PersonalPiPipeline {
 			preclassification,
 			assessment,
 			dispatch,
+			dispatch_record:
+				this.stateStore.read().dispatches.find((candidate) => candidate.id === dispatchRecord.id) ?? dispatchRecord,
 			decisions: [
 				...decisions,
 				...this.stateStore.read().decisions.filter((decision) => decision.inputs.includes(verification.id)),
