@@ -2,7 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { validateContextBudgetState } from "./context-budget.ts";
-import { deliveryEvidencePackageDigest, validateDeliveryEvidencePackage } from "./evidence.ts";
+import {
+	deliveryEvidencePackageDigest,
+	validateDeliveryEvidencePackage,
+	validateSourceProvenance,
+} from "./evidence.ts";
 import { validateMasterHandoffReceipt } from "./handoff.ts";
 import {
 	assertHumanApprovalAuthorizes,
@@ -221,6 +225,16 @@ function assertWorkerRuntimeInvariant(state: PersistentState): void {
 			throw new Error(`unavailable Worker Dispatch ${dispatch.id} must not have a lease_epoch`);
 		if (dispatch.worker_status.worker_capability === "available" && dispatch.lease_epoch === undefined)
 			throw new Error(`available Worker Dispatch ${dispatch.id} requires a lease_epoch`);
+		if (!Number.isInteger(dispatch.planned_worker_count) || dispatch.planned_worker_count < 0)
+			throw new Error(`Dispatch ${dispatch.id} has invalid planned_worker_count`);
+		if (!Number.isInteger(dispatch.effective_worker_count) || dispatch.effective_worker_count < 0)
+			throw new Error(`Dispatch ${dispatch.id} has invalid effective_worker_count`);
+		if (dispatch.effective_mode === "parallel" && dispatch.effective_worker_count < 2)
+			throw new Error(`parallel Dispatch ${dispatch.id} requires at least two effective Workers`);
+		if (dispatch.effective_mode === "parallel" && !dispatch.overlap_proof_ref?.trim())
+			throw new Error(`parallel Dispatch ${dispatch.id} requires overlap proof`);
+		if (dispatch.requested_mode !== dispatch.effective_mode && !dispatch.degrade_reason?.trim())
+			throw new Error(`Dispatch ${dispatch.id} changed execution mode without a degrade_reason`);
 	}
 	for (const run of state.runs) {
 		const status = validateWorkerStatus(run.worker_status);
@@ -250,6 +264,11 @@ function assertWorkerRuntimeInvariant(state: PersistentState): void {
 				throw new Error(
 					`Evidence ${evidence.id} has invalid tool result envelope: ${validation.errors.join("; ")}`,
 				);
+		}
+		for (const provenance of evidence.source_provenance ?? []) {
+			const validation = validateSourceProvenance(provenance);
+			if (!validation.valid)
+				throw new Error(`Evidence ${evidence.id} has invalid source provenance: ${validation.errors.join("; ")}`);
 		}
 	}
 	for (const verification of state.verifications) {
@@ -741,6 +760,11 @@ export class PersistentStateStore {
 			if (!validation.valid)
 				throw new Error(`cannot persist invalid delivery Evidence: ${validation.errors.join("; ")}`);
 		}
+		for (const provenance of evidence.source_provenance ?? []) {
+			const validation = validateSourceProvenance(provenance);
+			if (!validation.valid)
+				throw new Error(`cannot persist invalid source provenance: ${validation.errors.join("; ")}`);
+		}
 		this.transact((state) => {
 			if (state.evidence.some((candidate) => candidate.id === evidence.id))
 				throw new Error(`Evidence already exists: ${evidence.id}`);
@@ -974,6 +998,36 @@ export class PersistentStateStore {
 		if (dispatch.worker_status.worker_capability === "available" && dispatch.lease_epoch === undefined)
 			throw new Error("available Worker Dispatch requires a lease_epoch");
 		this.transact((state) => state.dispatches.push(structuredClone(dispatch)));
+	}
+
+	finalizeDispatchRuntime(
+		dispatchId: string,
+		input: Pick<
+			DispatchRecord,
+			"effective_mode" | "effective_worker_count" | "executor_kind" | "degrade_reason" | "overlap_proof_ref"
+		>,
+	): DispatchRecord {
+		let finalized!: DispatchRecord;
+		this.transact((state) => {
+			const dispatch = state.dispatches.find((candidate) => candidate.id === dispatchId);
+			if (!dispatch) throw new Error(`unknown Dispatch: ${dispatchId}`);
+			if (!Number.isInteger(input.effective_worker_count) || input.effective_worker_count < 0)
+				throw new Error("effective_worker_count must be a non-negative integer");
+			if (input.effective_mode === "parallel") {
+				if (input.effective_worker_count < 2)
+					throw new Error("parallel Dispatch requires at least two effective Workers");
+				if (!input.overlap_proof_ref?.trim()) throw new Error("parallel Dispatch requires overlap_proof_ref");
+			}
+			if (dispatch.requested_mode !== input.effective_mode && !input.degrade_reason?.trim())
+				throw new Error("Dispatch mode degradation requires degrade_reason");
+			dispatch.effective_mode = input.effective_mode;
+			dispatch.effective_worker_count = input.effective_worker_count;
+			dispatch.executor_kind = input.executor_kind;
+			dispatch.degrade_reason = input.degrade_reason;
+			dispatch.overlap_proof_ref = input.overlap_proof_ref;
+			finalized = structuredClone(dispatch);
+		});
+		return finalized;
 	}
 
 	addRoleProfile(role: RoleProfile): void {
