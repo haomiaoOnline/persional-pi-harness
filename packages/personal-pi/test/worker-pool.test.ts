@@ -1,8 +1,61 @@
 import { describe, expect, test } from "vitest";
-import { PiWorker, WorkerPool, WorkerPoolLeaseConflictError } from "../src/index.ts";
+import {
+	PiWorker,
+	WorkerPool,
+	WorkerPoolLeaseConflictError,
+	type WorkerProcessLifecycle,
+	type WorkerProcessSnapshot,
+} from "../src/index.ts";
 
 function adapter(workerId: string) {
 	return new PiWorker(workerId, () => ({ status: "success", summary: `${workerId} completed` }));
+}
+
+class DelayedLifecycle implements WorkerProcessLifecycle {
+	readonly adapter_id = "delayed";
+	readonly worker_instance_id: string;
+	readonly workspace_path: string;
+	readonly session_id: string;
+	private readonly onStart: (delta: 1 | -1) => void;
+	private alive = false;
+
+	constructor(workerId: string, onStart: (delta: 1 | -1) => void) {
+		this.worker_instance_id = `instance-${workerId}`;
+		this.workspace_path = `/tmp/${workerId}`;
+		this.session_id = `session-${workerId}`;
+		this.onStart = onStart;
+	}
+
+	async start(): Promise<WorkerProcessSnapshot> {
+		this.onStart(1);
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		this.alive = true;
+		this.onStart(-1);
+		return this.snapshot();
+	}
+
+	async stop(): Promise<void> {
+		this.alive = false;
+	}
+
+	async crash(): Promise<void> {
+		this.alive = false;
+	}
+
+	isAlive(): boolean {
+		return this.alive;
+	}
+
+	snapshot(): WorkerProcessSnapshot {
+		return {
+			adapter_id: this.adapter_id,
+			pid: this.alive ? 1 : null,
+			session_id: this.session_id,
+			session_id_sha256: `sha-${this.worker_instance_id}`,
+			workspace_path: this.workspace_path,
+			alive: this.alive,
+		};
+	}
 }
 
 describe("T12.4 Worker Pool Lifecycle Manager", () => {
@@ -73,5 +126,42 @@ describe("T12.4 Worker Pool Lifecycle Manager", () => {
 			false,
 		);
 		expect(pool.release(lease)).toBe(true);
+	});
+
+	test("warms independent process Workers concurrently", async () => {
+		let activeStarts = 0;
+		let peakStarts = 0;
+		const pool = new WorkerPool();
+		for (const workerId of ["warm-a", "warm-b", "warm-c"]) {
+			pool.register({
+				worker_id: workerId,
+				kind: "local_process_worker",
+				adapter: adapter(workerId),
+				lifecycle: new DelayedLifecycle(workerId, (delta) => {
+					activeStarts += delta;
+					peakStarts = Math.max(peakStarts, activeStarts);
+				}),
+			});
+		}
+		await pool.warmAllAsync();
+		expect(peakStarts).toBeGreaterThanOrEqual(2);
+		expect(pool.list().every((worker) => worker.state === "IDLE")).toBe(true);
+	});
+
+	test("counts distinct roles separately from active Workers", () => {
+		const pool = new WorkerPool({
+			coordination_budget: { max_active_workers: 3, max_handoffs_per_task: 1, max_concurrent_roles: 1 },
+		});
+		for (const workerId of ["role-a", "role-b", "role-c"]) {
+			pool.register({ worker_id: workerId, kind: "local_process_worker", adapter: adapter(workerId) });
+		}
+		pool.warmAll();
+		const first = pool.acquire("role-task-a", ["role-a"], "researcher");
+		const second = pool.acquire("role-task-b", ["role-b"], "researcher");
+		expect(first.role_id).toBe("researcher");
+		expect(second.role_id).toBe("researcher");
+		expect(() => pool.acquire("role-task-c", ["role-c"], "qa")).toThrow("max_concurrent_roles");
+		pool.release(first);
+		pool.release(second);
 	});
 });

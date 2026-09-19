@@ -67,6 +67,7 @@ export interface WorkerPoolLease {
 	task_id: string;
 	worker_id: string;
 	worker_instance_id: string;
+	role_id: string;
 	lease: Lease;
 	adapter: WorkerAdapter;
 }
@@ -75,7 +76,12 @@ export interface WorkerPoolBatchJob {
 	task_id: string;
 	request: WorkerProtocolRequest;
 	preferred_worker_ids?: readonly string[];
+	role_id?: string;
 	controls?: WorkerExecutionControls;
+	execute_with_lease?: (
+		lease: WorkerPoolLease,
+		decision: Pick<WorkerPoolBatchResult, "mode" | "reason">,
+	) => Promise<ResultContract>;
 }
 
 export interface WorkerPoolBatchResult {
@@ -324,9 +330,17 @@ export class WorkerPool {
 		if (decision.mode === "serial") {
 			const results: ResultContract[] = [];
 			for (const job of jobs) {
-				const lease = await this.acquireAsync(job.task_id, job.preferred_worker_ids ?? []);
+				const lease = await this.acquireAsync(
+					job.task_id,
+					job.preferred_worker_ids ?? [],
+					job.role_id ?? job.request.task.role_profile_ref,
+				);
 				try {
-					results.push(await this.execute(lease, this.bindRequestToLease(job.request, lease), job.controls));
+					results.push(
+						job.execute_with_lease
+							? await job.execute_with_lease(lease, { mode: "serial", reason: decision.reason })
+							: await this.execute(lease, this.bindRequestToLease(job.request, lease), job.controls),
+					);
 				} finally {
 					this.release(lease);
 				}
@@ -338,11 +352,20 @@ export class WorkerPool {
 			const chunk = jobs.slice(start, start + requestedWorkers);
 			const leases: WorkerPoolLease[] = [];
 			try {
-				for (const job of chunk) leases.push(await this.acquireAsync(job.task_id, job.preferred_worker_ids ?? []));
+				for (const job of chunk)
+					leases.push(
+						await this.acquireAsync(
+							job.task_id,
+							job.preferred_worker_ids ?? [],
+							job.role_id ?? job.request.task.role_profile_ref,
+						),
+					);
 				const chunkResults = await Promise.all(
 					chunk.map((job, index) => {
 						const lease = leases[index] as WorkerPoolLease;
-						return this.execute(lease, this.bindRequestToLease(job.request, lease), job.controls);
+						return job.execute_with_lease
+							? job.execute_with_lease(lease, { mode: "parallel", reason: decision.reason })
+							: this.execute(lease, this.bindRequestToLease(job.request, lease), job.controls);
 					}),
 				);
 				results.push(...chunkResults);
@@ -411,8 +434,13 @@ export class WorkerPool {
 	}
 
 	async warmAllAsync(): Promise<WorkerPoolSnapshot[]> {
-		for (const worker of this.workers.values()) {
-			if (worker.state === "COLD" || worker.state === "DEAD") await this.warmAsync(worker.worker_id);
+		const workerIds = [...this.workers.values()]
+			.filter((worker) => worker.state === "COLD" || worker.state === "DEAD")
+			.map((worker) => worker.worker_id);
+		const configuredLimit = this.resourceCeiling?.max_parallel_workers ?? Math.max(1, workerIds.length);
+		const limit = Math.max(1, Math.min(configuredLimit, Math.max(1, workerIds.length)));
+		for (let start = 0; start < workerIds.length; start += limit) {
+			await Promise.all(workerIds.slice(start, start + limit).map((workerId) => this.warmAsync(workerId)));
 		}
 		return this.list();
 	}
@@ -425,24 +453,28 @@ export class WorkerPool {
 		return cloneSnapshot(entry);
 	}
 
-	acquire(taskId: string, preferredWorkerIds: readonly string[] = []): WorkerPoolLease {
+	acquire(taskId: string, preferredWorkerIds: readonly string[] = [], roleId?: string): WorkerPoolLease {
 		if (this.taskLeases.has(taskId))
 			throw new WorkerPoolLeaseConflictError(`task already has an active lease: ${taskId}`);
 		for (const entry of this.candidates(preferredWorkerIds)) {
 			if (entry.state === "COLD" || entry.state === "DEAD") this.warm(entry.worker_id);
 			if (entry.state !== "IDLE" || this.workerLeases.has(entry.worker_id)) continue;
-			return this.claim(taskId, entry);
+			return this.claim(taskId, entry, roleId);
 		}
 		throw new WorkerPoolLeaseConflictError(`no idle Worker available for task: ${taskId}`);
 	}
 
-	async acquireAsync(taskId: string, preferredWorkerIds: readonly string[] = []): Promise<WorkerPoolLease> {
+	async acquireAsync(
+		taskId: string,
+		preferredWorkerIds: readonly string[] = [],
+		roleId?: string,
+	): Promise<WorkerPoolLease> {
 		if (this.taskLeases.has(taskId))
 			throw new WorkerPoolLeaseConflictError(`task already has an active lease: ${taskId}`);
 		for (const entry of this.candidates(preferredWorkerIds)) {
 			if (entry.state === "COLD" || entry.state === "DEAD") await this.warmAsync(entry.worker_id);
 			if (entry.state !== "IDLE" || this.workerLeases.has(entry.worker_id)) continue;
-			return this.claim(taskId, entry);
+			return this.claim(taskId, entry, roleId);
 		}
 		throw new WorkerPoolLeaseConflictError(`no idle Worker available for task: ${taskId}`);
 	}
@@ -497,6 +529,9 @@ export class WorkerPool {
 						: undefined,
 					observePromptViewAudit: controls.observePromptViewAudit
 						? (audit) => controls.observePromptViewAudit!(audit)
+						: undefined,
+					observeBackpressure: controls.observeBackpressure
+						? (observation) => controls.observeBackpressure!(observation)
 						: undefined,
 				}
 			: undefined;
@@ -644,18 +679,20 @@ export class WorkerPool {
 		return [...this.workers.values()].filter((worker) => preferred.size === 0 || preferred.has(worker.worker_id));
 	}
 
-	private claim(taskId: string, entry: WorkerPoolEntry): WorkerPoolLease {
+	private claim(taskId: string, entry: WorkerPoolEntry, roleId?: string): WorkerPoolLease {
 		if (this.taskLeases.has(taskId))
 			throw new WorkerPoolLeaseConflictError(`task already has an active lease: ${taskId}`);
 		if (entry.state !== "IDLE" || this.workerLeases.has(entry.worker_id))
 			throw new WorkerPoolLeaseConflictError(`worker is no longer idle: ${entry.worker_id}`);
-		this.reserveCoordination(taskId);
+		const effectiveRoleId = roleId?.trim() || `worker:${entry.worker_id}`;
+		this.reserveCoordination(taskId, effectiveRoleId);
 		try {
 			const lease = this.leaseManager.acquire(taskId, entry.worker_id, new Date(this.now()).toISOString());
 			const poolLease: WorkerPoolLease = {
 				task_id: taskId,
 				worker_id: entry.worker_id,
 				worker_instance_id: entry.worker_instance_id,
+				role_id: effectiveRoleId,
 				lease,
 				adapter: entry.adapter,
 			};
@@ -672,8 +709,10 @@ export class WorkerPool {
 		}
 	}
 
-	private reserveCoordination(taskId: string): void {
+	private reserveCoordination(taskId: string, roleId: string): void {
 		const activeWorkers = this.workerLeases.size + 1;
+		const concurrentRoles = new Set([...this.workerLeases.values()].map((lease) => lease.role_id).concat(roleId))
+			.size;
 		if (this.resourceCeiling && activeWorkers > 1) {
 			const resourceDecision = this.planParallelism(activeWorkers);
 			if (resourceDecision.mode === "serial")
@@ -682,14 +721,15 @@ export class WorkerPool {
 		if (this.coordinationBudget) {
 			if (activeWorkers > this.coordinationBudget.max_active_workers)
 				throw new WorkerPoolLeaseConflictError("coordination budget max_active_workers exceeded");
-			if (activeWorkers > this.coordinationBudget.max_concurrent_roles)
+			if (concurrentRoles > this.coordinationBudget.max_concurrent_roles)
 				throw new WorkerPoolLeaseConflictError("coordination budget max_concurrent_roles exceeded");
 		}
-		this.budgetController?.reserveDispatch(taskId, activeWorkers, 0, activeWorkers);
+		this.budgetController?.reserveDispatch(taskId, activeWorkers, 0, concurrentRoles);
 	}
 
 	private releaseCoordination(_entry: WorkerPoolEntry, taskId: string): void {
-		this.budgetController?.releaseDispatch(taskId, this.workerLeases.size, this.workerLeases.size);
+		const concurrentRoles = new Set([...this.workerLeases.values()].map((lease) => lease.role_id)).size;
+		this.budgetController?.releaseDispatch(taskId, this.workerLeases.size, concurrentRoles);
 	}
 
 	private async executeWithMemoryGuard(
