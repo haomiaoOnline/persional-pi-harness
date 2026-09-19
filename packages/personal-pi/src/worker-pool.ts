@@ -480,7 +480,7 @@ export class WorkerPool {
 		});
 		entry.last_activity_at = this.now();
 		this.persistEntry(entry);
-		const scopedControls = controls
+		const scopedControls: WorkerExecutionControls | undefined = controls
 			? {
 					beforeModelCall: () => {
 						const usage = controls.beforeModelCall();
@@ -492,6 +492,12 @@ export class WorkerPool {
 						entry.loop_usage = structuredClone(usage);
 						return usage;
 					},
+					observeContextUsage: controls.observeContextUsage
+						? (observation) => controls.observeContextUsage!(observation)
+						: undefined,
+					observePromptViewAudit: controls.observePromptViewAudit
+						? (audit) => controls.observePromptViewAudit!(audit)
+						: undefined,
 				}
 			: undefined;
 		try {

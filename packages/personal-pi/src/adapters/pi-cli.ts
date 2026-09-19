@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ArtifactStore } from "../artifacts.ts";
+import { buildPromptViewAudit } from "../context.ts";
 import { validateToolResultEnvelope } from "../tool-gateway.ts";
 import type {
 	ContextBudgetMetrics,
@@ -391,7 +392,8 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 			(input) => this.invoke(request, input, controls, tools, denial),
 			this.requested_model,
 		);
-		const result = await delegate.execute(request, controls);
+		const delegateControls = controls ? { ...controls, observePromptViewAudit: undefined } : undefined;
+		const result = await delegate.execute(request, delegateControls);
 		return this.last_observation ? withTrustedModelIdentity(result, this.last_observation) : result;
 	}
 
@@ -486,6 +488,18 @@ export class PiAgentWorkerAdapter implements WorkerAdapter {
 						assistantMessages += 1;
 						observation.model_calls += 1;
 						if (assistantMessages > 1) controls?.beforeModelCall();
+						try {
+							controls?.observePromptViewAudit?.(
+								buildPromptViewAudit({
+									turn_id: `${request.run_id ?? `${request.task.id}:${request.protocol.lease_epoch}`}:${assistantMessages}`,
+									prompt_text: prompt,
+									resolved_context: input.resolved_context,
+									tool_results: observation.tool_results,
+								}),
+							);
+						} catch {
+							// Prompt View Audit is observability only and must never gate the model turn.
+						}
 					}
 				}
 				if (record.type === "message_end" || record.type === "turn_end")

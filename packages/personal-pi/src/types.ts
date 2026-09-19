@@ -153,6 +153,7 @@ export interface WorkerExecutionControls {
 	beforeModelCall(): LoopUsage;
 	beforeToolCall(): LoopUsage;
 	observeContextUsage?(observation: ContextBudgetObservation): ContextBudgetWatermark;
+	observePromptViewAudit?(audit: PromptViewAudit): void;
 }
 
 export type ContextBudgetLayer = "tool_output" | "prompt" | "run" | "task";
@@ -426,6 +427,14 @@ export interface TraceMetrics {
 	graph_efficiency?: GraphEfficiencyMetrics;
 }
 
+export interface PromptViewAudit {
+	turn_id: string;
+	total_size: number;
+	sources: string[];
+	truncated_items: string[];
+	contamination_ratio: number;
+}
+
 export interface GraphEfficiencyMetrics {
 	graph_width: number;
 	graph_depth: number;
@@ -451,6 +460,7 @@ export interface ExecutionTrace {
 	events: TraceEvent[];
 	decisions: DecisionRecord[];
 	metrics: TraceMetrics;
+	prompt_view_audits?: PromptViewAudit[];
 	replayable: boolean;
 }
 

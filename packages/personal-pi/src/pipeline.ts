@@ -670,6 +670,7 @@ export class PersonalPiPipeline {
 				const controls: WorkerExecutionControls = {
 					beforeModelCall: () => this.loopBudgetController.beforeModelCall(request.task),
 					beforeToolCall: () => this.loopBudgetController.beforeToolCall(request.task),
+					observePromptViewAudit: (audit) => tracer.addPromptViewAudit(audit),
 					observeContextUsage: (observation) => {
 						if (!contextBudgetMetricsAreValid(observation.metrics)) {
 							throw new ContextRebuildRequiredError(

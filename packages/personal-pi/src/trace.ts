@@ -6,6 +6,7 @@ import type {
 	DecisionRecord,
 	ExecutionTrace,
 	GraphEfficiencyMetrics,
+	PromptViewAudit,
 	RegressionCase,
 	ResolvedContext,
 	TaskContract,
@@ -70,6 +71,7 @@ export class TraceRecorder {
 			events: [],
 			decisions: [],
 			metrics: emptyMetrics(),
+			prompt_view_audits: [],
 			replayable: true,
 		};
 	}
@@ -84,6 +86,30 @@ export class TraceRecorder {
 
 	addDecision(decision: DecisionRecord): void {
 		this.trace.decisions.push(structuredClone(decision));
+	}
+
+	addPromptViewAudit(audit: PromptViewAudit): void {
+		if (
+			typeof audit?.turn_id !== "string" ||
+			!Number.isFinite(audit.total_size) ||
+			audit.total_size < 0 ||
+			!Array.isArray(audit.sources) ||
+			!audit.sources.every((source) => typeof source === "string") ||
+			!Array.isArray(audit.truncated_items) ||
+			!audit.truncated_items.every((item) => typeof item === "string") ||
+			!Number.isFinite(audit.contamination_ratio) ||
+			audit.contamination_ratio < 0 ||
+			audit.contamination_ratio > 1
+		)
+			return;
+		this.trace.prompt_view_audits ??= [];
+		this.trace.prompt_view_audits.push({
+			turn_id: audit.turn_id,
+			total_size: audit.total_size,
+			sources: [...audit.sources],
+			truncated_items: [...audit.truncated_items],
+			contamination_ratio: audit.contamination_ratio,
+		});
 	}
 
 	setMetrics(metrics: {

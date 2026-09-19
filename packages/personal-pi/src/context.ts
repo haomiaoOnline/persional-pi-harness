@@ -11,6 +11,7 @@ import type {
 	ContextReference,
 	DecisionRecord,
 	PersistentState,
+	PromptViewAudit,
 	ReadinessEvaluation,
 	ResolvedContext,
 	ResolvedContextItem,
@@ -253,6 +254,50 @@ export class ContextResolver {
 	clearCache(): void {
 		this.cache.clear();
 	}
+}
+
+const CONTAMINATION_MARKER = /\b(?:error|failed|failure|stale|outdated|obsolete|stack trace)\b|错误|失败|过期|陈旧/i;
+
+export function buildPromptViewAudit(input: {
+	turn_id: string;
+	prompt_text: string;
+	resolved_context?: ResolvedContext;
+	tool_results?: readonly ToolResultEnvelope[];
+}): PromptViewAudit {
+	const context = input.resolved_context;
+	const toolResults = input.tool_results ?? [];
+	const sources = [
+		"task_prompt",
+		...(context?.items.map((item) => `context:${item.digest}`) ?? []),
+		...toolResults.map((result) => `tool:${result.artifact_id}`),
+	];
+	const truncatedItems = [
+		...(context?.omitted_optional.map((digest) => `context:${digest}`) ?? []),
+		...(context?.items
+			.filter((item) => item.content.includes("…[compacted]…"))
+			.map((item) => `context:${item.digest}`) ?? []),
+		...toolResults.filter((result) => result.truncated).map((result) => `tool:${result.artifact_id}`),
+	];
+	const visibleToolBytes = toolResults.reduce(
+		(sum, result) => sum + Buffer.byteLength(JSON.stringify(result), "utf8"),
+		0,
+	);
+	const totalSize = Buffer.byteLength(input.prompt_text, "utf8") + visibleToolBytes;
+	const contaminatedContextBytes =
+		context?.items
+			.filter((item) => CONTAMINATION_MARKER.test(item.content))
+			.reduce((sum, item) => sum + Buffer.byteLength(item.content, "utf8"), 0) ?? 0;
+	const contaminatedToolBytes = toolResults
+		.filter((result) => result.status !== "success")
+		.reduce((sum, result) => sum + Buffer.byteLength(JSON.stringify(result), "utf8"), 0);
+	return {
+		turn_id: input.turn_id,
+		total_size: totalSize,
+		sources: [...new Set(sources)],
+		truncated_items: [...new Set(truncatedItems)],
+		contamination_ratio:
+			totalSize > 0 ? Math.min(1, (contaminatedContextBytes + contaminatedToolBytes) / totalSize) : 0,
+	};
 }
 
 /**

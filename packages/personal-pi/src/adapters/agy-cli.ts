@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
+import { buildPromptViewAudit } from "../context.ts";
 import type {
 	ResultContract,
 	TaskContract,
@@ -335,7 +336,8 @@ export class AgyCliWorkerAdapter implements WorkerAdapter {
 			(input) => this.invoke(request, input, controls, denial),
 			this.requested_model,
 		);
-		const result = await delegate.execute(request, controls);
+		const delegateControls = controls ? { ...controls, observePromptViewAudit: undefined } : undefined;
+		const result = await delegate.execute(request, delegateControls);
 		return this.last_observation ? withTrustedModelIdentity(result, this.last_observation) : result;
 	}
 
@@ -386,7 +388,7 @@ export class AgyCliWorkerAdapter implements WorkerAdapter {
 			ended_at: started.toISOString(),
 			finish_reason: null,
 		};
-		const observationState = { agent_response_steps: 0 };
+		const observationState = { agent_response_steps: 0, audited_step_indexes: new Set<string>() };
 		const processResult = await this.run_process({
 			command: this.command,
 			args,
@@ -402,9 +404,28 @@ export class AgyCliWorkerAdapter implements WorkerAdapter {
 				if (eventName === "step_update") {
 					const update = asRecord(record.step_update);
 					if (update?.step_type === "agent_response" && update.state === "ACTIVE") {
-						observationState.agent_response_steps += 1;
-						observation.model_calls += 1;
-						if (observationState.agent_response_steps > 1) controls?.beforeModelCall();
+						const stepKey =
+							typeof update.step_index === "number" || typeof update.step_index === "string"
+								? String(update.step_index)
+								: `active:${observationState.agent_response_steps + 1}`;
+						if (!observationState.audited_step_indexes.has(stepKey)) {
+							observationState.audited_step_indexes.add(stepKey);
+							observationState.agent_response_steps += 1;
+							observation.model_calls += 1;
+							if (observationState.agent_response_steps > 1) controls?.beforeModelCall();
+							try {
+								controls?.observePromptViewAudit?.(
+									buildPromptViewAudit({
+										turn_id: `${request.run_id ?? `${request.task.id}:${request.protocol.lease_epoch}`}:${observationState.agent_response_steps}`,
+										prompt_text: prompt,
+										resolved_context: input.resolved_context,
+										tool_results: observation.tool_results,
+									}),
+								);
+							} catch {
+								// Prompt View Audit is observability only and must never gate the model turn.
+							}
+						}
 					}
 				}
 				const decision = observeAgyEvent(record, observation, metadata, (text) => {

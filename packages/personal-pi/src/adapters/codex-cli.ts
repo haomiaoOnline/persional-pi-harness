@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
+import { buildPromptViewAudit } from "../context.ts";
 import type {
 	ResultContract,
 	TaskContract,
@@ -183,7 +184,8 @@ export class CodexCliWorkerAdapter implements WorkerAdapter {
 			(input) => this.invoke(request, input, controls, denial),
 			this.requested_model,
 		);
-		const result = await delegate.execute(request, controls);
+		const delegateControls = controls ? { ...controls, observePromptViewAudit: undefined } : undefined;
+		const result = await delegate.execute(request, delegateControls);
 		return this.last_observation ? withTrustedModelIdentity(result, this.last_observation) : result;
 	}
 
@@ -221,6 +223,7 @@ export class CodexCliWorkerAdapter implements WorkerAdapter {
 		});
 		const started = Date.now();
 		let turns = 0;
+		let turnOpen = false;
 		const processResult = await this.run_process({
 			command: this.command,
 			args,
@@ -246,9 +249,23 @@ export class CodexCliWorkerAdapter implements WorkerAdapter {
 				if (typeof record.provider === "string") observation.provider = record.provider;
 				if (typeof record.model === "string") observation.model = record.model;
 				if (record.type === "turn.started" || record.type === "turn_start") {
+					if (turnOpen) return;
+					turnOpen = true;
 					turns += 1;
 					observation.model_calls += 1;
 					if (turns > 1) controls?.beforeModelCall();
+					try {
+						controls?.observePromptViewAudit?.(
+							buildPromptViewAudit({
+								turn_id: `${request.run_id ?? `${request.task.id}:${request.protocol.lease_epoch}`}:${turns}`,
+								prompt_text: prompt,
+								resolved_context: input.resolved_context,
+								tool_results: observation.tool_results,
+							}),
+						);
+					} catch {
+						// Prompt View Audit is observability only and must never gate the model turn.
+					}
 				}
 				if (record.type === "item.completed" || record.type === "item.started") {
 					const item = asRecord(record.item);
@@ -262,6 +279,7 @@ export class CodexCliWorkerAdapter implements WorkerAdapter {
 						return { terminate: true, reason: "Codex emitted a tool/action item without a Task Contract bridge" };
 				}
 				if (record.type === "turn.completed") {
+					turnOpen = false;
 					captureUsage(record, observation);
 					const budgetViolation = checkObservedBudget(request.task, observation, this.provider_fixed_input_tokens);
 					if (budgetViolation) {

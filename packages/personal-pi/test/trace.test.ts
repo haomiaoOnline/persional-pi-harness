@@ -236,6 +236,8 @@ describe("T11.1 execution trace", () => {
 		expect(replayExecutionTrace(execution.trace).complete).toBe(true);
 		expect(store.getTrace(execution.trace.trace_id)).toEqual(execution.trace);
 		expect(execution.trace.run_id).toBe(execution.run.id);
+		expect(execution.trace.prompt_view_audits).toHaveLength(1);
+		expect(execution.trace.prompt_view_audits?.[0]?.turn_id).toBe(`${execution.run.id}:1`);
 	});
 
 	test("turns a terminal pipeline failure into a persisted regression case", async () => {

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { accessSync, constants } from "node:fs";
+import { buildPromptViewAudit } from "./context.ts";
 import { ContextRebuildRequiredError } from "./context-budget.ts";
 import { LoopBudgetExhaustedError, LoopBudgetMissingError } from "./loop-budget.ts";
 import { buildPromptPayload } from "./prompt.ts";
@@ -159,8 +160,20 @@ export class PiWorker implements WorkerAdapter {
 			const safeContext = request.resolved_context
 				? filterSensitiveContext(request.resolved_context, permission.granted.credentials).context
 				: undefined;
+			const prompt = buildPromptPayload(request.task);
+			try {
+				controls?.observePromptViewAudit?.(
+					buildPromptViewAudit({
+						turn_id: `${request.run_id ?? `${request.task.id}:${request.protocol.lease_epoch}`}:1`,
+						prompt_text: [JSON.stringify(prompt), safeContext?.text ?? ""].filter(Boolean).join("\n"),
+						resolved_context: safeContext,
+					}),
+				);
+			} catch {
+				// Prompt View Audit is observability only and must never gate Worker execution.
+			}
 			const output = await this.executor({
-				prompt: buildPromptPayload(request.task),
+				prompt,
 				role_profile: request.role_profile,
 				requested_actions: [...(request.requested_actions ?? [])],
 				resolved_context: safeContext,
