@@ -69,6 +69,23 @@ describe("T10.4 command risk classification", () => {
 		expect(result.reasons.join(" ")).toContain("permanently blocked");
 	});
 
+	test("blocks full environment enumeration when credentials are denied", () => {
+		const contract = makeV3Task("env-risk", {
+			permissions: {
+				filesystem: { read: ["."], write: [] },
+				shell: { allowed: ["*"] },
+				network: "deny",
+				credentials: "deny",
+			},
+		});
+		for (const command of ["env", "printenv", "env | grep TOKEN", "export -p", "set"]) {
+			expect(authorizeCommand(contract, command)).toMatchObject({
+				action: "block",
+				classification: { risk: "danger", rule_id: "danger-environment-enumeration" },
+			});
+		}
+	});
+
 	test("does not invoke a runner for ask_user or block decisions", async () => {
 		let calls = 0;
 		const authorization = authorizeCommand(task(), "git push origin feature");

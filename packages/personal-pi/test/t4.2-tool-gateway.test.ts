@@ -296,6 +296,34 @@ describe("T4.2-C ToolGateway", () => {
 			"cursor does not belong to the requested artifact",
 		);
 	});
+
+	test("redacts secret-like environment variable names in summaries and artifact pages", () => {
+		const store = new ArtifactStore();
+		const gateway = new ToolGateway({ artifact_store: store });
+		const secret = "cf-secret-value-123456";
+		const genericKeySecret = "generic-key-secret-123456";
+		const envelope = gateway.wrap({
+			tool_name: "diagnostic",
+			task_id: "secret-like-key",
+			task_revision: 1,
+			exit_code: 0,
+			stdout: `SAFE=value\nCLOUDFLARE_API_TOKEN=${secret}\nFOO_KEY=${genericKeySecret}\nOTHER_PASSWORD:another-secret`,
+			stderr: "",
+			output_kind: "generic",
+		});
+		const summary = `${envelope.stdout_summary}\n${envelope.stderr_summary}`;
+		expect(summary).toContain("CLOUDFLARE_API_TOKEN=[REDACTED]");
+		expect(summary).toContain("FOO_KEY=[REDACTED]");
+		expect(summary).not.toContain(secret);
+		expect(summary).not.toContain(genericKeySecret);
+		const page = gateway.readArtifactPage(envelope.artifact_id, undefined, 16_000);
+		expect(page.sensitive_info).toBe("possible");
+		expect(page.content).toContain("CLOUDFLARE_API_TOKEN=[REDACTED]");
+		expect(page.content).toContain("FOO_KEY=[REDACTED]");
+		expect(page.content).not.toContain(secret);
+		expect(page.content).not.toContain(genericKeySecret);
+		expect(page.content).not.toContain("another-secret");
+	});
 });
 
 describe("T4.2-C Pipeline ToolGateway integration", () => {

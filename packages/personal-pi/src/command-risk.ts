@@ -117,6 +117,10 @@ const DEFAULT_RULES: readonly CommandRiskRule[] = [
 
 const RISK_ORDER: readonly CommandRisk[] = ["danger", "risky", "safe"];
 
+function isFullEnvironmentEnumeration(command: string): boolean {
+	return /(?:^|[;&|]\s*)(?:env|printenv|set|export\s+-p|declare\s+-x)(?=\s*(?:$|[|;&]))/i.test(command.trim());
+}
+
 function matches(rule: CommandRiskRule, command: string): boolean {
 	const match = rule.match;
 	if (match.prefix && (command === match.prefix || command.startsWith(`${match.prefix} `))) return true;
@@ -188,7 +192,15 @@ export function authorizeCommand(
 	classifier = new CommandRiskClassifier(),
 	options: { approval?: CommandApproval; now?: string } = {},
 ): CommandAuthorization {
-	const classification = classifier.classify(command);
+	const classification =
+		task.permissions.credentials === "deny" && isFullEnvironmentEnumeration(command)
+			? {
+					command,
+					risk: "danger" as const,
+					rule_id: "danger-environment-enumeration",
+					reason: "full environment enumeration can disclose credentials while credentials permission is denied",
+				}
+			: classifier.classify(command);
 	const actionDigest = commandActionDigest(task, command);
 	const boundRevision = task.task_revision;
 	const permission = evaluateTaskPermissions(task, { shell: [command] });

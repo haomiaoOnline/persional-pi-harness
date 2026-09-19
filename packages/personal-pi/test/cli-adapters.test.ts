@@ -108,6 +108,14 @@ describe("external CLI Worker adapters", () => {
 		expect(forgedIdentity.errors[0]).toContain("unsupported fields");
 	});
 
+	test("redacts generic *_KEY values returned by an external CLI worker", () => {
+		const secret = "generic-key-secret-123456";
+		const parsed = parseWorkerOutput(successText(`FOO_KEY=${secret}`));
+		expect(parsed.errors).toEqual([]);
+		expect(parsed.output?.summary).toContain("FOO_KEY=[REDACTED]");
+		expect(parsed.output?.summary).not.toContain(secret);
+	});
+
 	test("sanitizes environment names even when secret-like variables exist", () => {
 		process.env.OPENAI_API_KEY = "must-not-pass";
 		process.env.CODEX_API_KEY = "must-not-pass";

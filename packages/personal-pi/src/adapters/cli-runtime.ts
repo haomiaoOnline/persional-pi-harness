@@ -139,7 +139,9 @@ const SAFE_ENVIRONMENT_NAMES = [
 ] as const;
 
 const SECRET_LIKE_KEY =
-	/(api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|cookie|authorization|凭证|密钥|密码)/i;
+	/(token|api[_-]?key|access[_-]?key|(?:^|_)key$|password|secret|cookie|authorization|凭证|密钥|密码)/i;
+const SECRET_ASSIGNMENT =
+	/((?:^|[\s,{;])(?:[A-Z0-9_]*(?:TOKEN|API[_-]?KEY|ACCESS[_-]?KEY|SECRET|PASSWORD|COOKIE|AUTHORIZATION)[A-Z0-9_]*|[A-Z0-9_]+_KEY)\s*[:=]\s*)[^\s,;}]+/gim;
 
 export function createCliObservation(): CliObservation {
 	return {
@@ -350,10 +352,7 @@ export function createSanitizedEnvironment(
 
 function redactText(value: string): string {
 	return value
-		.replace(
-			/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|cookie|authorization)\s*[:=]\s*)[^\s,}]+/gi,
-			"$1[REDACTED]",
-		)
+		.replace(SECRET_ASSIGNMENT, "$1[REDACTED]")
 		.replace(/(Bearer\s+)[A-Za-z0-9._-]+/gi, "$1[REDACTED]")
 		.replace(/-----BEGIN[\s\S]*?-----END[^-]+-----/gi, "[REDACTED CREDENTIAL]");
 }
