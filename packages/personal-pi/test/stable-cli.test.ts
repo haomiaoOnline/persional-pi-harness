@@ -107,6 +107,7 @@ describe("T2.7-C stable CLI", () => {
 			task_id_factory: () => "pph-stable-1",
 			worker_factory: () => noOpWorker(),
 			worker_status_factory: () => AVAILABLE_WORKER_STATUS,
+			execution_surface: { pph_commit: "stable-cli-commit", bundle_sha256: "stable-cli-bundle" },
 		};
 
 		const registered = parsed(
@@ -158,6 +159,15 @@ describe("T2.7-C stable CLI", () => {
 			),
 		);
 		expect((run.task as Record<string, unknown>).state).toBe("DONE");
+		expect(run.execution_surface).toEqual({
+			entrypoint: "stable_cli",
+			pph_commit: "stable-cli-commit",
+			bundle_sha256: "stable-cli-bundle",
+			ingress_bound: true,
+			pipeline_bound: true,
+			scheduler_enabled: true,
+			scheduler_kind: "direct",
+		});
 		const persisted = new PersistentStateStore(statePath).read();
 		expect(persisted.dispatches).toHaveLength(1);
 		expect(persisted.runs).toHaveLength(1);

@@ -66,6 +66,8 @@ import { runMigrations, showDeprecationWarnings } from "./migrations.ts";
 import { InteractiveMode, runPrintMode, runRpcMode } from "./modes/index.ts";
 import {
 	createInteractiveIngressForMode,
+	enforceInteractiveIngressBinding,
+	type InteractiveExecutionSurfaceIdentity,
 	type InteractiveIngressFactory,
 	probeLocalInteractiveWorkerStatus,
 } from "./modes/interactive/interactive-ingress.ts";
@@ -563,6 +565,8 @@ async function promptForMissingSessionCwd(
 export interface MainOptions {
 	extensionFactories?: InlineExtension[];
 	interactiveIngressFactory?: InteractiveIngressFactory;
+	requireInteractiveIngress?: boolean;
+	executionSurfaceIdentity?: InteractiveExecutionSurfaceIdentity;
 }
 
 export async function main(args: string[], options?: MainOptions) {
@@ -932,23 +936,39 @@ export async function main(args: string[], options?: MainOptions) {
 			.catch(() => {})
 			.finally(() => clearTimeout(timeout));
 	}
-	const interactiveIngress = await createInteractiveIngressForMode(appMode, options?.interactiveIngressFactory, {
-		getWorkerRoute: () => {
-			const currentSession = runtime.session;
-			const cliEntry = process.argv[1];
-			const commandArgsPrefix = cliEntry ? [cliEntry] : [];
-			return {
-				cwd: runtime.cwd,
-				command: process.execPath,
-				command_args_prefix: commandArgsPrefix,
-				provider: currentSession.model?.provider,
-				model: currentSession.model?.id,
-				thinking: currentSession.thinkingLevel,
-				active_tools: currentSession.getActiveToolNames(),
-				worker_status: probeLocalInteractiveWorkerStatus(process.execPath, commandArgsPrefix),
-			};
+	const executionSurfaceRecorder = (metadata: Readonly<Record<string, unknown>>) => {
+		sessionManager.appendCustomEntry("personal-pi.execution-surface", metadata);
+	};
+	const configuredInteractiveIngress = await createInteractiveIngressForMode(
+		appMode,
+		options?.interactiveIngressFactory,
+		{
+			getWorkerRoute: () => {
+				const currentSession = runtime.session;
+				const cliEntry = process.argv[1];
+				const commandArgsPrefix = cliEntry ? [cliEntry] : [];
+				return {
+					cwd: runtime.cwd,
+					command: process.execPath,
+					command_args_prefix: commandArgsPrefix,
+					provider: currentSession.model?.provider,
+					model: currentSession.model?.id,
+					thinking: currentSession.thinkingLevel,
+					active_tools: currentSession.getActiveToolNames(),
+					worker_status: probeLocalInteractiveWorkerStatus(process.execPath, commandArgsPrefix),
+				};
+			},
+			recordExecutionSurface: executionSurfaceRecorder,
 		},
-	});
+	);
+	const interactiveIngress =
+		appMode === "interactive"
+			? enforceInteractiveIngressBinding(configuredInteractiveIngress, {
+					required: options?.requireInteractiveIngress === true,
+					execution_surface: options?.executionSurfaceIdentity,
+					recordExecutionSurface: executionSurfaceRecorder,
+				})
+			: configuredInteractiveIngress;
 
 	if (appMode === "rpc") {
 		printTimings();

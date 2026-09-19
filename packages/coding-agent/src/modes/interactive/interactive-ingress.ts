@@ -11,6 +11,11 @@ export interface InteractiveIngressResult {
 	summary?: string;
 }
 
+export interface InteractiveExecutionSurfaceIdentity {
+	pph_commit: string;
+	bundle_sha256: string;
+}
+
 export interface InteractiveWorkerStatus {
 	worker_capability: "available" | "unavailable";
 	execution_mode: "normal" | "root_only" | "degraded";
@@ -30,6 +35,8 @@ export interface InteractiveWorkerRoute {
 
 export interface InteractiveIngressFactoryContext {
 	getWorkerRoute(): InteractiveWorkerRoute;
+	/** Persist audit-only execution metadata outside LLM context. */
+	recordExecutionSurface?(metadata: Readonly<Record<string, unknown>>): void;
 }
 
 export type InteractiveIngressHandler = (submission: InteractiveWorkSubmission) => Promise<InteractiveIngressResult>;
@@ -60,6 +67,29 @@ export async function createInteractiveIngressForMode(
 ): Promise<InteractiveIngressHandler | undefined> {
 	if (mode !== "interactive" || !factory) return undefined;
 	return await factory(context);
+}
+
+export function enforceInteractiveIngressBinding(
+	handler: InteractiveIngressHandler | undefined,
+	options: {
+		required: boolean;
+		execution_surface?: InteractiveExecutionSurfaceIdentity;
+		recordExecutionSurface?(metadata: Readonly<Record<string, unknown>>): void;
+	},
+): InteractiveIngressHandler | undefined {
+	if (handler || !options.required) return handler;
+	options.recordExecutionSurface?.({
+		entrypoint: "interactive",
+		pph_commit: options.execution_surface?.pph_commit ?? "unknown",
+		bundle_sha256: options.execution_surface?.bundle_sha256 ?? "unknown",
+		ingress_bound: false,
+		pipeline_bound: false,
+		scheduler_enabled: false,
+		scheduler_kind: "direct",
+	});
+	return async () => {
+		throw new Error("governed interactive ingress is required but not bound");
+	};
 }
 
 export function governedInteractiveBusyReason(

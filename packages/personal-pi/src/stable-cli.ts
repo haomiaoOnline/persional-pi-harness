@@ -12,6 +12,7 @@ import { DEFAULT_ROLE_PROFILES } from "./roles.ts";
 import { inspectStableCliTask, readStableCliGateStatus } from "./stable-cli-readonly.ts";
 import type {
 	ArchitectureCommercialAssessment,
+	ExecutionSurfaceAttestation,
 	PersistentState,
 	ProviderMode,
 	RoleProfile,
@@ -45,6 +46,7 @@ export interface PersonalPiStableCliOptions {
 	task_id_factory?: () => string;
 	worker_factory?: (request: StableCliWorkerRequest) => WorkerAdapter;
 	worker_status_factory?: (request: StableCliWorkerRequest) => WorkerStatus;
+	execution_surface?: Pick<ExecutionSurfaceAttestation, "pph_commit" | "bundle_sha256">;
 }
 
 interface ParsedFlags {
@@ -71,6 +73,18 @@ function success(payload: unknown): StableCliResult {
 
 function failure(message: string): StableCliResult {
 	return { handled: true, exit_code: 2, stdout: "", stderr: `${message}\n` };
+}
+
+function stableExecutionSurface(options: PersonalPiStableCliOptions): ExecutionSurfaceAttestation {
+	return {
+		entrypoint: "stable_cli",
+		pph_commit: options.execution_surface?.pph_commit ?? "unknown",
+		bundle_sha256: options.execution_surface?.bundle_sha256 ?? "unknown",
+		ingress_bound: true,
+		pipeline_bound: true,
+		scheduler_enabled: true,
+		scheduler_kind: "direct",
+	};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -349,7 +363,12 @@ async function taskRun(flags: ParsedFlags, options: PersonalPiStableCliOptions, 
 		workspace_snapshot_provider: (artifacts) => gitSnapshot(project.repo_path, artifacts),
 		existing_task: task,
 	});
-	return success({ task: execution.task, run: execution.run, verification: execution.verification });
+	return success({
+		task: execution.task,
+		run: execution.run,
+		verification: execution.verification,
+		execution_surface: stableExecutionSurface(options),
+	});
 }
 
 async function taskInspect(

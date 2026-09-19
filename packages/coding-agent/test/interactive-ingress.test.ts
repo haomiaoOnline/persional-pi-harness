@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import {
 	createInteractiveIngressForMode,
+	enforceInteractiveIngressBinding,
 	governedInteractiveBusyReason,
 	probeLocalInteractiveWorkerStatus,
 	routeInteractiveSubmission,
@@ -44,6 +45,30 @@ describe("T7.0 interactive ingress routing", () => {
 		const fallback = vi.fn(async () => ({ summary: "raw" }));
 		await routeInteractiveSubmission(undefined, { text: "legacy" }, fallback);
 		expect(fallback).toHaveBeenCalledOnce();
+	});
+
+	test("fails closed and records an unbound execution surface when governed ingress is required", async () => {
+		const fallback = vi.fn(async () => ({ summary: "raw" }));
+		const recordExecutionSurface = vi.fn();
+		const handler = enforceInteractiveIngressBinding(undefined, {
+			required: true,
+			execution_surface: { pph_commit: "commit-fixture", bundle_sha256: "bundle-fixture" },
+			recordExecutionSurface,
+		});
+
+		await expect(routeInteractiveSubmission(handler, { text: "must be governed" }, fallback)).rejects.toThrow(
+			"governed interactive ingress is required but not bound",
+		);
+		expect(fallback).not.toHaveBeenCalled();
+		expect(recordExecutionSurface).toHaveBeenCalledWith({
+			entrypoint: "interactive",
+			pph_commit: "commit-fixture",
+			bundle_sha256: "bundle-fixture",
+			ingress_bound: false,
+			pipeline_bound: false,
+			scheduler_enabled: false,
+			scheduler_kind: "direct",
+		});
 	});
 
 	test.each(["print", "json", "rpc"] as const)("does not construct interactive ingress in %s mode", async (mode) => {
