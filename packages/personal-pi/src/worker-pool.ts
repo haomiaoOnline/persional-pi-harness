@@ -3,6 +3,15 @@ import type { BudgetController, CoordinationBudget } from "./graph-intelligence.
 import { LeaseManager } from "./lease.ts";
 import type { PersistentStateStore } from "./persistence.ts";
 import type { WorkerProcessLifecycle, WorkerProcessSnapshot } from "./process-worker.ts";
+import type { RecoveryManager } from "./recovery.ts";
+import {
+	evaluateResourceParallelism,
+	PsWorkerMemoryMonitor,
+	type ResourceCeiling,
+	type ResourceParallelismDecision,
+	validateResourceCeiling,
+	type WorkerMemoryMonitor,
+} from "./resource-ceiling.ts";
 import { validateResultContract } from "./result.ts";
 import type {
 	Lease,
@@ -62,6 +71,19 @@ export interface WorkerPoolLease {
 	adapter: WorkerAdapter;
 }
 
+export interface WorkerPoolBatchJob {
+	task_id: string;
+	request: WorkerProtocolRequest;
+	preferred_worker_ids?: readonly string[];
+	controls?: WorkerExecutionControls;
+}
+
+export interface WorkerPoolBatchResult {
+	mode: "parallel" | "serial";
+	reason: string;
+	results: ResultContract[];
+}
+
 export class WorkerPoolError extends Error {
 	constructor(message: string) {
 		super(message);
@@ -80,6 +102,18 @@ export class WorkerPoolStaleResultError extends WorkerPoolLeaseConflictError {
 	constructor(message = "REJECTED_STALE_EPOCH") {
 		super(message);
 		this.name = "WorkerPoolStaleResultError";
+	}
+}
+
+export class WorkerPoolMemoryLimitError extends WorkerPoolError {
+	readonly worker_id: string;
+	readonly observed_memory_mb: number;
+
+	constructor(workerId: string, observedMemoryMb: number, limitMb: number) {
+		super(`worker ${workerId} memory ${observedMemoryMb.toFixed(1)}MB exceeded ${limitMb}MB`);
+		this.name = "WorkerPoolMemoryLimitError";
+		this.worker_id = workerId;
+		this.observed_memory_mb = observedMemoryMb;
 	}
 }
 
@@ -176,6 +210,9 @@ export class WorkerPool {
 	private readonly coordinationBudget?: CoordinationBudget;
 	private readonly budgetController?: Pick<BudgetController, "reserveDispatch" | "releaseDispatch">;
 	private readonly instanceStore?: PersistentStateStore;
+	private readonly resourceCeiling?: ResourceCeiling;
+	private readonly memoryMonitor?: WorkerMemoryMonitor;
+	private readonly recoveryManager?: Pick<RecoveryManager, "recover">;
 
 	constructor(
 		options: {
@@ -185,6 +222,9 @@ export class WorkerPool {
 			coordination_budget?: CoordinationBudget;
 			budget_controller?: Pick<BudgetController, "reserveDispatch" | "releaseDispatch">;
 			instance_store?: PersistentStateStore;
+			resource_ceiling?: ResourceCeiling;
+			memory_monitor?: WorkerMemoryMonitor;
+			recovery_manager?: Pick<RecoveryManager, "recover">;
 		} = {},
 	) {
 		this.leaseManager = options.lease_manager ?? new LeaseManager();
@@ -193,6 +233,13 @@ export class WorkerPool {
 		this.coordinationBudget = options.coordination_budget;
 		this.budgetController = options.budget_controller;
 		this.instanceStore = options.instance_store;
+		if (options.resource_ceiling) {
+			const validation = validateResourceCeiling(options.resource_ceiling);
+			if (!validation.valid) throw new WorkerPoolError(`invalid resource_ceiling: ${validation.errors.join("; ")}`);
+			this.resourceCeiling = structuredClone(options.resource_ceiling);
+			this.memoryMonitor = options.memory_monitor ?? new PsWorkerMemoryMonitor();
+		}
+		this.recoveryManager = options.recovery_manager;
 	}
 
 	register(input: WorkerPoolRegistration): WorkerPoolSnapshot {
@@ -241,6 +288,82 @@ export class WorkerPool {
 
 	list(): WorkerPoolSnapshot[] {
 		return [...this.workers.values()].map(cloneSnapshot);
+	}
+
+	planParallelism(requestedWorkers: number, preferredWorkerIds: readonly string[] = []): ResourceParallelismDecision {
+		if (!this.resourceCeiling)
+			return {
+				mode: requestedWorkers > 1 ? "parallel" : "serial",
+				reason: "resource ceiling is not configured",
+			};
+		const candidates = this.candidates(preferredWorkerIds).slice(0, Math.max(0, requestedWorkers));
+		const memory = candidates.map((entry) => {
+			const pid = lifecycleSnapshot(entry)?.pid;
+			return pid && this.memoryMonitor ? this.memoryMonitor.workerMemoryMb(pid) : undefined;
+		});
+		return evaluateResourceParallelism({
+			ceiling: this.resourceCeiling,
+			requested_workers: requestedWorkers,
+			worker_memory_mb: memory,
+		});
+	}
+
+	async executeResourceAwareBatch(jobs: readonly WorkerPoolBatchJob[]): Promise<WorkerPoolBatchResult> {
+		if (jobs.length === 0) return { mode: "serial", reason: "no jobs", results: [] };
+		const requestedWorkers = Math.min(
+			jobs.length,
+			this.workers.size,
+			this.resourceCeiling?.max_parallel_workers ?? Number.POSITIVE_INFINITY,
+		);
+		const decision = this.resourceCeiling
+			? this.planParallelism(requestedWorkers)
+			: {
+					mode: requestedWorkers > 1 ? ("parallel" as const) : ("serial" as const),
+					reason: "resource ceiling is not configured",
+				};
+		if (decision.mode === "serial") {
+			const results: ResultContract[] = [];
+			for (const job of jobs) {
+				const lease = await this.acquireAsync(job.task_id, job.preferred_worker_ids ?? []);
+				try {
+					results.push(await this.execute(lease, this.bindRequestToLease(job.request, lease), job.controls));
+				} finally {
+					this.release(lease);
+				}
+			}
+			return { mode: "serial", reason: decision.reason, results };
+		}
+		const results: ResultContract[] = [];
+		for (let start = 0; start < jobs.length; start += requestedWorkers) {
+			const chunk = jobs.slice(start, start + requestedWorkers);
+			const leases: WorkerPoolLease[] = [];
+			try {
+				for (const job of chunk) leases.push(await this.acquireAsync(job.task_id, job.preferred_worker_ids ?? []));
+				const chunkResults = await Promise.all(
+					chunk.map((job, index) => {
+						const lease = leases[index] as WorkerPoolLease;
+						return this.execute(lease, this.bindRequestToLease(job.request, lease), job.controls);
+					}),
+				);
+				results.push(...chunkResults);
+			} finally {
+				for (const lease of leases) this.release(lease);
+			}
+		}
+		return { mode: "parallel", reason: decision.reason, results };
+	}
+
+	private bindRequestToLease(request: WorkerProtocolRequest, lease: WorkerPoolLease): WorkerProtocolRequest {
+		if (request.task.id !== lease.task_id)
+			throw new WorkerPoolError(`batch request task mismatch: ${request.task.id} != ${lease.task_id}`);
+		return {
+			...request,
+			protocol: {
+				...request.protocol,
+				task_id: lease.task_id,
+				lease_epoch: lease.lease.lease_epoch,
+			},
+		};
 	}
 
 	warm(workerId: string): WorkerPoolSnapshot {
@@ -372,7 +495,10 @@ export class WorkerPool {
 				}
 			: undefined;
 		try {
-			const result = await poolLease.adapter.execute(request, scopedControls);
+			const execution = poolLease.adapter.execute(request, scopedControls);
+			const result = this.resourceCeiling
+				? await this.executeWithMemoryGuard(entry, poolLease, execution)
+				: await execution;
 			const validation = validateResultContract(result);
 			if (!validation.valid || !validation.value)
 				throw new WorkerPoolError(`worker returned malformed Result: ${validation.errors.join("; ")}`);
@@ -542,6 +668,11 @@ export class WorkerPool {
 
 	private reserveCoordination(taskId: string): void {
 		const activeWorkers = this.workerLeases.size + 1;
+		if (this.resourceCeiling && activeWorkers > 1) {
+			const resourceDecision = this.planParallelism(activeWorkers);
+			if (resourceDecision.mode === "serial")
+				throw new WorkerPoolLeaseConflictError(`resource pressure: ${resourceDecision.reason}`);
+		}
 		if (this.coordinationBudget) {
 			if (activeWorkers > this.coordinationBudget.max_active_workers)
 				throw new WorkerPoolLeaseConflictError("coordination budget max_active_workers exceeded");
@@ -553,6 +684,54 @@ export class WorkerPool {
 
 	private releaseCoordination(_entry: WorkerPoolEntry, taskId: string): void {
 		this.budgetController?.releaseDispatch(taskId, this.workerLeases.size, this.workerLeases.size);
+	}
+
+	private async executeWithMemoryGuard(
+		entry: WorkerPoolEntry,
+		poolLease: WorkerPoolLease,
+		execution: Promise<ResultContract>,
+	): Promise<ResultContract> {
+		const ceiling = this.resourceCeiling;
+		const monitor = this.memoryMonitor;
+		const pid = lifecycleSnapshot(entry)?.pid;
+		if (!ceiling || !monitor || !pid) return execution;
+		let timer: NodeJS.Timeout | undefined;
+		let cancelled = false;
+		const pressure = new Promise<{ memory_mb: number }>((resolve) => {
+			const check = () => {
+				if (cancelled) return;
+				const memoryMb = monitor.workerMemoryMb(pid);
+				if (memoryMb !== undefined && memoryMb > ceiling.max_memory_mb_per_worker) {
+					resolve({ memory_mb: memoryMb });
+					return;
+				}
+				timer = setTimeout(check, 20);
+			};
+			check();
+		});
+		const outcome = await Promise.race([
+			execution.then((result) => ({ kind: "result" as const, result })),
+			pressure.then((sample) => ({ kind: "memory" as const, sample })),
+		]);
+		cancelled = true;
+		if (timer) clearTimeout(timer);
+		if (outcome.kind === "result") return outcome.result;
+		void execution.catch(() => undefined);
+		const reason = `resource ceiling exceeded: worker_memory_mb=${outcome.sample.memory_mb.toFixed(1)}`;
+		await entry.lifecycle?.crash();
+		await this.reclaim(poolLease, reason);
+		this.recoveryManager?.recover({
+			task_id: poolLease.task_id,
+			fault: "crash",
+			worker_id: poolLease.worker_id,
+			reason,
+			at: new Date(this.now()).toISOString(),
+		});
+		throw new WorkerPoolMemoryLimitError(
+			poolLease.worker_id,
+			outcome.sample.memory_mb,
+			ceiling.max_memory_mb_per_worker,
+		);
 	}
 
 	private applyProcessSnapshot(entry: WorkerPoolEntry, snapshot: WorkerProcessSnapshot): void {

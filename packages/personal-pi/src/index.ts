@@ -42,6 +42,7 @@ export * from "./readonly-state.ts";
 export * from "./recipes.ts";
 export * from "./recovery.ts";
 export * from "./registry.ts";
+export * from "./resource-ceiling.ts";
 export * from "./result.ts";
 export * from "./roles.ts";
 export * from "./routines.ts";
