@@ -370,6 +370,45 @@ describe("T7.1 complete Personal PI pipeline", () => {
 		expect(store.getLoopUsage(task.id)).toMatchObject({ attempts: 1, model_calls: 2 });
 		expect(store.read().results[0]?.errors.join(" ")).toContain("max_model_calls");
 	});
+
+	test("records structured provider backpressure wait in Trace without model-generated sleep", async () => {
+		const task = makeTask("e2e-backpressure-trace");
+		const execution = await new PersonalPiPipeline().execute({
+			...planFor(task),
+			requirement: requirement(),
+			task,
+			worker: new PiWorker("pi-backpressure", ({ loop_budget }) => {
+				loop_budget?.observeBackpressure?.({
+					scope: "provider",
+					source: "provider-fixture",
+					action: "QUEUE",
+					wait_ms: 750,
+					reason: "Retry-After",
+				});
+				return {
+					status: "success",
+					summary: "continued after scheduler-managed admission",
+					evidence: ["worker_result"],
+					work_receipt: legalNoOpReceipt(),
+				};
+			}),
+			worker_status: AVAILABLE_WORKER_STATUS,
+			snapshot: captureWorkspaceSnapshot("backpressure-trace", [], []),
+		});
+
+		expect(execution.trace.events).toContainEqual(
+			expect.objectContaining({
+				stage: "WORKER",
+				detail: "backpressure:provider:provider-fixture",
+				fields: expect.objectContaining({
+					backpressure_scope: "provider",
+					backpressure_source: "provider-fixture",
+					backpressure_wait_ms: 750,
+					backpressure_action: "QUEUE",
+				}),
+			}),
+		);
+	});
 });
 
 describe("T7.2 self-development", () => {

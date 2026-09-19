@@ -32,19 +32,20 @@ describe("T12.6 Provider Quota / Backpressure / Circuit Breaker", () => {
 
 		expect(controller.admit("primary", { at: 1_000 }).action).toBe("ALLOW");
 		controller.recordResponse("primary", 429, 1_001);
-		expect(controller.admit("primary", { at: 1_002 }).action).toBe("ALLOW");
-		controller.recordResponse("primary", 500, 1_003);
+		expect(controller.admit("primary", { at: 1_002 }).action).toBe("QUEUE");
+		expect(controller.admit("primary", { at: 2_002 }).action).toBe("ALLOW");
+		controller.recordResponse("primary", 500, 2_003);
 		expect(controller.status("primary").state).toBe("OPEN");
 
-		const fallback = controller.admit("primary", { fallback_provider_id: "backup", at: 1_100 });
+		const fallback = controller.admit("primary", { fallback_provider_id: "backup", at: 2_100 });
 		expect(fallback.action).toBe("FALLBACK");
 		expect(fallback.provider_id).toBe("backup");
 		expect(fallback.fallback_from).toBe("primary");
 
-		const probe = controller.admit("primary", { at: 2_004 });
+		const probe = controller.admit("primary", { at: 4_004 });
 		expect(probe.action).toBe("ALLOW");
 		expect(controller.status("primary").state).toBe("HALF_OPEN");
-		controller.recordResponse("primary", 200, 2_005);
+		controller.recordResponse("primary", 200, 4_005);
 		expect(controller.status("primary").state).toBe("CLOSED");
 	});
 
@@ -56,6 +57,6 @@ describe("T12.6 Provider Quota / Backpressure / Circuit Breaker", () => {
 		const queued = controller.enqueue("queued-request", "primary", { at: 1_100 });
 		expect(queued.action).toBe("QUEUE");
 		expect(controller.drain(1_200)).toEqual([]);
-		expect(controller.drain(1_600)).toHaveLength(1);
+		expect(controller.drain(2_100)).toHaveLength(1);
 	});
 });

@@ -3,6 +3,12 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 import type { ArtifactStore } from "./artifacts.ts";
 import type {
+	BackpressureAdmission,
+	BackpressureKey,
+	BackpressureSignal,
+	ExecutionBackpressureController,
+} from "./backpressure.ts";
+import type {
 	CommandEvidence,
 	JsonValue,
 	ToolArtifactPage,
@@ -19,6 +25,8 @@ const MAX_PAGE_CHARS = 16_000;
 const SEARCH_RESULT_COUNT_LIMIT = 20;
 const SEARCH_RESULT_BYTE_LIMIT = 2_048;
 const CURSOR_PREFIX = "tool-output:";
+const SECRET_ASSIGNMENT =
+	/((?:^|[\s,{;])(?:[A-Z0-9_]*(?:TOKEN|API[_-]?KEY|ACCESS[_-]?KEY|SECRET|PASSWORD|COOKIE|AUTHORIZATION)[A-Z0-9_]*|[A-Z0-9_]+_KEY)\s*[:=]\s*)[^\s,;}]+/gim;
 
 const ToolResultStatusSchema = Type.Union([
 	Type.Literal("success"),
@@ -63,7 +71,7 @@ function containsSensitiveInfo(value: string): boolean {
 	return (
 		/-----BEGIN [^-\n]*PRIVATE KEY-----/i.test(value) ||
 		/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/i.test(value) ||
-		/\b(?:api[_-]?key|token|password|secret)\s*[:=]\s*[^\s]{6,}/i.test(value)
+		new RegExp(SECRET_ASSIGNMENT.source, "im").test(value)
 	);
 }
 
@@ -71,7 +79,7 @@ function redactSensitive(value: string): string {
 	return value
 		.replace(/-----BEGIN [^-\n]*PRIVATE KEY-----[\s\S]*?-----END [^-\n]*PRIVATE KEY-----/gi, "[REDACTED PRIVATE KEY]")
 		.replace(/(\bBearer\s+)[A-Za-z0-9._~+/=-]{12,}/gi, "$1[REDACTED]")
-		.replace(/(\b(?:api[_-]?key|token|password|secret)\s*[:=]\s*)[^\s]+/gi, "$1[REDACTED]");
+		.replace(SECRET_ASSIGNMENT, "$1[REDACTED]");
 }
 
 function limitText(value: string, maxChars: number): { text: string; truncated: boolean } {
@@ -342,6 +350,7 @@ export interface ToolGatewayOptions {
 	now?: () => string;
 	clock_ms?: () => number;
 	page_chars?: number;
+	backpressure_controller?: ExecutionBackpressureController;
 }
 
 export interface ToolGatewayWrapInput {
@@ -378,12 +387,37 @@ export class ToolGateway {
 	private readonly clockMs: () => number;
 	private readonly pageChars: number;
 	private readonly previousErrors = new Map<string, string>();
+	private readonly backpressure?: ExecutionBackpressureController;
 
 	constructor(options: ToolGatewayOptions) {
 		this.artifactStore = options.artifact_store;
 		this.now = options.now ?? (() => new Date().toISOString());
 		this.clockMs = options.clock_ms ?? (() => Date.now());
 		this.pageChars = Math.max(1, Math.min(options.page_chars ?? DEFAULT_PAGE_CHARS, MAX_PAGE_CHARS));
+		this.backpressure = options.backpressure_controller;
+	}
+
+	admitBackpressure(input: BackpressureKey, at = this.clockMs()): BackpressureAdmission {
+		return (
+			this.backpressure?.admit(input, at) ?? {
+				...input,
+				action: "ALLOW",
+				wait_ms: 0,
+				reason: "no backpressure controller",
+			}
+		);
+	}
+
+	reportBackpressure(input: BackpressureSignal): BackpressureAdmission {
+		return (
+			this.backpressure?.report(input) ?? {
+				scope: input.scope,
+				key: input.key,
+				action: "ALLOW",
+				wait_ms: 0,
+				reason: "no backpressure controller",
+			}
+		);
 	}
 
 	hasDurableArchive(): boolean {
@@ -498,8 +532,21 @@ export class ToolGateway {
 		runner: (command: string) => Promise<CommandEvidence> | CommandEvidence;
 		output_kind?: ToolOutputKind;
 		captured_at?: string;
+		backpressure_key?: BackpressureKey;
 	}): Promise<ToolGatewayExecution> {
 		this.assertDurableArchive();
+		if (input.backpressure_key) {
+			const admission = this.admitBackpressure(input.backpressure_key);
+			if (admission.action === "QUEUE") {
+				return this.createBlockedCommand({
+					command: input.command,
+					task_id: input.task_id,
+					task_revision: input.task_revision,
+					reason: `backpressure queued ${admission.scope}:${admission.key}; wait_ms=${admission.wait_ms}`,
+					captured_at: input.captured_at,
+				});
+			}
+		}
 		const started = this.clockMs();
 		try {
 			const raw = await input.runner(input.command);

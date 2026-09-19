@@ -1,6 +1,7 @@
 export type ProviderCircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 export type ProviderAdmissionAction = "ALLOW" | "QUEUE" | "FALLBACK";
 
+import { ExecutionBackpressureController } from "./backpressure.ts";
 import { createModelIdentity } from "./result.ts";
 import type { ModelIdentity, ResultContract, WorkerExecutionControls, WorkerProtocolRequest } from "./types.ts";
 import type { WorkerAdapter } from "./worker.ts";
@@ -22,6 +23,7 @@ export interface ProviderAdmission {
 	fallback_from?: string;
 	reason: string;
 	queue_depth: number;
+	backpressure_wait_ms: number;
 }
 
 export interface ProviderResilienceSnapshot {
@@ -64,6 +66,11 @@ function isRetryableProviderFailure(status: number): boolean {
 export class ProviderResilienceController {
 	private readonly providers = new Map<string, ProviderState>();
 	private readonly pending: QueuedRequest[] = [];
+	private readonly backpressure: ExecutionBackpressureController;
+
+	constructor(options: { backpressure?: ExecutionBackpressureController } = {}) {
+		this.backpressure = options.backpressure ?? new ExecutionBackpressureController();
+	}
 
 	register(config: ProviderResilienceConfig): ProviderResilienceSnapshot {
 		if (this.providers.has(config.provider_id))
@@ -88,8 +95,46 @@ export class ProviderResilienceController {
 
 	admit(providerId: string, options: { fallback_provider_id?: string; at?: number } = {}): ProviderAdmission {
 		const at = options.at ?? Date.now();
+		const external = this.backpressure.admit({ scope: "provider", key: providerId }, at);
+		if (external.action === "QUEUE") {
+			if (!options.fallback_provider_id)
+				return {
+					action: "QUEUE",
+					provider_id: providerId,
+					reason: external.reason,
+					queue_depth: this.pending.length,
+					backpressure_wait_ms: external.wait_ms,
+				};
+			const fallbackExternal = this.backpressure.admit({ scope: "provider", key: options.fallback_provider_id }, at);
+			if (fallbackExternal.action === "ALLOW") {
+				const fallback = this.tryAdmit(options.fallback_provider_id, at);
+				if (fallback.action === "ALLOW")
+					return {
+						action: "FALLBACK",
+						provider_id: fallback.provider_id,
+						fallback_from: providerId,
+						reason: `${providerId} unavailable: ${external.reason}`,
+						queue_depth: this.pending.length,
+						backpressure_wait_ms: 0,
+					};
+			}
+			return {
+				action: "QUEUE",
+				provider_id: providerId,
+				reason: `${external.reason}; fallback ${options.fallback_provider_id} unavailable`,
+				queue_depth: this.pending.length,
+				backpressure_wait_ms: external.wait_ms,
+			};
+		}
 		const primary = this.tryAdmit(providerId, at);
 		if (primary.action === "ALLOW" || !options.fallback_provider_id) return primary;
+		const fallbackExternal = this.backpressure.admit({ scope: "provider", key: options.fallback_provider_id }, at);
+		if (fallbackExternal.action === "QUEUE")
+			return {
+				...primary,
+				reason: `${primary.reason}; fallback ${fallbackExternal.reason}`,
+				backpressure_wait_ms: fallbackExternal.wait_ms,
+			};
 		const fallback = this.tryAdmit(options.fallback_provider_id, at);
 		if (fallback.action === "ALLOW") {
 			return {
@@ -98,6 +143,7 @@ export class ProviderResilienceController {
 				fallback_from: providerId,
 				reason: `${providerId} unavailable: ${primary.reason}`,
 				queue_depth: this.pending.length,
+				backpressure_wait_ms: fallback.backpressure_wait_ms,
 			};
 		}
 		return {
@@ -138,7 +184,19 @@ export class ProviderResilienceController {
 		return admitted;
 	}
 
-	recordResponse(providerId: string, status: number, at = Date.now()): ProviderResilienceSnapshot {
+	recordResponse(
+		providerId: string,
+		status: number,
+		at = Date.now(),
+		retryAfterMs?: number,
+	): ProviderResilienceSnapshot {
+		this.backpressure.report({
+			scope: "provider",
+			key: providerId,
+			status,
+			retry_after_ms: retryAfterMs,
+			at,
+		});
 		const state = this.requireProvider(providerId);
 		if (state.state === "HALF_OPEN") {
 			state.probe_in_flight = false;
@@ -186,11 +244,18 @@ export class ProviderResilienceController {
 			provider_id: providerId,
 			reason: "provider admitted",
 			queue_depth: this.pending.length,
+			backpressure_wait_ms: 0,
 		};
 	}
 
 	private blocked(providerId: string, reason: string): ProviderAdmission {
-		return { action: "QUEUE", provider_id: providerId, reason, queue_depth: this.pending.length };
+		return {
+			action: "QUEUE",
+			provider_id: providerId,
+			reason,
+			queue_depth: this.pending.length,
+			backpressure_wait_ms: 0,
+		};
 	}
 
 	private open(state: ProviderState, at: number): void {
@@ -259,6 +324,7 @@ function providerAdmissionFailure(
 		evidence: [
 			`${admission.provider_id}:admission=QUEUE`,
 			`${admission.provider_id}:queue_depth=${admission.queue_depth}`,
+			`${admission.provider_id}:backpressure_wait_ms=${admission.backpressure_wait_ms}`,
 		],
 		errors: [`provider backpressure: ${admission.reason}`],
 		model_identity: createModelIdentity(requestedModel),
@@ -303,6 +369,13 @@ export class ProviderResilientWorkerAdapter implements WorkerAdapter {
 		const admission = this.controller.admit(this.provider_id, {
 			fallback_provider_id: this.fallbackProviderId,
 		});
+		controls?.observeBackpressure?.({
+			scope: "provider",
+			source: admission.provider_id,
+			action: admission.action === "QUEUE" ? "QUEUE" : "ALLOW",
+			wait_ms: admission.backpressure_wait_ms,
+			reason: admission.reason,
+		});
 		if (admission.action === "QUEUE")
 			return providerAdmissionFailure(request, this.worker_id, this.requested_model, admission);
 		try {
@@ -314,6 +387,7 @@ export class ProviderResilientWorkerAdapter implements WorkerAdapter {
 					...result.evidence,
 					`${admission.provider_id}:admission=${admission.action}`,
 					`${admission.provider_id}:queue_depth=${admission.queue_depth}`,
+					`${admission.provider_id}:backpressure_wait_ms=${admission.backpressure_wait_ms}`,
 				],
 			};
 		} catch (error) {
